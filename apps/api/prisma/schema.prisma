@@ -1,0 +1,386 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  parent
+  student
+  tutor
+  expert
+  operator
+  part_timer
+}
+
+enum DeviceMode {
+  rental
+  sale
+}
+
+enum TaskType {
+  individual
+  group
+  check_in
+  competition
+  collect
+  qa
+  survey
+  creation
+}
+
+enum TaskStatus {
+  draft
+  published
+  in_progress
+  submitted
+  scored
+}
+
+enum WorkType {
+  text
+  image
+  audio
+  single_choice
+  multiple_choice
+  boolean
+}
+
+enum ScoringStatus {
+  pending
+  ai_suggested
+  confirmed
+}
+
+enum ReportStatus {
+  draft
+  generated
+  published
+}
+
+enum MessageType {
+  system
+  team_broadcast
+  group_broadcast
+  direct
+}
+
+model User {
+  id                String          @id @default(cuid())
+  account           String          @unique
+  passwordHash      String
+  role              UserRole
+  displayName       String
+  phone             String?         @unique
+  studentProfile    StudentProfile?
+  primaryChildren   StudentProfile[] @relation("PrimaryParent")
+  organizationLinks OrganizationMember[]
+  sentMessages      Message[]       @relation("MessageSender")
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+}
+
+model StudentProfile {
+  id                    String                  @id @default(cuid())
+  userId                String                  @unique
+  primaryParentUserId   String?
+  name                  String
+  city                  String?
+  school                String?
+  grade                 String?
+  avatarUrl             String?
+  birthDate             DateTime?
+  user                  User                    @relation(fields: [userId], references: [id])
+  primaryParent         User?                   @relation("PrimaryParent", fields: [primaryParentUserId], references: [id])
+  deviceBindings        DeviceBinding[]
+  teamMembers           TeamMember[]
+  tasks                 Task[]
+  works                 Work[]
+  scores                ScoreRecord[]
+  reports               Report[]
+  capabilityIndexRecords CapabilityIndexRecord[]
+  growthValueRecords    GrowthValueRecord[]
+  aiRecords             AiRecord[]
+  uploadedFiles         FileAsset[]
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+}
+
+model Organization {
+  id          String               @id @default(cuid())
+  name        String
+  type        String
+  city        String?
+  contactName String?
+  contactPhone String?
+  members     OrganizationMember[]
+  teams       Team[]
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+}
+
+model OrganizationMember {
+  id             String        @id @default(cuid())
+  organizationId String
+  userId         String
+  title          String?
+  organization   Organization  @relation(fields: [organizationId], references: [id])
+  user           User          @relation(fields: [userId], references: [id])
+  createdAt      DateTime      @default(now())
+
+  @@unique([organizationId, userId])
+}
+
+model Device {
+  id            String         @id @default(cuid())
+  deviceCode    String         @unique
+  serialNumber  String?        @unique
+  mode          DeviceMode
+  platform      String         @default("android")
+  isActive      Boolean        @default(true)
+  bindings      DeviceBinding[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model DeviceBinding {
+  id         String         @id @default(cuid())
+  deviceId   String
+  studentId  String
+  boundAt    DateTime       @default(now())
+  unboundAt  DateTime?
+  device     Device         @relation(fields: [deviceId], references: [id])
+  student    StudentProfile @relation(fields: [studentId], references: [id])
+
+  @@index([deviceId, studentId])
+}
+
+model Team {
+  id             String       @id @default(cuid())
+  organizationId String?
+  name           String
+  startDate      DateTime
+  endDate        DateTime?
+  status         String       @default("draft")
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  groups         Group[]
+  members        TeamMember[]
+  tasks          Task[]
+  reports        Report[]
+  messages       Message[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+model Group {
+  id         String       @id @default(cuid())
+  teamId     String
+  name       String
+  badgeUrl   String?
+  team       Team         @relation(fields: [teamId], references: [id])
+  members    TeamMember[]
+  tasks      Task[]
+  works      Work[]
+  scores     ScoreRecord[]
+  messages   Message[]
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+}
+
+model TeamMember {
+  id         String         @id @default(cuid())
+  teamId      String
+  studentId   String
+  groupId     String?
+  roleName    String?
+  team        Team          @relation(fields: [teamId], references: [id])
+  group       Group?        @relation(fields: [groupId], references: [id])
+  student     StudentProfile @relation(fields: [studentId], references: [id])
+  createdAt   DateTime      @default(now())
+
+  @@unique([teamId, studentId])
+}
+
+model TaskTemplate {
+  id                   String   @id @default(cuid())
+  title                String
+  description          String
+  taskType             TaskType
+  requirementTemplate  Json?
+  abilityTags          String[]
+  tasks                Task[]
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model Task {
+  id          String        @id @default(cuid())
+  teamId       String?
+  groupId      String?
+  studentId    String?
+  templateId   String?
+  title        String
+  description  String
+  taskType     TaskType
+  status       TaskStatus   @default(draft)
+  dueAt        DateTime?
+  team         Team?        @relation(fields: [teamId], references: [id])
+  group        Group?       @relation(fields: [groupId], references: [id])
+  student      StudentProfile? @relation(fields: [studentId], references: [id])
+  template     TaskTemplate? @relation(fields: [templateId], references: [id])
+  works        Work[]
+  scores       ScoreRecord[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+model Work {
+  id          String         @id @default(cuid())
+  taskId       String
+  studentId    String?
+  groupId      String?
+  type         WorkType
+  content      String
+  attachments  Json?
+  submittedAt  DateTime      @default(now())
+  task         Task          @relation(fields: [taskId], references: [id])
+  student      StudentProfile? @relation(fields: [studentId], references: [id])
+  group        Group?        @relation(fields: [groupId], references: [id])
+  scores       ScoreRecord[]
+}
+
+model ScoreRecord {
+  id           String         @id @default(cuid())
+  taskId        String
+  workId        String?
+  studentId     String?
+  groupId       String?
+  status        ScoringStatus @default(pending)
+  aiScore       Float?
+  tutorScore    Float?
+  comment       String?
+  task          Task          @relation(fields: [taskId], references: [id])
+  work          Work?         @relation(fields: [workId], references: [id])
+  student       StudentProfile? @relation(fields: [studentId], references: [id])
+  group         Group?        @relation(fields: [groupId], references: [id])
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model Report {
+  id          String         @id @default(cuid())
+  studentId    String
+  teamId       String?
+  title        String
+  status       ReportStatus  @default(draft)
+  summary      Json?
+  publishedAt  DateTime?
+  student      StudentProfile @relation(fields: [studentId], references: [id])
+  team         Team?         @relation(fields: [teamId], references: [id])
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model CapabilityIndexRecord {
+  id           String         @id @default(cuid())
+  studentId     String
+  elementKey    String
+  source        String
+  score         Float
+  recordedAt    DateTime      @default(now())
+  student       StudentProfile @relation(fields: [studentId], references: [id])
+}
+
+model GrowthValueRecord {
+  id           String         @id @default(cuid())
+  studentId     String
+  sourceType    String
+  delta         Int
+  description   String
+  occurredAt    DateTime      @default(now())
+  student       StudentProfile @relation(fields: [studentId], references: [id])
+}
+
+model Course {
+  id           String   @id @default(cuid())
+  title        String
+  summary      String
+  format       String
+  status       String   @default("draft")
+  expertUserId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model KnowledgeItem {
+  id           String   @id @default(cuid())
+  title        String
+  category     String
+  content      String
+  expertUserId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Challenge {
+  id           String   @id @default(cuid())
+  title        String
+  summary      String
+  detail       String
+  difficulty   String
+  status       String   @default("draft")
+  expertUserId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model News {
+  id          String    @id @default(cuid())
+  title       String
+  summary     String
+  content     String
+  category    String
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Message {
+  id           String       @id @default(cuid())
+  type         MessageType
+  title        String
+  content      String
+  senderUserId String?
+  teamId       String?
+  groupId      String?
+  sender       User?        @relation("MessageSender", fields: [senderUserId], references: [id])
+  team         Team?        @relation(fields: [teamId], references: [id])
+  group        Group?       @relation(fields: [groupId], references: [id])
+  createdAt    DateTime     @default(now())
+}
+
+model AiRecord {
+  id          String         @id @default(cuid())
+  studentId   String
+  scene       String
+  title       String
+  summary     String
+  createdAt   DateTime       @default(now())
+  student     StudentProfile @relation(fields: [studentId], references: [id])
+}
+
+model FileAsset {
+  id          String         @id @default(cuid())
+  studentId   String?
+  fileName    String
+  originalName String
+  mimeType    String
+  size        Int
+  storagePath String
+  publicUrl   String
+  createdAt   DateTime       @default(now())
+  student     StudentProfile? @relation(fields: [studentId], references: [id])
+}

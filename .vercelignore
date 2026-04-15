@@ -1,0 +1,22 @@
+.DS_Store
+
+# Local dependencies and build caches should be rebuilt by Vercel.
+node_modules
+**/node_modules
+.next
+**/.next
+.turbo
+**/.turbo
+dist
+**/dist
+coverage
+**/coverage
+
+# Local-only files.
+.vercel
+.env
+.env.local
+.env.*.local
+*.log
+tmp
+docs
