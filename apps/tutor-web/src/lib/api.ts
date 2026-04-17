@@ -2,22 +2,24 @@
 
 export const TUTOR_STORAGE_KEY = 'yanxuebao_tutor_session';
 
-export type WebSession = {
-  accessToken: string;
-  refreshToken: string;
-  role: string;
-  user: {
-    id: string;
-    account: string;
-    displayName: string;
-    role: string;
-    studentId?: string;
-  };
+export type TutorSession = {
+  id: string;
+  account: string;
+  displayName: string;
+  role: 'tutor';
+  organizationName: string;
+  avatar: string;
 };
 
-export function getApiBaseUrl() {
-  return `${process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001'}/api`;
-}
+export const tutorDemoSession: TutorSession = {
+  id: 'tutor_demo_user',
+  account: 'tutor_demo',
+  displayName: '李老师',
+  role: 'tutor',
+  organizationName: '南山实验学校研学中心',
+  avatar:
+    'https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=320&q=80',
+};
 
 export function getStoredSession() {
   if (typeof window === 'undefined') {
@@ -25,10 +27,10 @@ export function getStoredSession() {
   }
 
   const raw = window.sessionStorage.getItem(TUTOR_STORAGE_KEY);
-  return raw ? (JSON.parse(raw) as WebSession) : null;
+  return raw ? (JSON.parse(raw) as TutorSession) : null;
 }
 
-export function storeSession(session: WebSession) {
+export function storeSession(session: TutorSession) {
   if (typeof window !== 'undefined') {
     window.sessionStorage.setItem(TUTOR_STORAGE_KEY, JSON.stringify(session));
   }
@@ -40,101 +42,13 @@ export function clearSession() {
   }
 }
 
-async function parseResponse<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    const message = await response.text();
-    throw new Error(message || 'Request failed');
+export async function mockLogin(account: string, password: string) {
+  await new Promise((resolve) => setTimeout(resolve, 300));
+
+  if (account !== 'tutor_demo' || password !== 'Yanxuebao@2026') {
+    throw new Error('账号或密码错误，请使用演示账号登录');
   }
 
-  const payload = (await response.json()) as T | { items: T[] };
-
-  if (
-    payload &&
-    typeof payload === 'object' &&
-    'items' in payload &&
-    Array.isArray((payload as { items: unknown[] }).items)
-  ) {
-    return (payload as { items: T }).items;
-  }
-
-  return payload as T;
-}
-
-async function refreshSession(current: WebSession) {
-  const response = await fetch(`${getApiBaseUrl()}/auth/refresh`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      refreshToken: current.refreshToken,
-    }),
-  });
-
-  if (!response.ok) {
-    clearSession();
-    throw new Error('登录已失效，请重新登录');
-  }
-
-  const nextSession = (await response.json()) as WebSession;
-  storeSession(nextSession);
-  return nextSession;
-}
-
-export async function apiFetch<T>(path: string, init?: RequestInit, retried = false): Promise<T> {
-  const session = getStoredSession();
-  const response = await fetch(`${getApiBaseUrl()}${path}`, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(session?.accessToken ? { Authorization: `Bearer ${session.accessToken}` } : {}),
-      ...(init?.headers ?? {}),
-    },
-  });
-
-  if (response.status === 401 && session?.refreshToken && !retried) {
-    const nextSession = await refreshSession(session);
-    return apiFetch<T>(
-      path,
-      {
-        ...init,
-        headers: {
-          ...(init?.headers ?? {}),
-          Authorization: `Bearer ${nextSession.accessToken}`,
-        },
-      },
-      true,
-    );
-  }
-
-  return parseResponse<T>(response);
-}
-
-export async function uploadFile<T = { file: { publicUrl: string; originalName: string; mimeType: string } }>(
-  file: File,
-  extra?: Record<string, string>,
-  retried = false,
-): Promise<T> {
-  const session = getStoredSession();
-  const formData = new FormData();
-  formData.append('file', file);
-
-  Object.entries(extra ?? {}).forEach(([key, value]) => {
-    formData.append(key, value);
-  });
-
-  const response = await fetch(`${getApiBaseUrl()}/files/upload`, {
-    method: 'POST',
-    headers: {
-      ...(session?.accessToken ? { Authorization: `Bearer ${session.accessToken}` } : {}),
-    },
-    body: formData,
-  });
-
-  if (response.status === 401 && session?.refreshToken && !retried) {
-    await refreshSession(session);
-    return uploadFile<T>(file, extra, true);
-  }
-
-  return parseResponse<T>(response);
+  storeSession(tutorDemoSession);
+  return tutorDemoSession;
 }
