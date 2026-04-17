@@ -1,8 +1,35 @@
 # 研学宝 V1 Monorepo
 
-本仓库承载研学宝 V1 的正式研发与设备端 Demo 验证，当前已进入 `V1 Alpha` 阶段，支持设备端 Demo 开箱直达、五端联调与 API 持久化优先运行。设备端当前重点按“手表设备交互”去做高保真演示，而不是普通 H5 页面堆叠。
+本仓库承载研学宝 V1 的多端研发，当前已包含设备端 Demo 与导师端 H5 原型。导师端现阶段按移动端 H5 工作台重构，采用纯前端本地 mock 方案，主要用于和业务部门对齐产品流程、页面结构与交互。
 
-## 先看设备端 Demo
+## 先看导师端 H5
+
+### 一条命令启动
+
+```bash
+pnpm install
+pnpm tutor
+```
+
+### 直达地址
+
+- 导师端登录页：`http://localhost:3106/login`
+- 导师端工作台：`http://localhost:3106/dashboard`
+- 团队列表：`http://localhost:3106/teams`
+
+### 当前导师端范围
+
+- 底部一级导航：工作台、团队、任务、我的
+- 工作台：当前团队卡片、快捷菜单、学员任务信息、小组任务信息、TAB 工作区
+- 团队域：团队列表、团队详情、学生管理、小组管理、助理管理、资料管理、任务作品
+- 任务域：学员任务、小组任务、历史复制、任务排序
+- 其他页面：广播、排行、研学报告、照片管理、安全中心
+
+### 导师端文档
+
+- 产品文档：`docs/tutor-mobile-prd.md`
+
+## 再看设备端 Demo
 
 ### 一条命令启动
 
@@ -55,6 +82,7 @@ pnpm dev:device-demo
 - API 鉴权、角色守卫、学员/设备、团队/任务、作品/评分、报告/成长、内容供给、消息与 AI 记录接口
 - 运营后台首批正式能力：登录、机构、任务模板、题库、库存
 - 导师端首批正式能力：登录、团队、小组、任务、评分、报告
+- 导师端 H5 重构版：移动端工作台、团队总控页、团队级管理页、任务作品查看、本地 mock 可操作原型
 - 家长端首批正式能力：登录、学员管理、设备绑定、能力成长、家庭任务、AI 记录
 - 专家端首批正式能力：登录、课程、知识库、挑战、资讯
 - 设备端正式基础能力：授权码登录、首页、团队、任务、成长、AI、我的、SoS
@@ -63,7 +91,7 @@ pnpm dev:device-demo
 - 设备端演示增强页：演示级能力总览、真机待对接能力清单、社交 / 会议 / 朋友圈 / 支付 / 网盘 / AI 创作页
 - 设备端首页 / 任务 / 成长 / AI 已补动态状态与演示反馈
 - 设备端 `device bridge` 占位层：已接入人脸登录演示与 SoS 定位演示
-- 根级快捷启动脚本：`pnpm dev:api`、`pnpm dev:device`、`pnpm dev:device-demo`
+- 根级快捷启动脚本：`pnpm tutor`、`pnpm tutor:build`、`pnpm dev:api`、`pnpm dev:device`、`pnpm dev:device-demo`
 - 全仓 `pnpm check`
 - API 与业务烟测脚本：`pnpm smoke:test`
 - API 数据层已切到 `Prisma 优先、DemoDataService 回退`
@@ -96,6 +124,18 @@ pnpm dev:device-demo
 
 ```bash
 pnpm dev
+```
+
+### 单独启动导师端
+
+```bash
+pnpm tutor
+```
+
+### 构建导师端
+
+```bash
+pnpm tutor:build
 ```
 
 ### 单独启动 API
@@ -135,3 +175,4 @@ pnpm check
 - `docs/module-owners.md`
 - `docs/smoke-test-report.md`
 - `docs/hardware-readiness.md`
+- `docs/tutor-mobile-prd.md`
