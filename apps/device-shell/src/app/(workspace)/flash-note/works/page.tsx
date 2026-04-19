@@ -1,35 +1,58 @@
 'use client';
 
-import { Typography } from 'antd';
+import { Button, Tag, Typography } from 'antd';
 import Link from 'next/link';
-import { demoFlashWorks } from '../../../../lib/device-demo-data';
-import { WatchHero, WatchSection, WatchActionButtons, WatchNextSteps } from '../../../../lib/watch-ui';
+import { useEffect, useState } from 'react';
+import { getFlashNoteMeta, getFlashNoteSummary, getFlashNotes, getFlashNoteTypeLabel, type FlashNoteItem } from '../../../../lib/flash-notes';
 
 const { Paragraph } = Typography;
 
 export default function DeviceFlashWorksPage() {
+  const [notes, setNotes] = useState<FlashNoteItem[]>([]);
+
+  useEffect(() => {
+    setNotes(getFlashNotes());
+  }, []);
+
   return (
     <div className="device-page-stack">
-      <WatchHero title="闪记作品" subtitle="查看语音闪记和视频闪记。" />
-      <WatchSection title="作品列表">
+      <div className="device-hero-card device-stage-card" style={{ padding: 12 }}>
+        <p className="device-page-title">闪记作品</p>
+        <p className="device-page-subtle">统一查看语音闪记和视频闪记，供任务引用和回看。</p>
+      </div>
+
+      <div className="device-compact-card">
+        <p className="device-section-label">作品列表</p>
         <div className="device-mini-list">
-          {demoFlashWorks.map((item) => (
-            <Link key={item.id} href="/flash-note" className="device-card-link">
+          {notes.map((item) => (
+            <Link key={item.id} href={`/flash-note/${item.id}`} className="device-card-link">
               <div className="device-mini-item">
                 <div className="device-mini-item-title">
                   <span>{item.title}</span>
-                  <span>{item.duration}</span>
+                  <Tag color={item.type === 'voice_note' ? 'green' : 'purple'}>{getFlashNoteTypeLabel(item)}</Tag>
                 </div>
-                <Paragraph type="secondary" style={{ margin: 0, fontSize: 11 }}>
-                  {item.type} · {item.status}
+                <Paragraph type="secondary" style={{ margin: '4px 0 0', fontSize: 11 }}>
+                  {getFlashNoteSummary(item)}
                 </Paragraph>
+                <div className="device-action-chip-row" style={{ marginTop: 8 }}>
+                  {getFlashNoteMeta(item).map((meta) => (
+                    <Tag key={`${item.id}-${meta}`} color="cyan">{meta}</Tag>
+                  ))}
+                </div>
               </div>
             </Link>
           ))}
         </div>
-      </WatchSection>
-      <WatchNextSteps text="可回看、编辑，也可加入作品。" />
-      <WatchActionButtons primary={{ label: '闪记', path: '/flash-note' }} secondary={{ label: '任务', path: '/tasks/new' }} />
+      </div>
+
+      <div className="device-action-row">
+        <Link href="/flash-note">
+          <Button type="primary" block>闪记</Button>
+        </Link>
+        <Link href="/tasks/new">
+          <Button block>任务</Button>
+        </Link>
+      </div>
     </div>
   );
 }

@@ -14,10 +14,10 @@ export default function DeviceTeamGroupsScopedPage() {
   const detail = params.teamId ? details[params.teamId] : undefined;
 
   if (!team || !detail) {
-    return <Result status="404" title="未找到团队" extra={<Link href="/team"><Button>团队列表</Button></Link>} />;
+    return <Result status="404" title="未找到团队" extra={<Link href="/team"><Button>更多团队</Button></Link>} />;
   }
 
-  const canOperate = team.joinStatus === 'joined';
+  const canOperate = team.membershipStatus === '已加入';
 
   return (
     <div className="device-page-stack">
@@ -29,7 +29,7 @@ export default function DeviceTeamGroupsScopedPage() {
             <div key={group.id} className="device-mini-item">
               <Link href={`/team/${team.id}/groups/${group.id}`} className="device-card-link">
                 <div className="device-mini-item-title">
-                  <span>{group.name}</span>
+                  <span>{group.displayName}</span>
                   <Space size={6}>
                     <Tag color="blue">{group.members.length} 人</Tag>
                     {group.joined ? <Tag color="green">当前小组</Tag> : null}
@@ -44,7 +44,7 @@ export default function DeviceTeamGroupsScopedPage() {
                       size="small"
                       onClick={() => {
                         exitTeamGroup(team.id, group.id);
-                        messageApi.success(`已退出 ${group.name}`);
+                        messageApi.success(`已退出 ${group.displayName}`);
                       }}
                     >
                       退出小组
@@ -55,7 +55,7 @@ export default function DeviceTeamGroupsScopedPage() {
                       type="primary"
                       onClick={() => {
                         joinTeamGroup(team.id, group.id);
-                        messageApi.success(`已加入 ${group.name}`);
+                        messageApi.success(`已加入 ${group.displayName}`);
                       }}
                     >
                       加入小组
@@ -69,9 +69,6 @@ export default function DeviceTeamGroupsScopedPage() {
       </WatchSection>
 
       <div className="device-action-row">
-        <Link href={`/team/${team.id}/roles`}>
-          <Button type="primary" block>岗位</Button>
-        </Link>
         <Link href={`/team/${team.id}`}>
           <Button block>团队详情</Button>
         </Link>

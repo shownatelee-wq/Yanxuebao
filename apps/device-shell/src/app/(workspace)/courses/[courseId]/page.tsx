@@ -115,14 +115,14 @@ export default function DeviceCourseDetailPage() {
       </div>
 
       <div className="device-compact-card">
-        <p className="device-section-label">AI 陪伴学习</p>
+        <p className="device-section-label">专家伴学</p>
         <div className="device-mini-item watch-list-card">
           <div className="device-mini-item-title">
             <span>{course.aiCompanionTitle}</span>
             <Tag color="blue">课程上下文</Tag>
           </div>
           <p className="device-mini-item-desc">
-            从课程界面进入问答后，会带着当前课程内容继续提问，关闭后返回课程详情。
+            从课程界面进入专家伴学后，会带着当前课程内容继续提问，关闭后返回课程详情。
           </p>
         </div>
       </div>
@@ -142,8 +142,8 @@ export default function DeviceCourseDetailPage() {
         >
           {primaryActionLabel}
         </Button>
-        <Link href="/ask">
-          <Button block>AI 陪伴学习</Button>
+        <Link href="/ask?agentId=plaza_agent_03">
+          <Button block>专家伴学</Button>
         </Link>
       </div>
       <div className="device-action-row" style={{ marginTop: 10 }}>
@@ -161,10 +161,10 @@ export default function DeviceCourseDetailPage() {
           block
           onClick={() => {
             shareCourse(course.id);
-            messageApi.success('已分享当前课程');
+            messageApi.success('已推荐课程给家长');
           }}
         >
-          分享课程
+          推荐给家长
         </Button>
       </div>
       <div className="device-action-row" style={{ marginTop: 10 }}>

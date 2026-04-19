@@ -8,7 +8,7 @@ import {
 import { Button, Space, Typography } from 'antd';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { getDeviceDataMode } from '../../lib/api';
+import { getDeviceDataMode, getDeviceInitialized } from '../../lib/api';
 import { useDeviceSession } from '../../lib/use-device-session';
 
 const { Text, Title } = Typography;
@@ -18,15 +18,17 @@ const pageTitles: Record<string, string> = {
   '/tasks': '任务',
   '/tasks/new': '填写作品',
   '/capture': '拍拍',
-  '/ask': '问问',
+  '/ask': '专家伴学',
   '/flash-note': '闪记',
-  '/flash-note/new': '新建闪记',
+  '/flash-note/new': '语音闪记',
   '/identify': '识物',
-  '/team': '团队',
+  '/team': '更多团队',
+  '/team/travel': '研学旅行团队',
   '/growth': '成长',
   '/messages': '消息',
   '/chat': '聊天',
   '/courses': '课程',
+  '/course-qa': '专家问答',
   '/me': '我的',
   '/sos': 'SoS',
   '/plaza': '广场',
@@ -45,6 +47,7 @@ const pageTitles: Record<string, string> = {
   '/cloud': '网盘',
   '/settings': '设置',
   '/settings/device': '设备绑定',
+  '/settings/switch-account': '切换账号',
   '/settings/password': '锁屏密码',
   '/settings/face': '人脸识别',
   '/settings/payment': '支付卡管理',
@@ -61,10 +64,11 @@ const pageTitles: Record<string, string> = {
   '/team/handbook': '研学手册',
   '/team/rankings': '团队排行',
   '/team/reviews': '研学评价',
-  '/team/join': '加入团队',
+  '/team/join': '扫码入团',
   '/team/groups': '小组',
   '/team/roles': '岗位',
   '/team/badge': '名称与徽章',
+  '/team/badge/upload': '上传徽章',
   '/growth/index': '能力指数',
   '/growth/self-test': '能力自测',
   '/growth/value': '成长值',
@@ -83,15 +87,6 @@ function resolvePageTitle(pathname: string) {
       return '作品项';
     }
     if (pathname.startsWith('/tasks/works/')) {
-      if (pathname.endsWith('/self-review')) {
-        return '学生自评';
-      }
-      if (pathname.endsWith('/peer-review')) {
-        return '组员互评';
-      }
-      if (pathname.endsWith('/teacher-review')) {
-        return '教师评价';
-      }
       if (pathname.endsWith('/edit')) {
         return '修改作品';
       }
@@ -167,15 +162,15 @@ function resolvePageTitle(pathname: string) {
     }
     if (pathname.startsWith('/team/reviews') || dynamicTeamPath.startsWith('/reviews')) {
       if (pathname.endsWith('/self')) {
-        return '自评';
+        return '团队自评';
       }
       if (pathname.endsWith('/peer')) {
-        return '互评';
+        return '团队互评';
       }
       return '研学评价';
     }
     if (pathname.startsWith('/team/join')) {
-      return '加入团队';
+      return '扫码入团';
     }
     if (pathname.startsWith('/team/groups') || dynamicTeamPath.startsWith('/groups')) {
       if (pathname !== '/team/groups') {
@@ -190,7 +185,19 @@ function resolvePageTitle(pathname: string) {
       return '岗位';
     }
     if (pathname.startsWith('/team/badge') || dynamicTeamPath.startsWith('/badge')) {
+      if (dynamicTeamPath.startsWith('/badge/upload')) {
+        return '上传徽章';
+      }
       return '名称与徽章';
+    }
+    if (dynamicTeamPath.startsWith('/tasks')) {
+      return '团队任务';
+    }
+    if (dynamicTeamPath.startsWith('/reports')) {
+      return '研学报告';
+    }
+    if (dynamicTeamPath.startsWith('/certificate')) {
+      return '研学证书';
     }
     return '团队详情';
   }
@@ -289,10 +296,11 @@ export default function DeviceWorkspaceLayout({ children }: { children: React.Re
   const router = useRouter();
   const { status, session } = useDeviceSession();
   const [now, setNow] = useState(() => new Date());
+  const [isCourseQaMode, setIsCourseQaMode] = useState(false);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
-      router.replace('/login');
+      router.replace(getDeviceInitialized() ? '/student-login' : '/login');
     }
   }, [router, status]);
 
@@ -300,6 +308,14 @@ export default function DeviceWorkspaceLayout({ children }: { children: React.Re
     const timer = window.setInterval(() => setNow(new Date()), 60_000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    setIsCourseQaMode(pathname === '/ask' && new URLSearchParams(window.location.search).get('mode') === 'course_qa');
+  }, [pathname]);
 
   const timeLabel = useMemo(
     () =>
@@ -312,7 +328,9 @@ export default function DeviceWorkspaceLayout({ children }: { children: React.Re
   );
 
   const isHome = pathname === '/home';
-  const pageTitle = resolvePageTitle(pathname);
+  const pageTitle = isCourseQaMode
+    ? '专家问答'
+    : resolvePageTitle(pathname);
 
   if (status === 'hydrating') {
     return (
@@ -401,7 +419,7 @@ export default function DeviceWorkspaceLayout({ children }: { children: React.Re
         ) : null}
       </div>
       <div className="device-screen-content">
-        <div key={pathname} className="device-page-enter">
+        <div key={pathname} className={`device-page-enter${isHome ? ' home-enter' : ''}`}>
           {children}
         </div>
       </div>

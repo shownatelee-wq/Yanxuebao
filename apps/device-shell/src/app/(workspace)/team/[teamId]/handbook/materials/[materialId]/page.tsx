@@ -15,7 +15,7 @@ export default function DeviceHandbookMaterialScopedDetailPage() {
   const material = detail?.handbookMaterials.find((item) => item.id === params.materialId);
 
   if (!team || !detail || !material) {
-    return <Result status="404" title="未找到资料" extra={<Link href="/team"><Button>团队列表</Button></Link>} />;
+    return <Result status="404" title="未找到资料" extra={<Link href="/team"><Button>更多团队</Button></Link>} />;
   }
 
   return (
@@ -24,7 +24,9 @@ export default function DeviceHandbookMaterialScopedDetailPage() {
         <Space direction="vertical" size={8} style={{ width: '100%' }}>
           <Space>
             <Tag color="blue">研学资料</Tag>
-            <Tag color={material.type === 'pdf' ? 'purple' : 'green'}>{material.type === 'pdf' ? 'PDF 预览' : '图文资料'}</Tag>
+            <Tag color={material.type === 'pdf' ? 'purple' : material.type === 'video' ? 'gold' : material.type === 'ai_reference' ? 'cyan' : 'green'}>
+              {material.type === 'pdf' ? 'PDF 预览' : material.type === 'video' ? '视频资料' : material.type === 'ai_reference' ? 'AI 参考资料' : '图文资料'}
+            </Tag>
           </Space>
           <p className="device-page-title">{material.title}</p>
           <p className="device-page-subtle">{team.name}</p>
@@ -53,7 +55,7 @@ export default function DeviceHandbookMaterialScopedDetailPage() {
             ))}
           </div>
         </div>
-      ) : (
+      ) : material.previewMode === 'pdf' ? (
         <div className="device-compact-card">
           <p className="device-section-label">PDF 预览</p>
           <div className="device-resource-pdf-list">
@@ -73,6 +75,30 @@ export default function DeviceHandbookMaterialScopedDetailPage() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      ) : material.previewMode === 'video' ? (
+        <div className="device-compact-card">
+          <p className="device-section-label">视频预览</p>
+          <div className="device-mini-item">
+            <div className="device-mini-item-title">
+              <span>{material.coverImage ?? '视频封面'}</span>
+              <Tag color="gold">{material.duration ?? '时长待定'}</Tag>
+            </div>
+            <p className="device-mini-item-desc">本轮为纯前端演示，点击播放按钮展示视频已就绪状态。</p>
+            <Button size="small" type="primary" style={{ marginTop: 8 }}>播放视频</Button>
+          </div>
+        </div>
+      ) : (
+        <div className="device-compact-card">
+          <p className="device-section-label">AI 参考资料</p>
+          <div className="device-mini-item">
+            <p className="device-mini-item-desc">{material.aiSummary}</p>
+            <div className="device-action-chip-row" style={{ marginTop: 8 }}>
+              {(material.questions ?? []).map((question) => (
+                <Tag key={question} color="cyan">{question}</Tag>
+              ))}
+            </div>
           </div>
         </div>
       )}

@@ -10,10 +10,11 @@ import {
   type DemoTeam,
   type DemoTeamBadge,
   type DemoTeamDetail,
+  type DemoTeamEvaluationItem,
   type DemoTeamReviewTask,
 } from './device-demo-data';
 
-const DEVICE_TEAM_STATE_KEY = 'yanxuebao_device_team_state';
+const DEVICE_TEAM_STATE_KEY = 'yanxuebao_device_team_state_v3';
 const DEVICE_TEAM_EVENT = 'yanxuebao:device-team-change';
 
 type DeviceTeamState = {
@@ -119,8 +120,30 @@ function getCurrentStudentMember(detail: DemoTeamDetail) {
 export function getVisibleTeamsForList() {
   const state = getStoredTeamState();
   return [...state.teams].sort((left, right) => {
-    const leftOrder = left.joinStatus === 'joined' && left.isActive ? 0 : left.joinStatus === 'joinable' ? 1 : 2;
-    const rightOrder = right.joinStatus === 'joined' && right.isActive ? 0 : right.joinStatus === 'joinable' ? 1 : 2;
+    const priority = (team: DemoTeam) => {
+      if (team.sourceType === '研学旅行推荐') {
+        return 90;
+      }
+      if (team.membershipStatus === '已加入' && team.lifecycleStatus === '进行中') {
+        return 0;
+      }
+      if (team.membershipStatus === '已加入' && team.lifecycleStatus === '待出行') {
+        return 1;
+      }
+      if (team.membershipStatus === '待审批') {
+        return 2;
+      }
+      if (team.membershipStatus === '未加入' && team.lifecycleStatus === '招募中') {
+        return 3;
+      }
+      if (team.membershipStatus === '历史可查看') {
+        return 4;
+      }
+      return 10;
+    };
+
+    const leftOrder = priority(left);
+    const rightOrder = priority(right);
     if (leftOrder !== rightOrder) {
       return leftOrder - rightOrder;
     }
@@ -130,7 +153,11 @@ export function getVisibleTeamsForList() {
 
 export function getCurrentJoinedTeam() {
   const teams = getVisibleTeamsForList();
-  return teams.find((item) => item.joinStatus === 'joined' && item.isActive) ?? teams.find((item) => item.joinStatus === 'joined') ?? null;
+  return (
+    teams.find((item) => item.membershipStatus === '已加入' && item.lifecycleStatus === '进行中') ??
+    teams.find((item) => item.membershipStatus === '已加入') ??
+    null
+  );
 }
 
 export function getTeamById(teamId: string) {
@@ -167,18 +194,61 @@ export function submitTeamJoinCode(code: string) {
     return { ok: false as const, reason: '授权码无效，请检查后重新输入。' };
   }
 
-  if (matched.team.joinStatus === 'ended') {
+  if (matched.team.lifecycleStatus === '已结束') {
     return { ok: false as const, reason: '该授权码已过期，不属于当前可加入的研学团队。' };
   }
 
   updateTeamState((draft) => {
     const team = getTeamFromState(draft, matched.team.id);
     if (team) {
-      team.joinStatus = 'joined';
+      if (team.lifecycleStatus === '招募中') {
+        team.membershipStatus = '待审批';
+        team.joinStatus = 'joinable';
+      } else {
+        team.membershipStatus = '已加入';
+        team.joinStatus = 'joined';
+      }
     }
   });
 
-  return { ok: true as const, teamId: matched.team.id };
+  return {
+    ok: true as const,
+    teamId: matched.team.id,
+    membershipStatus: matched.team.lifecycleStatus === '招募中' ? '待审批' : '已加入',
+  };
+}
+
+export function submitTeamScanJoin(teamId: string) {
+  const matched = getTeamById(teamId);
+  if (!matched) {
+    return { ok: false as const, reason: '未找到对应团队。' };
+  }
+
+  if (matched.team.lifecycleStatus === '已结束') {
+    return { ok: false as const, reason: '该团队已结束，当前不可加入。' };
+  }
+
+  updateTeamState((draft) => {
+    const team = getTeamFromState(draft, teamId);
+    if (!team) {
+      return;
+    }
+
+    if (team.lifecycleStatus === '招募中') {
+      team.membershipStatus = '待审批';
+      team.joinStatus = 'joinable';
+      return;
+    }
+
+    team.membershipStatus = '已加入';
+    team.joinStatus = 'joined';
+  });
+
+  return {
+    ok: true as const,
+    teamId,
+    membershipStatus: matched.team.lifecycleStatus === '招募中' ? '待审批' : '已加入',
+  };
 }
 
 export function getTeamBadges(teamId: string): DemoTeamBadge[] {
@@ -228,7 +298,7 @@ export function joinTeamGroup(teamId: string, groupId: string) {
           roleName: group.id === previousGroupId ? previousRole : '待分配',
           isCurrentStudent: true,
         });
-        detail.groupName = group.name;
+        detail.groupName = group.displayName;
         detail.badge = group.badgeTitle;
       }
     });
@@ -263,7 +333,11 @@ export function exitTeamGroup(teamId: string, groupId: string) {
   });
 }
 
-export function updateTeamGroupProfile(teamId: string, groupId: string, payload: { name: string; badgeTitle: string; badgeEmoji: string }) {
+export function updateTeamGroupProfile(
+  teamId: string,
+  groupId: string,
+  payload: { customName: string; badgeTitle: string; badgeEmoji: string; badgeImage?: string },
+) {
   updateTeamState((draft) => {
     const detail = getTeamDetailFromState(draft, teamId);
     if (!detail) {
@@ -275,18 +349,21 @@ export function updateTeamGroupProfile(teamId: string, groupId: string, payload:
       return;
     }
 
-    group.name = payload.name;
+    group.customName = payload.customName;
+    group.name = payload.customName;
+    group.displayName = `${group.serialNo}组：${payload.customName}`;
     group.badgeTitle = payload.badgeTitle;
     group.badgeEmoji = payload.badgeEmoji;
+    group.badgeImage = payload.badgeImage ?? group.badgeImage;
 
     if (detail.myGroupId === groupId) {
-      detail.groupName = payload.name;
+      detail.groupName = group.displayName;
       detail.badge = payload.badgeTitle;
     }
   });
 }
 
-export function assignTeamRole(teamId: string, groupId: string, memberId: string, roleName: string) {
+export function assignTeamRole(teamId: string, groupId: string, memberId: string, roleName: string, customRoleName?: string) {
   updateTeamState((draft) => {
     const detail = getTeamDetailFromState(draft, teamId);
     if (!detail) {
@@ -300,6 +377,8 @@ export function assignTeamRole(teamId: string, groupId: string, memberId: string
     }
 
     member.roleName = roleName;
+    member.rolePreset = customRoleName ? undefined : roleName;
+    member.customRoleName = customRoleName;
     if (member.isCurrentStudent) {
       detail.groupRole = roleName;
       detail.myRole = roleName;
@@ -333,6 +412,20 @@ function createRubricItems(
   }));
 }
 
+function updateEvaluationRoleScores(
+  detail: DemoTeamDetail,
+  values: Array<{ dimension: string; score: number }>,
+  roles: Array<DemoTeamEvaluationItem['scores'][number]['role']>,
+) {
+  detail.reviewConfig.evaluationItems?.forEach((item) => {
+    const matched = values.find((value) => value.dimension === item.coreIndicator);
+    if (!matched) {
+      return;
+    }
+    item.scores = item.scores.map((score) => (roles.includes(score.role) ? { ...score, score: matched.score } : score));
+  });
+}
+
 export function submitTeamSelfReview(
   teamId: string,
   payload: {
@@ -346,7 +439,8 @@ export function submitTeamSelfReview(
       return;
     }
 
-    const totalScore = payload.values.reduce((sum, item) => sum + item.score, 0);
+    updateEvaluationRoleScores(detail, payload.values, ['学生自评', '小组自评']);
+    const totalScore = payload.values.length ? payload.values.reduce((sum, item) => sum + item.score, 0) / payload.values.length : 0;
     const rubric: DemoReviewRubric = {
       role: '自评',
       targetName: detail.myMember.name,
@@ -385,7 +479,8 @@ export function submitTeamPeerReview(
       return;
     }
 
-    const totalScore = payload.values.reduce((sum, item) => sum + item.score, 0);
+    updateEvaluationRoleScores(detail, payload.values, ['同学互评']);
+    const totalScore = payload.values.length ? payload.values.reduce((sum, item) => sum + item.score, 0) / payload.values.length : 0;
     const rubric: DemoReviewRubric = {
       role: '互评',
       targetName: targetMember.name,

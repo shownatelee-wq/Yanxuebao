@@ -8,7 +8,7 @@ import { demoDiaries, demoFavorites, demoReports } from '../../../lib/device-dem
 import { getPurchasedCourses, useCourseState } from '../../../lib/device-course-data';
 
 type Profile = { id: string; account: string; displayName: string; role: string; studentId?: string };
-type Report = { id: string; title: string; status: string; publishedAt?: string };
+type Report = { id: string; title: string; status: string; publishedAt?: string; teamId?: string; certificateTitle?: string };
 
 export default function DeviceMePage() {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -27,6 +27,8 @@ export default function DeviceMePage() {
           title: report.title,
           status: report.status,
           publishedAt: report.publishedAt,
+          teamId: report.teamId,
+          certificateTitle: report.certificateTitle,
         })),
       );
       setProfile(
@@ -124,7 +126,8 @@ export default function DeviceMePage() {
                     <span>{report.title}</span>
                     <Tag color="green">{report.status}</Tag>
                   </div>
-                  <p className="device-mini-item-desc">{report.publishedAt ?? '待发布'}</p>
+                  <p className="device-mini-item-desc">{report.teamId ?? '未关联团队'} · {report.publishedAt ?? '待发布'}</p>
+                  {report.certificateTitle ? <p className="device-mini-item-meta">{report.certificateTitle}</p> : null}
                 </div>
               </Link>
             ))}

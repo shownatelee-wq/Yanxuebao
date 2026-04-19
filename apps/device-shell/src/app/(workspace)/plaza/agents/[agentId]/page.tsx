@@ -54,6 +54,7 @@ export default function DevicePlazaAgentDetailPage() {
             <div style={{ minWidth: 0 }}>
               <p className="device-page-title">{item.title}</p>
               <p className="device-page-subtle">{item.desc}</p>
+              <p className="device-page-subtle" style={{ marginTop: 6 }}>{item.expertName} · {item.oneLineIntro}</p>
             </div>
           </div>
           <div className="watch-status-pills" style={{ marginTop: 8 }}>
@@ -72,9 +73,11 @@ export default function DevicePlazaAgentDetailPage() {
           <div className="device-mini-list">
             <div className="device-mini-item watch-list-card">
               <div className="device-mini-item-title">
-                <span>适用场景</span>
+                <span>专家信息</span>
                 <Tag color="blue">{item.category}</Tag>
               </div>
+              <Paragraph style={{ margin: '0 0 8px', fontSize: 12 }}>{item.expertName} · {item.operatorName ?? '专家团队'}</Paragraph>
+              <Paragraph style={{ margin: '0 0 8px', fontSize: 12 }}>{item.oneLineIntro}</Paragraph>
               <div className="watch-status-pills">
                 {item.scenes.map((scene) => (
                   <span key={scene} className="watch-status-pill">{scene}</span>
@@ -116,6 +119,10 @@ export default function DevicePlazaAgentDetailPage() {
             <span>资讯 / 课程 / 挑战</span>
           </div>
           <div className="device-plaza-grid">
+            <Link href={`/ask?agentId=${item.id}`} className="device-plaza-tile">
+              <BellOutlined style={{ fontSize: 18, color: '#ff8a34' }} />
+              <Text strong style={{ fontSize: 12 }}>专家伴学</Text>
+            </Link>
             <Link href={`/plaza/agents/${item.id}/news`} className="device-plaza-tile">
               <BellOutlined style={{ fontSize: 18, color: '#2f6bff' }} />
               <Text strong style={{ fontSize: 12 }}>资讯订阅</Text>
@@ -197,7 +204,7 @@ export default function DevicePlazaAgentDetailPage() {
 
         <div className="watch-bottom-dock">
           <div className="device-action-row">
-            <Link href={item.openPath}>
+            <Link href={item.openPath === '/ask' ? `/ask?agentId=${item.id}` : item.openPath}>
               <Button type="primary" block>{item.openPath === '/ai-draw' || item.openPath === '/ai' ? '打开智能体' : '开始对话'}</Button>
             </Link>
             <Button

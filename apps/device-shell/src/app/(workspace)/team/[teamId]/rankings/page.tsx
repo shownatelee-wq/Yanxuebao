@@ -13,7 +13,7 @@ export default function DeviceTeamRankingsScopedPage() {
   const detail = params.teamId ? details[params.teamId] : undefined;
 
   if (!team || !detail) {
-    return <Result status="404" title="未找到团队排行" extra={<Link href="/team"><span>团队列表</span></Link>} />;
+    return <Result status="404" title="未找到团队排行" extra={<Link href="/team"><span>更多团队</span></Link>} />;
   }
 
   return (

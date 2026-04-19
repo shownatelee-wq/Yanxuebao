@@ -24,7 +24,7 @@ export default function DeviceAiKnowledgeDetailPage() {
             <Tag color="green">{item.category}</Tag>
           </Space>
           <p className="device-page-title">{item.title}</p>
-          <p className="device-page-subtle">已可加入问答和任务链路。</p>
+          <p className="device-page-subtle">已可加入专家伴学和任务链路。</p>
         </Space>
       </div>
 
@@ -36,13 +36,13 @@ export default function DeviceAiKnowledgeDetailPage() {
       <div className="device-compact-card">
         <p className="device-section-label">相关操作</p>
         <p className="device-mini-item-desc" style={{ margin: 0 }}>
-          可结合问问补充细节，或回 AI 页查看其他知识卡和记录。
+          可结合专家伴学补充细节，或回 AI 页查看其他知识卡和记录。
         </p>
       </div>
 
       <div className="device-action-row">
-        <Link href="/ask">
-          <Button type="primary" block>问问</Button>
+        <Link href="/ask?agentId=plaza_agent_03">
+          <Button type="primary" block>专家伴学</Button>
         </Link>
         <Link href="/ai">
           <Button block>回 AI 页</Button>

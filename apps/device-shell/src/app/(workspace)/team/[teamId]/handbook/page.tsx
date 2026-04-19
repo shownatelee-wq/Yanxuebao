@@ -15,7 +15,7 @@ export default function DeviceTeamHandbookScopedPage() {
   const detail = params.teamId ? details[params.teamId] : undefined;
 
   if (!team || !detail) {
-    return <Result status="404" title="未找到研学手册" extra={<Link href="/team"><span>团队列表</span></Link>} />;
+    return <Result status="404" title="未找到研学手册" extra={<Link href="/team"><span>更多团队</span></Link>} />;
   }
 
   return (
@@ -37,7 +37,9 @@ export default function DeviceTeamHandbookScopedPage() {
               <div className="device-mini-item">
                 <div className="device-mini-item-title">
                   <span>{item.title}</span>
-                  <span>{item.type === 'pdf' ? 'PDF' : '图文'}</span>
+                  <span>
+                    {item.type === 'pdf' ? 'PDF' : item.type === 'video' ? '视频' : item.type === 'ai_reference' ? 'AI 参考' : '图文'}
+                  </span>
                 </div>
                 <Paragraph style={{ margin: 0, fontSize: 11 }} type="secondary">
                   {item.summary}

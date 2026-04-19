@@ -1,14 +1,17 @@
 'use client';
 
 import { Button } from 'antd';
-import { clearSession } from '../../../lib/api';
+import { clearSession, getStoredDeviceAccountHistory, getStoredSession } from '../../../lib/api';
 import { demoSettings } from '../../../lib/device-demo-data';
 import Link from 'next/link';
 
 export default function DeviceSettingsPage() {
+  const session = getStoredSession();
+  const accountHistory = getStoredDeviceAccountHistory();
+
   function handleLogout() {
     clearSession();
-    window.location.replace('/login');
+    window.location.replace('/student-login');
   }
 
   return (
@@ -31,7 +34,7 @@ export default function DeviceSettingsPage() {
               <div className="device-mini-item-title">
                 <span>设备绑定</span>
               </div>
-              <p className="device-mini-item-desc">YXB-DEV-0001 · 李同学</p>
+              <p className="device-mini-item-desc">{`YXB-DEV-0001 · ${session?.user.displayName ?? '当前学员'}`}</p>
             </div>
             <div className="device-mini-item watch-list-card">
               <div className="device-mini-item-title">
@@ -43,7 +46,7 @@ export default function DeviceSettingsPage() {
               <div className="device-mini-item-title">
                 <span>账号状态</span>
               </div>
-              <p className="device-mini-item-desc">当前账号在线。</p>
+              <p className="device-mini-item-desc">{`${session?.user.displayName ?? '当前账号'} 在线 · 已记录 ${accountHistory.length} 个账号`}</p>
             </div>
           </div>
         </div>

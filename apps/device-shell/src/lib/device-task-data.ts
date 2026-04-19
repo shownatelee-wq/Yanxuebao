@@ -16,6 +16,7 @@ export type DeviceLearningWorkItem = {
   sheetId: string;
   title: string;
   topicType: DeviceTaskSheet['topicType'];
+  gameplayKind?: DeviceTaskSheet['gameplayKind'];
   workCategory: DeviceTaskSheet['workCategory'];
   workMode: DeviceTaskSheet['workMode'];
   requirement: string;
@@ -42,12 +43,17 @@ function withDerivedTask(task: DemoTask): DemoTask {
   const submittedSheetCount = new Set(
     currentStudentWorks.filter((work) => work.status === '已提交' && work.taskSheetId).map((work) => work.taskSheetId),
   ).size;
-  const rating = currentStudentWorks.some((work) => work.teacherReview?.score != null) ? task.rating ?? 'B' : task.rating;
-
+  const nextWorksSubmitted = Math.max(task.worksSubmitted, submittedSheetCount);
+  const nextStatus: DemoTask['status'] =
+    nextWorksSubmitted >= task.worksRequired
+      ? 'submitted'
+      : nextWorksSubmitted > 0 || currentStudentWorks.some((work) => work.status === '草稿')
+        ? 'in_progress'
+        : task.status;
   return {
     ...task,
-    worksSubmitted: Math.max(task.worksSubmitted, submittedSheetCount),
-    rating,
+    worksSubmitted: nextWorksSubmitted,
+    status: nextStatus,
     taskSheets: task.taskSheets.map((sheet) => {
       const currentWork = relatedWorks.find(
         (work) => work.taskSheetId === sheet.id && work.authorName === CURRENT_DEVICE_STUDENT_NAME,
@@ -58,21 +64,10 @@ function withDerivedTask(task: DemoTask): DemoTask {
           : currentWork?.status === '草稿'
             ? '待提交'
             : sheet.submissionStatus;
-      const reviewStatus =
-        currentWork?.teacherReview?.status === '已评价'
-          ? '已完成'
-          : currentWork?.peerReviews?.length
-            ? '待教师评价'
-            : currentWork?.selfReview
-              ? currentWork.workMode === '小组协作'
-                ? '待互评'
-                : '待教师评价'
-              : sheet.reviewStatus;
 
       return {
         ...sheet,
         submissionStatus,
-        reviewStatus,
         status:
           currentWork?.status === '已提交'
             ? '已完成'
@@ -123,32 +118,26 @@ export function getDeviceLearningWorkItems(taskId: string): DeviceLearningWorkIt
     return [];
   }
 
-  return task.taskSheets
-    .map((sheet) => {
-      const work = getCurrentStudentWorkBySheetId(sheet.id);
-      const displayStatus: DeviceLearningWorkItem['displayStatus'] = work?.status === '已提交' ? '已提交' : '未完成';
+  return task.taskSheets.map((sheet) => {
+    const work = getCurrentStudentWorkBySheetId(sheet.id);
+    const displayStatus: DeviceLearningWorkItem['displayStatus'] = work?.status === '已提交' ? '已提交' : '未完成';
 
-      return {
-        taskId: task.id,
-        sheetId: sheet.id,
-        title: sheet.title,
-        topicType: sheet.topicType,
-        workCategory: sheet.workCategory,
-        workMode: sheet.workMode,
-        requirement: sheet.requirement,
-        displayStatus,
-        entryPath: work?.status === '已提交' ? `/tasks/works/${work.id}` : `/tasks/new?taskId=${task.id}&sheetId=${sheet.id}`,
-        workId: work?.id,
-        updatedAt: work?.updatedAt,
-        summary: work?.summary,
-      };
-    })
-    .sort((left, right) => {
-      if (left.displayStatus !== right.displayStatus) {
-        return left.displayStatus === '未完成' ? -1 : 1;
-      }
-      return left.title.localeCompare(right.title, 'zh-CN');
-    });
+    return {
+      taskId: task.id,
+      sheetId: sheet.id,
+      title: sheet.title,
+      topicType: sheet.topicType,
+      gameplayKind: sheet.gameplayKind,
+      workCategory: sheet.workCategory,
+      workMode: sheet.workMode,
+      requirement: sheet.requirement,
+      displayStatus,
+      entryPath: work?.status === '已提交' ? `/tasks/works/${work.id}` : `/tasks/new?taskId=${task.id}&sheetId=${sheet.id}`,
+      workId: work?.id,
+      updatedAt: work?.updatedAt,
+      summary: work?.summary,
+    };
+  });
 }
 
 export function getDevicePeerWorksByTaskId(taskId: string, currentWorkId?: string) {
@@ -182,13 +171,24 @@ export function upsertDeviceTaskWorkSubmission(input: {
   media: DemoWorkMedia[];
   summary: string;
   textContent: string;
+  linkedFlashNotes?: Array<{
+    id: string;
+    title: string;
+    type?: 'voice_note' | 'video_note';
+    transcript?: string;
+    photoCount?: number;
+    duration?: string;
+  }>;
+  audioPreview?: { title: string; duration?: string };
 }) {
   const existing = getCurrentStudentWorkBySheetId(input.sheet.id);
   const nextType: DemoTaskWork['type'] = input.media.some((item) => item.type === '视频')
     ? '视频'
     : input.media.some((item) => item.type === '照片')
       ? '图片'
-      : '文字';
+      : input.media.some((item) => item.type === '音频')
+        ? '音频'
+        : '文字';
 
   if (existing) {
     existing.title = input.sheet.title;
@@ -196,10 +196,16 @@ export function upsertDeviceTaskWorkSubmission(input: {
     existing.topicType = input.sheet.topicType;
     existing.workMode = input.sheet.workMode;
     existing.type = nextType;
+    existing.workKind = input.sheet.workKind;
     existing.summary = input.summary;
     existing.textContent = input.textContent;
     existing.media = input.media;
+    existing.attachments = input.media;
     existing.formAnswers = input.formAnswers;
+    existing.capabilityTags = input.task.capabilityTags;
+    existing.linkedFlashNotes = input.linkedFlashNotes;
+    existing.audioPreview = input.audioPreview;
+    existing.canResubmit = true;
     existing.updatedAt = '刚刚';
     existing.status = '已提交';
     return existing;
@@ -216,58 +222,20 @@ export function upsertDeviceTaskWorkSubmission(input: {
     topicType: input.sheet.topicType,
     workMode: input.sheet.workMode,
     type: nextType,
+    workKind: input.sheet.workKind,
     summary: input.summary,
     textContent: input.textContent,
     media: input.media,
+    attachments: input.media,
     formAnswers: input.formAnswers,
+    capabilityTags: input.task.capabilityTags,
+    linkedFlashNotes: input.linkedFlashNotes,
+    audioPreview: input.audioPreview,
+    canResubmit: true,
     updatedAt: '刚刚',
     status: '已提交',
-    teacherReview: { status: '待评价' },
   };
 
   demoTaskWorks.unshift(nextWork);
   return nextWork;
-}
-
-export function submitDevicePeerReview(input: {
-  workId: string;
-  reviewerName: string;
-  totalScore: number;
-  summary: string;
-  items: Array<{
-    dimension: string;
-    score: number;
-    level: string;
-    comment: string;
-  }>;
-}) {
-  const work = demoTaskWorks.find((item) => item.id === input.workId);
-  if (!work) {
-    return undefined;
-  }
-
-  const completedAt = '刚刚';
-  const peerReview = {
-    reviewer: input.reviewerName,
-    score: input.totalScore,
-    comment: input.summary,
-    completedAt,
-  };
-  const peerReviewDetail = {
-    role: '互评' as const,
-    targetName: work.authorName,
-    totalScore: input.totalScore,
-    summary: input.summary,
-    completedAt,
-    items: input.items,
-  };
-
-  work.peerReviews = [peerReview, ...(work.peerReviews ?? []).filter((item) => item.reviewer !== input.reviewerName)];
-  work.peerReviewDetails = [
-    peerReviewDetail,
-    ...(work.peerReviewDetails ?? []).filter((item) => !(item.targetName === work.authorName && item.summary === input.summary)),
-  ];
-  work.updatedAt = '刚刚';
-
-  return work;
 }

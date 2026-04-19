@@ -16,12 +16,31 @@ export default function DeviceTeamSelfReviewScopedPage() {
   const detail = params.teamId ? details[params.teamId] : undefined;
 
   if (!team || !detail) {
-    return <Result status="404" title="未找到自评页面" extra={<Link href="/team"><Button>团队列表</Button></Link>} />;
+    return <Result status="404" title="未找到自评页面" extra={<Link href="/team"><Button>更多团队</Button></Link>} />;
   }
 
   if (!detail.reviewConfig.allowSelfReview) {
     return <Result status="403" title="当前团队未开放自评" extra={<Link href={`/team/${team.id}/reviews`}><Button>返回评价</Button></Link>} />;
   }
+
+  const reviewItems = detail.reviewConfig.evaluationItems?.length
+    ? detail.reviewConfig.evaluationItems.map((item) => {
+      const role = item.phase === '过程性评价' ? '学生自评' : '小组自评';
+      return {
+        id: item.id,
+        phase: item.phase,
+        dimension: item.coreIndicator,
+        standard: `${role} · ${item.dimension}`,
+        defaultScore: item.scores.find((score) => score.role === role)?.score ?? 8,
+      };
+    })
+    : detail.reviewConfig.rubricItems.map((item) => ({
+      id: item.id,
+      phase: '团队评价',
+      dimension: item.dimension,
+      standard: item.standard,
+      defaultScore: 8,
+    }));
 
   return (
     <div className="device-page-stack">
@@ -30,13 +49,13 @@ export default function DeviceTeamSelfReviewScopedPage() {
       <Form
         form={form}
         layout="vertical"
-        initialValues={Object.fromEntries(detail.reviewConfig.rubricItems.map((item) => [item.id, 8]))}
+        initialValues={Object.fromEntries(reviewItems.map((item) => [item.id, item.defaultScore]))}
         onFinish={(values) => {
           submitTeamSelfReview(team.id, {
             summary: String(values.summary ?? '').trim(),
-            values: detail.reviewConfig.rubricItems.map((item) => ({
+            values: reviewItems.map((item) => ({
               dimension: item.dimension,
-              score: Number(values[item.id] ?? 8),
+              score: Number(values[item.id] ?? item.defaultScore),
               comment: item.standard,
             })),
           });
@@ -46,11 +65,11 @@ export default function DeviceTeamSelfReviewScopedPage() {
       >
         <WatchSection title="自评项目">
           <div className="device-rubric-list">
-            {detail.reviewConfig.rubricItems.map((item) => (
+            {reviewItems.map((item) => (
               <div key={item.id} className="device-rubric-item">
                 <div className="device-mini-item-title">
                   <span>{item.dimension}</span>
-                  <Tag color="purple">1-10 分</Tag>
+                  <Tag color="purple">{item.phase}</Tag>
                 </div>
                 <p className="device-mini-item-desc">{item.standard}</p>
                 <Form.Item name={item.id} style={{ marginBottom: 0 }}>

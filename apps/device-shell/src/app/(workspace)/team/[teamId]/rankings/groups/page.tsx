@@ -15,7 +15,7 @@ export default function DeviceTeamGroupRankingsScopedPage() {
   const detail = params.teamId ? details[params.teamId] : undefined;
 
   if (!team || !detail) {
-    return <Result status="404" title="未找到小组排行" extra={<Link href="/team"><Button>团队列表</Button></Link>} />;
+    return <Result status="404" title="未找到小组排行" extra={<Link href="/team"><Button>更多团队</Button></Link>} />;
   }
 
   return (
@@ -40,7 +40,7 @@ export default function DeviceTeamGroupRankingsScopedPage() {
                 </Space>
               </div>
               <Paragraph type="secondary" style={{ margin: 0, fontSize: 11 }}>
-                小组积分会跟随作品质量、互评和协作表现更新。
+                小组积分会跟随作品质量、团队评价和协作表现更新。
               </Paragraph>
             </div>
           ))}

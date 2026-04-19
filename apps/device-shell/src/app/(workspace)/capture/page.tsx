@@ -150,7 +150,7 @@ export default function DeviceCapturePage() {
     const asset = currentAsset ?? buildAsset();
     saveCaptureAsset(asset);
     saveCaptureShare(asset, target);
-    router.push(target === 'expert' ? '/plaza/agents/plaza_agent_03' : '/ask');
+    router.push(target === 'expert' ? '/plaza/agents/plaza_agent_03' : '/ask?agentId=plaza_agent_03');
   }
 
   return (

@@ -26,7 +26,7 @@ export default function DevicePlazaAgentCoursesPage() {
       <div className="watch-app-view">
         <div className="device-hero-card device-stage-card watch-system-hero" style={{ padding: 12 }}>
           <p className="device-page-title">{agent.title}</p>
-          <p className="device-page-subtle">课程支持在线学习、免费试听、课程目录、断点续播、闪记、收藏和分享。</p>
+          <p className="device-page-subtle">{agent.expertName} · 课程支持在线学习、闪记、专家问答和推荐给家长。</p>
           <div className="watch-status-pills" style={{ marginTop: 8 }}>
             <span className="watch-status-pill">{agent.courses.length} 门课程</span>
             <span className="watch-status-pill">{agent.courses.filter((item) => item.isPreviewFree).length} 门可试听</span>

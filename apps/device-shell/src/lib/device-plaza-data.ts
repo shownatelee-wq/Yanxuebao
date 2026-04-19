@@ -12,7 +12,7 @@ import {
 
 const DEVICE_PLAZA_STATE_KEY = 'yanxuebao_device_plaza_state';
 const DEVICE_PLAZA_EVENT = 'yanxuebao:device-plaza-change';
-const DEVICE_PLAZA_STATE_VERSION = 2;
+const DEVICE_PLAZA_STATE_VERSION = 4;
 
 type DevicePlazaState = {
   version: number;
@@ -100,7 +100,7 @@ export function getPlazaAgentById(agentId: string, state: DevicePlazaState = rea
 }
 
 export function getPlazaCategories(state: DevicePlazaState = readState()) {
-  const categoryOrder: DemoPlazaCategory[] = ['科技', '学习', '读书', '创作', '文艺', '能力', '商业', '运动'];
+  const categoryOrder: DemoPlazaCategory[] = ['科技', '文艺', '健康', '商业', '成长', '创作'];
   return categoryOrder
     .map((category) => {
       const count = state.agents.filter((item) => item.category === category).length;

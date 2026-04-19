@@ -16,6 +16,13 @@ export default function DevicePlazaAgentCourseDetailPage() {
     return <Result status="404" title="未找到课程" extra={<Link href="/plaza"><Button>广场</Button></Link>} />;
   }
 
+  const courseQaHref = `/course-qa?${new URLSearchParams({
+    agentId: agent.id,
+    courseId: course.id,
+    courseTitle: course.title,
+    courseSummary: course.summary,
+  }).toString()}`;
+
   return (
     <div className="device-page-stack">
       {contextHolder}
@@ -23,6 +30,7 @@ export default function DevicePlazaAgentCourseDetailPage() {
         <div className="device-hero-card device-stage-card watch-system-hero" style={{ padding: 12 }}>
           <p className="device-page-title">{course.title}</p>
           <p className="device-page-subtle">{course.summary}</p>
+          <p className="device-page-subtle">{agent.expertName} · {agent.oneLineIntro}</p>
           <div className="watch-status-pills" style={{ marginTop: 8 }}>
             <span className="watch-status-pill">{course.isPreviewFree ? '免费试听' : '家长端购买'}</span>
             <span className="watch-status-pill">{course.progress}% 进度</span>
@@ -76,7 +84,7 @@ export default function DevicePlazaAgentCourseDetailPage() {
 
         <div className="watch-list-panel">
           <div className="watch-inline-head">
-            <span>收藏与分享</span>
+            <span>分享与问答</span>
             <span>{agent.shortTitle}</span>
           </div>
           <div className="device-mini-list">
@@ -126,15 +134,24 @@ export default function DevicePlazaAgentCourseDetailPage() {
             >
               加入闪记
             </Button>
+            <Link href={courseQaHref}>
+              <Button block>专家问答</Button>
+            </Link>
+          </div>
+          <div className="device-action-row" style={{ marginTop: 10 }}>
             <Button
+              type="primary"
               block
               onClick={() => {
                 sharePlazaCourse(agent.id, course.id);
-                messageApi.success('已分享课程推荐');
+                messageApi.success('已分享课程推荐给家长');
               }}
             >
-              分享课程
+              推荐给家长
             </Button>
+            <Link href={`/plaza/agents/${agent.id}`}>
+              <Button block>返回专家</Button>
+            </Link>
           </div>
         </div>
       </div>

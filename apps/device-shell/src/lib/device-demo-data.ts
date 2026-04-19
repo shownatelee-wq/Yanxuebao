@@ -40,6 +40,7 @@ export type DemoWorkFormField =
       placeholder: string;
       helper?: string;
       required?: boolean;
+      tools?: Array<'ask' | 'identify' | 'ai_draw' | 'ai_video' | 'flash_note' | 'camera' | 'checkin' | 'voice_text'>;
     }
   | {
       id: string;
@@ -48,21 +49,28 @@ export type DemoWorkFormField =
       helper?: string;
       options: string[];
       required?: boolean;
+      tools?: Array<'ask' | 'identify' | 'ai_draw' | 'ai_video' | 'flash_note' | 'camera' | 'checkin' | 'voice_text'>;
     }
   | {
       id: string;
-      kind: 'image_upload' | 'video_upload';
+      kind: 'image_upload' | 'video_upload' | 'audio_upload' | 'link_upload';
       label: string;
       helper?: string;
       limitText?: string;
       required?: boolean;
+      tools?: Array<'ask' | 'identify' | 'ai_draw' | 'ai_video' | 'flash_note' | 'camera' | 'checkin' | 'voice_text'>;
     };
 
 export type DemoWorkMedia = {
   id: string;
-  type: '照片' | '视频';
+  type: '照片' | '视频' | '音频' | '链接' | '闪记引用' | '打卡证明' | 'AI回答' | 'AI识图' | 'AI绘图' | 'AI视频';
   title: string;
   url: string;
+  duration?: string;
+  locationLabel?: string;
+  capturedAt?: string;
+  flashNoteId?: string;
+  summary?: string;
 };
 
 export type DemoWorkAnswer =
@@ -80,7 +88,7 @@ export type DemoWorkAnswer =
     }
   | {
       fieldId: string;
-      kind: 'image_upload' | 'video_upload';
+      kind: 'image_upload' | 'video_upload' | 'audio_upload' | 'link_upload';
       label: string;
       files: DemoWorkMedia[];
     };
@@ -120,25 +128,42 @@ export type DemoTask = {
   rating?: 'A' | 'B' | 'C' | 'D';
   sequence: number;
   timeLimit: string;
+  capabilityTags: string[];
+  capabilityTagSource?: 'manual' | 'ai';
   taskSheets: Array<{
     id: string;
     title: string;
-    topicType: '感想' | '创作地图' | '画作';
+    topicType: '感想' | '创作地图' | '画作' | '讲解视频' | 'AI 探究' | '打卡记录' | '闪记' | '寻宝收集' | '问答' | '调查';
     workCategory: DemoWorkCategory;
     workMode: '独立完成' | '小组协作';
+    workKind:
+      | 'ai_link'
+      | 'flash_note'
+      | 'explain_video'
+      | 'checkin_treasure'
+      | 'rich_text'
+      | 'image'
+      | 'video';
+    sheetTemplateKind?: 'observation' | 'ai_proof' | 'speed_checkin' | 'treasure_collect' | 'creative_research' | 'qa_research' | 'survey';
+    gameplayKind?: 'speed_checkin' | 'treasure_collect' | 'creative_research' | 'qa_research' | 'survey';
     requirement: string;
-    mediaTypes: Array<'照片' | '视频' | '文字'>;
+    mediaTypes: Array<'照片' | '视频' | '文字' | '音频' | '链接' | '定位打卡'>;
     status: '待开始' | '进行中' | '已完成';
     submissionStatus: '待填写' | '待提交' | '已提交';
-    reviewStatus: '待自评' | '待互评' | '待教师评价' | '已完成';
     workForm: DemoWorkFormField[];
   }>;
   resourcePacks: Array<{
     id: string;
     title: string;
-    type: 'doc' | 'pdf';
+    type: 'doc' | 'pdf' | 'video' | 'ai_reference' | 'ai';
     summary: string;
-    previewMode: 'doc' | 'pdf';
+    previewMode: 'doc' | 'pdf' | 'video' | 'ai_reference' | 'ai';
+    coverImage?: string;
+    duration?: string;
+    aiSummary?: string;
+    defaultPrompt?: string;
+    allowEditPrompt?: boolean;
+    questions?: string[];
     docSections?: DemoResourceDocSection[];
     pdfPages?: DemoResourcePdfPage[];
   }>;
@@ -152,14 +177,34 @@ export type DemoTaskWork = {
   groupName?: string;
   title: string;
   workCategory: DemoWorkCategory;
-  topicType: '感想' | '创作地图' | '画作';
+  topicType: '感想' | '创作地图' | '画作' | '讲解视频' | 'AI 探究' | '打卡记录' | '闪记' | '寻宝收集' | '问答' | '调查';
   workMode: '独立完成' | '小组协作';
   type: '文字' | '图片' | '音频' | '视频';
+  workKind:
+    | 'ai_link'
+    | 'flash_note'
+    | 'explain_video'
+    | 'checkin_treasure'
+    | 'rich_text'
+    | 'image'
+    | 'video';
   summary: string;
   textContent?: string;
   voiceTranscript?: string;
   media: DemoWorkMedia[];
+  attachments?: DemoWorkMedia[];
   formAnswers?: DemoWorkAnswer[];
+  capabilityTags?: string[];
+  linkedFlashNotes?: Array<{
+    id: string;
+    title: string;
+    type?: 'voice_note' | 'video_note';
+    transcript?: string;
+    photoCount?: number;
+    duration?: string;
+  }>;
+  audioPreview?: { title: string; duration?: string };
+  canResubmit?: boolean;
   collaborators?: Array<{ id: string; name: string; role: string }>;
   sharedInputs?: Array<{ id: string; member: string; content: string }>;
   selfReview?: { score: number; comment: string; completedAt: string };
@@ -284,6 +329,9 @@ export type DemoCapabilityOverview = {
 };
 
 export type DemoTeamJoinStatus = 'joined' | 'joinable' | 'ended';
+export type DemoTeamLifecycleStatus = '招募中' | '待出行' | '进行中' | '已结束';
+export type DemoTeamMembershipStatus = '已加入' | '待审批' | '未加入' | '历史可查看';
+export type DemoTeamSourceType = '学校团体研学' | '机构团体研学' | '研学旅行推荐';
 
 export type DemoTeam = {
   id: string;
@@ -295,15 +343,27 @@ export type DemoTeam = {
   destination: string;
   studentCount: number;
   joinStatus: DemoTeamJoinStatus;
+  lifecycleStatus: DemoTeamLifecycleStatus;
+  membershipStatus: DemoTeamMembershipStatus;
+  sourceType: DemoTeamSourceType;
+  schoolName?: string;
+  shareTarget?: 'parent';
+  canScanJoin?: boolean;
+  canCodeJoin?: boolean;
+  shareSummary?: string;
   isActive?: boolean;
 };
 
 export type DemoTeamHandbookMaterial = {
   id: string;
   title: string;
-  type: 'doc' | 'pdf';
+  type: 'doc' | 'pdf' | 'video' | 'ai_reference';
   summary: string;
-  previewMode: 'doc' | 'pdf';
+  previewMode: 'doc' | 'pdf' | 'video' | 'ai_reference';
+  coverImage?: string;
+  duration?: string;
+  aiSummary?: string;
+  questions?: string[];
   docSections?: Array<{
     title: string;
     imageLabel: string;
@@ -323,6 +383,8 @@ export type DemoTeamMember = {
   id: string;
   name: string;
   roleName: string;
+  rolePreset?: string;
+  customRoleName?: string;
   note?: string;
   isCurrentStudent?: boolean;
   canManageRoles?: boolean;
@@ -331,10 +393,14 @@ export type DemoTeamMember = {
 
 export type DemoTeamGroup = {
   id: string;
+  serialNo: number;
+  customName?: string;
+  displayName: string;
   name: string;
   topic: string;
   badgeTitle: string;
   badgeEmoji: string;
+  badgeImage?: string;
   score: number;
   rank: number;
   members: DemoTeamMember[];
@@ -357,9 +423,24 @@ export type DemoTeamReviewTask = {
   targetName?: string;
 };
 
+export type DemoTeamEvaluationPhase = '过程性评价' | '总结性评价';
+
+export type DemoTeamEvaluationItem = {
+  id: string;
+  phase: DemoTeamEvaluationPhase;
+  dimension: string;
+  coreIndicator: string;
+  scores: Array<{
+    role: '学生自评' | '同学互评' | '老师评价' | '小组自评' | '专家评价';
+    score: number;
+  }>;
+  note?: string;
+};
+
 export type DemoTeamReviewConfig = {
   allowSelfReview: boolean;
   allowPeerReview: boolean;
+  evaluationItems?: DemoTeamEvaluationItem[];
   rubricItems: Array<{
     id: string;
     dimension: string;
@@ -410,10 +491,13 @@ export type DemoTeamBadge = {
 
 export type DemoReport = {
   id: string;
+  teamId: string;
   title: string;
   status: string;
   publishedAt?: string;
   summary: string;
+  certificateId?: string;
+  certificateTitle?: string;
 };
 
 export type DemoPlazaContent = { id: string; title: string; summary: string; tag: string; path: string };
@@ -421,11 +505,9 @@ export type DemoPlazaContent = { id: string; title: string; summary: string; tag
 export type DemoPlazaCategory =
   | '科技'
   | '文艺'
-  | '运动'
+  | '健康'
   | '商业'
-  | '能力'
-  | '读书'
-  | '学习'
+  | '成长'
   | '创作';
 
 export type DemoPlazaNewsItem = {
@@ -482,6 +564,11 @@ export type DemoPlazaAgent = {
   logo: string;
   accent: 'blue' | 'green' | 'orange' | 'purple' | 'teal' | 'pink';
   desc: string;
+  expertName: string;
+  expertAvatarOrLogo: string;
+  operatorName?: string;
+  oneLineIntro: string;
+  companionModes: Array<'text' | 'voice' | 'image'>;
   tag: string;
   category: DemoPlazaCategory;
   recent?: boolean;
@@ -733,42 +820,191 @@ export const demoTasks: DemoTask[] = [
   {
     id: 'task_demo_01',
     title: '观察海洋生物',
-    description: '补 1 张现场图，再写一句观察。',
-    intro: '观察海豚、海狮或水母的行为特征，完成个人观察记录，并把有效证据整理成作品。',
+    description: '把观察、打卡、寻宝、创作、问答、调查都变成可提交的海洋生物挑战。',
+    intro: '围绕海豚、海狮或水母完成观察、问答、打卡、寻宝、创作和调查，让现场发现变成更有趣、更完整的研学作品。',
     taskType: '团队研学活动',
     taskDescription: '在海洋馆主馆区完成生物观察，记录典型行为与现场证据，形成个人观察作品。',
-    status: 'submitted',
+    status: 'in_progress',
     dueAt: now,
     category: 'study',
     target: '个人',
-    requirement: '上传 1 张照片和 1 句观察记录。',
+    requirement: '完成观察记录、AI 探究、竞速打卡、寻宝收集、创作研究、问答挑战和现场调查。',
     infoSummary: '海洋馆主馆区 · 个人观察任务',
     worksSubmitted: 1,
-    worksRequired: 1,
+    worksRequired: 7,
     score: 95,
     rating: 'A',
     sequence: 1,
     timeLimit: '今天 16:30 前',
+    capabilityTags: ['观察能力', '提问能力', '科学素养', '表达能力', '探究能力'],
+    capabilityTagSource: 'ai',
     taskSheets: [
       {
         id: 'sheet_demo_01',
-        title: '海豚观察感想',
-        topicType: '感想',
+        title: '闪记观察：海豚行为记录',
+        topicType: '闪记',
         workCategory: '观察型',
         workMode: '独立完成',
-        requirement: '上传 1 张照片，并写下 80 字观察感想。',
+        workKind: 'flash_note',
+        requirement: '用闪记记录海豚行为，可以补充照片、语音、文字或视频。',
         mediaTypes: ['照片', '文字'],
         status: '已完成',
         submissionStatus: '已提交',
-        reviewStatus: '已完成',
         workForm: [
-          { id: 'sheet_01_observe', kind: 'fill_blank', label: '观察到了什么行为', placeholder: '例如：海豚会并排游动后再跃出水面' },
-          { id: 'sheet_01_reason', kind: 'fill_blank', label: '你觉得这个行为说明了什么', placeholder: '写出你的判断或感受' },
-          { id: 'sheet_01_photo', kind: 'image_upload', label: '上传观察照片', helper: '至少 1 张能看清行为的照片', limitText: '最多上传 2 张', required: false },
+          { id: 'sheet_01_observe', kind: 'fill_blank', label: '观察到了什么行为', placeholder: '例如：海豚会并排游动后再跃出水面', tools: ['ask', 'flash_note', 'voice_text'] },
+          { id: 'sheet_01_reason', kind: 'fill_blank', label: '你觉得这个行为说明了什么', placeholder: '写出你的判断或感受', tools: ['ask', 'flash_note', 'voice_text'] },
+          { id: 'sheet_01_photo', kind: 'image_upload', label: '上传观察照片', helper: '至少 1 张能看清行为的照片', limitText: '最多上传 2 张', required: false, tools: ['identify', 'camera', 'checkin'] },
+        ],
+      },
+      {
+        id: 'sheet_demo_01_ai',
+        title: 'AI探究过程证明',
+        topicType: 'AI 探究',
+        workCategory: '探究型',
+        workMode: '独立完成',
+        workKind: 'ai_link',
+        requirement: '提交 1 条问问/AI识物/AI创作过程链接或截图，并写下 AI 帮你发现的新问题。',
+        mediaTypes: ['链接', '照片', '文字'],
+        status: '进行中',
+        submissionStatus: '待填写',
+        workForm: [
+          {
+            id: 'sheet_01_ai_link',
+            kind: 'link_upload',
+            label: 'AI探究或创作链接',
+            helper: '可粘贴问问、AI识物、AI绘图、AI视频等过程链接',
+            tools: ['ask'],
+          },
+          {
+            id: 'sheet_01_ai_question',
+            kind: 'fill_blank',
+            label: 'AI帮你发现了什么新问题',
+            placeholder: '例如：为什么海豚能听懂训练员的手势？',
+            tools: ['ask', 'flash_note', 'voice_text'],
+          },
+          {
+            id: 'sheet_01_ai_screenshot',
+            kind: 'image_upload',
+            label: '上传AI过程截图',
+            helper: '可上传 AI 对话、AI识物或AI创作截图',
+            limitText: '最多上传 2 张',
+            required: false,
+            tools: ['identify', 'ai_draw', 'camera'],
+          },
+        ],
+      },
+      {
+        id: 'sheet_demo_01_checkin',
+        title: '竞速打卡：找到海豚主池',
+        topicType: '打卡记录',
+        workCategory: '打卡型',
+        workMode: '独立完成',
+        workKind: 'checkin_treasure',
+        gameplayKind: 'speed_checkin',
+        requirement: '在 8 分钟内找到海豚主池或主池标志牌，完成带时间和地点的拍照打卡。',
+        mediaTypes: ['照片', '文字', '定位打卡'],
+        status: '待开始',
+        submissionStatus: '待填写',
+        workForm: [
+          { id: 'sheet_01_checkin_photo', kind: 'image_upload', label: '上传主池打卡照片', helper: '照片需带地点和时间水印', limitText: '上传 1 张图片', required: false, tools: ['checkin', 'camera'] },
+          { id: 'sheet_01_checkin_mark', kind: 'fill_blank', label: '你找到的标志物是什么', placeholder: '例如：海豚主池蓝色入口牌', tools: ['ask', 'flash_note', 'voice_text'] },
+        ],
+      },
+      {
+        id: 'sheet_demo_01_treasure',
+        title: '寻宝收集：找到 3 个海豚线索',
+        topicType: '寻宝收集',
+        workCategory: '探究型',
+        workMode: '独立完成',
+        workKind: 'image',
+        gameplayKind: 'treasure_collect',
+        requirement: '寻找 3 个与海豚有关的线索，至少拍照上传 2 个，并写出收集进度。',
+        mediaTypes: ['照片', '文字'],
+        status: '待开始',
+        submissionStatus: '待填写',
+        workForm: [
+          { id: 'sheet_01_treasure_photo', kind: 'image_upload', label: '上传海豚线索照片', helper: '可以是科普牌、标本、互动装置', limitText: '最多上传 3 张', required: false, tools: ['identify', 'camera'] },
+          { id: 'sheet_01_treasure_progress', kind: 'fill_blank', label: '收集进度', placeholder: '例如：已找到 2/3 个线索', tools: ['ask', 'flash_note', 'voice_text'] },
+          {
+            id: 'sheet_01_treasure_kind',
+            kind: 'multiple_choice',
+            label: '你找到了哪些线索',
+            options: ['科普标牌', '海豚动作', '互动装置', '导师提示'],
+            tools: ['ask'],
+          },
+        ],
+      },
+      {
+        id: 'sheet_demo_01_creative',
+        title: '创作研究：设计海豚守护海报',
+        topicType: '创作地图',
+        workCategory: '创作型',
+        workMode: '独立完成',
+        workKind: 'image',
+        gameplayKind: 'creative_research',
+        requirement: '根据观察结果完成一张海豚守护海报，可用 AI 绘图、AI 视频辅助构思并上传作品。',
+        mediaTypes: ['照片', '视频', '文字'],
+        status: '待开始',
+        submissionStatus: '待填写',
+        workForm: [
+          { id: 'sheet_01_creative_idea', kind: 'fill_blank', label: '你的创作主题', placeholder: '例如：安静观演，守护海豚沟通环境', tools: ['ask', 'ai_draw', 'ai_video', 'flash_note', 'voice_text'] },
+          { id: 'sheet_01_creative_image', kind: 'image_upload', label: '上传创作作品', helper: '可以上传手绘海报或 AI 绘图作品', limitText: '最多上传 2 张', required: false, tools: ['ai_draw', 'camera'] },
+          { id: 'sheet_01_creative_video', kind: 'video_upload', label: '上传创作说明视频', helper: '可选，用 15 秒说明你的设计想法', limitText: '上传 1 段视频', required: false, tools: ['ai_video'] },
+        ],
+      },
+      {
+        id: 'sheet_demo_01_qa',
+        title: '问答挑战：海豚为什么会配合表演',
+        topicType: '问答',
+        workCategory: '研究型',
+        workMode: '独立完成',
+        workKind: 'flash_note',
+        gameplayKind: 'qa_research',
+        requirement: '研究后用录音和照片回答：海豚为什么能和训练员配合完成表演动作？',
+        mediaTypes: ['音频', '照片', '文字'],
+        status: '待开始',
+        submissionStatus: '待填写',
+        workForm: [
+          { id: 'sheet_01_qa_answer', kind: 'fill_blank', label: '你的研究答案', placeholder: '写出你的判断，并说明你从哪里看出来', tools: ['ask', 'flash_note', 'voice_text'] },
+          { id: 'sheet_01_qa_audio', kind: 'audio_upload', label: '上传语音答案', helper: '可用闪记录制一段研究回答', limitText: '上传 1 段音频', required: false, tools: ['flash_note'] },
+          { id: 'sheet_01_qa_photo', kind: 'image_upload', label: '上传支持答案的照片', helper: '拍下训练动作、手势或现场提示牌', limitText: '上传 1 张图片', required: false, tools: ['identify', 'camera'] },
+        ],
+      },
+      {
+        id: 'sheet_demo_01_survey',
+        title: '现场调查：哪种观察证据最有用',
+        topicType: '调查',
+        workCategory: '论证型',
+        workMode: '独立完成',
+        workKind: 'rich_text',
+        gameplayKind: 'survey',
+        requirement: '比较照片、语音、AI 识图和现场笔记，选出你认为最有用的观察证据并说明理由。',
+        mediaTypes: ['文字'],
+        status: '待开始',
+        submissionStatus: '待填写',
+        workForm: [
+          {
+            id: 'sheet_01_survey_choice',
+            kind: 'single_choice',
+            label: '你认为哪种观察证据最有用',
+            options: ['连续观察照片', '语音闪记', 'AI识图结果', '现场文字记录'],
+            tools: ['ask'],
+          },
+          { id: 'sheet_01_survey_reason', kind: 'fill_blank', label: '选择理由', placeholder: '写出它为什么最能帮助你完成任务', tools: ['ask', 'flash_note', 'voice_text'] },
         ],
       },
     ],
     resourcePacks: [
+      {
+        id: 'resource_demo_ai_01',
+        title: 'AI 行前指导',
+        type: 'ai',
+        summary: '点击后进入 AI 对话框，按统一提示词生成适合本次活动的行前指导。',
+        previewMode: 'ai',
+        allowEditPrompt: true,
+        defaultPrompt:
+          '请为“海豚行为观察”研学活动生成一份行前指导资源，面向学生和家长，内容包含活动概述、行前准备、学生注意事项、家长配合事项、带队老师检查清单、安全提醒和活动收获引导。要求语言正式但容易理解，内容具体可执行。',
+      },
       {
         id: 'resource_demo_01',
         title: '海豚观察提示卡',
@@ -849,6 +1085,8 @@ export const demoTasks: DemoTask[] = [
     rating: 'B',
     sequence: 2,
     timeLimit: '今天 17:00 前',
+    capabilityTags: ['合作能力', '创新能力', '表达能力', '环境意识', '协作能力'],
+    capabilityTagSource: 'manual',
     taskSheets: [
       {
         id: 'sheet_demo_02',
@@ -856,11 +1094,11 @@ export const demoTasks: DemoTask[] = [
         topicType: '感想',
         workCategory: '学习型',
         workMode: '独立完成',
+        workKind: 'rich_text',
         requirement: '每位组员补充 1 条环保倡议感想，可语音转文字。',
         mediaTypes: ['文字'],
         status: '进行中',
         submissionStatus: '待提交',
-        reviewStatus: '待自评',
         workForm: [
           { id: 'sheet_02_theme', kind: 'fill_blank', label: '倡议主题', placeholder: '例如：减少一次性塑料' },
           { id: 'sheet_02_slogan', kind: 'fill_blank', label: '倡议口号', placeholder: '用一句短句说清你的倡议' },
@@ -878,11 +1116,11 @@ export const demoTasks: DemoTask[] = [
         topicType: '创作地图',
         workCategory: '创作型',
         workMode: '小组协作',
+        workKind: 'image',
         requirement: '共同绘制倡议地图，上传照片并补充 3 条说明。',
         mediaTypes: ['照片', '文字'],
         status: '进行中',
         submissionStatus: '已提交',
-        reviewStatus: '待互评',
         workForm: [
           { id: 'sheet_03_title', kind: 'fill_blank', label: '地图主题', placeholder: '例如：海洋馆低塑行动图' },
           { id: 'sheet_03_spot', kind: 'fill_blank', label: '需要重点改进的馆区位置', placeholder: '写出区域和原因' },
@@ -898,14 +1136,14 @@ export const demoTasks: DemoTask[] = [
       {
         id: 'sheet_demo_04',
         title: '主题海报画作',
-        topicType: '画作',
+        topicType: '讲解视频',
         workCategory: '创作型',
         workMode: '小组协作',
+        workKind: 'explain_video',
         requirement: '完成海报画作并拍摄 1 段 15 秒解说视频。',
         mediaTypes: ['照片', '视频', '文字'],
         status: '待开始',
         submissionStatus: '待填写',
-        reviewStatus: '待自评',
         workForm: [
           { id: 'sheet_04_title', kind: 'fill_blank', label: '海报主题', placeholder: '写出海报想传达的主题' },
           { id: 'sheet_04_copy', kind: 'fill_blank', label: '海报主文案', placeholder: '写一句最醒目的宣传语' },
@@ -921,6 +1159,16 @@ export const demoTasks: DemoTask[] = [
       },
     ],
     resourcePacks: [
+      {
+        id: 'resource_demo_ai_02',
+        title: 'AI 倡议表达助手',
+        type: 'ai',
+        summary: '根据小组环保主题生成倡议文案、口号和行动建议。',
+        previewMode: 'ai',
+        allowEditPrompt: true,
+        defaultPrompt:
+          '请为“环保倡议卡”团队研学活动生成一份环保倡议资源，内容包含倡议主题、问题发现、倡议口号、两条行动建议、小组分工提示和展示表达稿。要求适合小学生小组协作，语言有感染力但不夸张。',
+      },
       {
         id: 'resource_demo_03',
         title: '环保倡议案例',
@@ -973,10 +1221,10 @@ export const demoTasks: DemoTask[] = [
           },
           {
             pageTitle: '第 3 页 · 评价维度',
-            pageHint: '自评和互评都围绕同一张评价表完成。',
+            pageHint: '作品提交后可直接查看和重新填写。',
             blocks: [
-              { title: '评价项', content: '内容完整度 | 表达清晰度 | 小组协作度 | 现场证据真实性', tone: 'table' },
-              { content: '完成作品后先自评，再进入同组作品列表做互评。', tone: 'tip' },
+              { title: '作品项', content: '内容完整度 | 表达清晰度 | 小组协作度 | 现场证据真实性', tone: 'table' },
+              { content: '完成作品后可直接查看作品详情，如需补充内容可重新填写并覆盖更新。', tone: 'tip' },
             ],
           },
         ],
@@ -1001,18 +1249,20 @@ export const demoTasks: DemoTask[] = [
     score: 0,
     sequence: 3,
     timeLimit: '今天 18:00 前',
+    capabilityTags: ['身体健康', '适应能力', '实践能力', '环境意识', '自主学习'],
+    capabilityTagSource: 'ai',
     taskSheets: [
       {
         id: 'sheet_demo_05',
         title: '步行观察记录',
-        topicType: '感想',
+        topicType: '打卡记录',
         workCategory: '打卡型',
         workMode: '独立完成',
+        workKind: 'checkin_treasure',
         requirement: '提交 1 张路线截图，并写 1 条沿途观察。',
-        mediaTypes: ['照片', '文字'],
+        mediaTypes: ['照片', '文字', '定位打卡'],
         status: '待开始',
         submissionStatus: '待填写',
-        reviewStatus: '待自评',
         workForm: [
           { id: 'sheet_05_photo', kind: 'image_upload', label: '上传步行路线截图', helper: '截图里尽量带上时间和路线', limitText: '上传 1 张图片', required: false },
           { id: 'sheet_05_find', kind: 'fill_blank', label: '沿途观察到了什么', placeholder: '写一句步行中最明显的发现' },
@@ -1026,6 +1276,43 @@ export const demoTasks: DemoTask[] = [
       },
     ],
     resourcePacks: [
+      {
+        id: 'resource_demo_ai_03',
+        title: 'AI 活动路线图',
+        type: 'ai',
+        summary: '根据活动地点、任务和打卡要求，智能生成一份路线图说明。',
+        previewMode: 'ai',
+        allowEditPrompt: true,
+        defaultPrompt:
+          '请为“海洋馆步行打卡”研学活动生成一份活动路线图说明，内容包含路线总览、时间安排、站点顺序、每个站点活动内容、转场提醒、安全注意事项和带队老师执行清单。要求路线清晰、时间安排合理，信息不足时用“待补充”标记。',
+      },
+      {
+        id: 'resource_demo_doc_03',
+        title: '步行观察提示卡',
+        type: 'doc',
+        summary: '帮助学生在步行中记录路线、环境变化和安全提醒。',
+        previewMode: 'doc',
+        docSections: [
+          {
+            title: '路线记录',
+            imageLabel: '路线草图',
+            description: '每经过一个打卡点，记录当前位置、看到的标志物和下一站方向。',
+            accent: 'blue',
+          },
+          {
+            title: '沿途观察',
+            imageLabel: '观察提示',
+            description: '关注人流、指示牌、场馆声音和环境变化，选择一个最明显的发现写下来。',
+            accent: 'green',
+          },
+          {
+            title: '安全提醒',
+            imageLabel: '同行示意',
+            description: '保持小组同行，不边走边低头操作设备，需要拍照时先停在安全位置。',
+            accent: 'orange',
+          },
+        ],
+      },
       {
         id: 'resource_demo_05',
         title: '步行路线说明',
@@ -1055,63 +1342,113 @@ export const demoTasks: DemoTask[] = [
   {
     id: 'task_demo_04',
     title: '海狮馆声音采样',
-    description: '录制海狮表演的声音线索，并整理声音变化。',
-    intro: '在海狮馆内完成声音采样，对比不同环节声音强弱和环境变化。',
+    description: '用闪记、问问、识图和创作图研究声音变化。',
+    intro: '在海狮馆内完成声音采样、声音问答和变化图创作，对比不同环节声音强弱和环境变化。',
     taskType: '团队研学活动',
     taskDescription: '围绕海狮表演的不同环节采集声音样本，并通过图文整理声音变化特征。',
     status: 'todo',
     dueAt: now,
     category: 'study',
     target: '个人',
-    requirement: '上传 2 段声音样本，并补充文字说明。',
+    requirement: '完成声音闪记、声音问答、竞速打卡和声音变化创作图。',
     infoSummary: '海狮馆 · 声音观察任务',
     worksSubmitted: 0,
-    worksRequired: 2,
+    worksRequired: 4,
     score: 0,
     sequence: 4,
     timeLimit: '今天 17:40 前',
+    capabilityTags: ['提问能力', '科学素养', '探究能力', '快速学习', '观察能力'],
+    capabilityTagSource: 'ai',
     taskSheets: [
       {
         id: 'sheet_demo_06',
-        title: '表演前环境声音',
-        topicType: '感想',
+        title: '闪记采样：表演前环境声音',
+        topicType: '闪记',
         workCategory: '观察型',
         workMode: '独立完成',
-        requirement: '录制 10 秒音频，并写下现场感受。',
-        mediaTypes: ['文字'],
+        workKind: 'flash_note',
+        requirement: '用闪记记录表演前环境声音，可包含语音、文字、照片或视频。',
+        mediaTypes: ['文字', '音频'],
         status: '待开始',
         submissionStatus: '待填写',
-        reviewStatus: '待自评',
         workForm: [
-          { id: 'sheet_06_scene', kind: 'fill_blank', label: '表演前听到了什么声音', placeholder: '例如：观众交谈声、提示广播声' },
-          { id: 'sheet_06_change', kind: 'fill_blank', label: '你觉得这些声音说明了什么', placeholder: '写出你的判断' },
+          { id: 'sheet_06_audio', kind: 'audio_upload', label: '上传环境声音', helper: '可用新建闪记保存录音，也可选择已有闪记', limitText: '上传 1 段音频', required: false, tools: ['flash_note'] },
+          { id: 'sheet_06_scene', kind: 'fill_blank', label: '表演前听到了什么声音', placeholder: '例如：观众交谈声、提示广播声', tools: ['ask', 'flash_note', 'voice_text'] },
+          { id: 'sheet_06_change', kind: 'fill_blank', label: '你觉得这些声音说明了什么', placeholder: '写出你的判断', tools: ['ask', 'flash_note', 'voice_text'] },
           {
             id: 'sheet_06_loudness',
             kind: 'single_choice',
             label: '表演前整体声音强弱',
             options: ['很安静', '比较平稳', '逐渐变大', '已经很热闹'],
+            tools: ['ask'],
           },
         ],
       },
       {
+        id: 'sheet_demo_06_qa',
+        title: '问答挑战：声音为什么会变大',
+        topicType: '问答',
+        workCategory: '研究型',
+        workMode: '独立完成',
+        workKind: 'flash_note',
+        gameplayKind: 'qa_research',
+        requirement: '研究后用录音和照片回答：为什么表演开始后声音会明显变大？',
+        mediaTypes: ['音频', '照片', '文字'],
+        status: '待开始',
+        submissionStatus: '待填写',
+        workForm: [
+          { id: 'sheet_06_qa_answer', kind: 'fill_blank', label: '你的研究答案', placeholder: '写出声音变大的原因', tools: ['ask', 'flash_note', 'voice_text'] },
+          { id: 'sheet_06_qa_audio', kind: 'audio_upload', label: '上传语音答案', helper: '可用闪记录制一段回答', limitText: '上传 1 段音频', required: false, tools: ['flash_note'] },
+          { id: 'sheet_06_qa_photo', kind: 'image_upload', label: '上传现场证据照片', helper: '拍下音响、观众区或表演环节', limitText: '上传 1 张图片', required: false, tools: ['identify', 'camera'] },
+        ],
+      },
+      {
         id: 'sheet_demo_07',
-        title: '表演中声音变化图',
+        title: '创作研究：声音变化图',
         topicType: '创作地图',
         workCategory: '研究型',
         workMode: '独立完成',
-        requirement: '用图文展示声音变化节奏。',
+        workKind: 'image',
+        gameplayKind: 'creative_research',
+        requirement: '用图文或 AI 绘图展示声音变化节奏。',
         mediaTypes: ['照片', '文字'],
         status: '待开始',
         submissionStatus: '待填写',
-        reviewStatus: '待自评',
         workForm: [
-          { id: 'sheet_07_peak', kind: 'fill_blank', label: '声音最大的时候发生了什么', placeholder: '写出当时的场景' },
-          { id: 'sheet_07_reason', kind: 'fill_blank', label: '你认为声音变化和什么有关', placeholder: '例如：动作、灯光、观众互动' },
-          { id: 'sheet_07_image', kind: 'image_upload', label: '上传声音变化图', helper: '可以是手绘图或表格拍照', limitText: '上传 1 张图片', required: false },
+          { id: 'sheet_07_peak', kind: 'fill_blank', label: '声音最大的时候发生了什么', placeholder: '写出当时的场景', tools: ['ask', 'flash_note', 'voice_text'] },
+          { id: 'sheet_07_reason', kind: 'fill_blank', label: '你认为声音变化和什么有关', placeholder: '例如：动作、灯光、观众互动', tools: ['ask', 'flash_note', 'voice_text'] },
+          { id: 'sheet_07_image', kind: 'image_upload', label: '上传声音变化图', helper: '可以是手绘图、AI 绘图或表格拍照', limitText: '上传 1 张图片', required: false, tools: ['ai_draw', 'camera', 'identify'] },
+        ],
+      },
+      {
+        id: 'sheet_demo_07_checkin',
+        title: '竞速打卡：找到最佳录音点',
+        topicType: '打卡记录',
+        workCategory: '打卡型',
+        workMode: '独立完成',
+        workKind: 'checkin_treasure',
+        gameplayKind: 'speed_checkin',
+        requirement: '根据任务说明在 5 分钟内找到你认为最适合录音的位置，拍照打卡并写出判断依据。',
+        mediaTypes: ['照片', '文字', '定位打卡'],
+        status: '待开始',
+        submissionStatus: '待填写',
+        workForm: [
+          { id: 'sheet_07_checkin_photo', kind: 'image_upload', label: '上传录音点照片', helper: '照片需带地点和时间水印', limitText: '上传 1 张图片', required: false, tools: ['checkin', 'camera'] },
+          { id: 'sheet_07_checkin_reason', kind: 'fill_blank', label: '你为什么选这里录音', placeholder: '例如：这里既能听到表演声，也能听到观众反应', tools: ['ask', 'flash_note', 'voice_text'] },
         ],
       },
     ],
     resourcePacks: [
+      {
+        id: 'resource_demo_ai_04',
+        title: 'AI 声音采样方案',
+        type: 'ai',
+        summary: '根据海狮馆任务自动生成声音采样步骤和记录建议。',
+        previewMode: 'ai',
+        allowEditPrompt: true,
+        defaultPrompt:
+          '请为“海狮馆声音采样”研学活动生成一份声音采样资源，内容包含采样目标、采样位置、记录方法、问答引导、声音变化图整理建议和安全提醒。要求适合学生现场使用，步骤清楚。',
+      },
       {
         id: 'resource_demo_06',
         title: '声音采样方法',
@@ -1133,69 +1470,173 @@ export const demoTasks: DemoTask[] = [
           },
         ],
       },
+      {
+        id: 'resource_demo_pdf_04',
+        title: '海狮馆声音任务单',
+        type: 'pdf',
+        summary: '包含声音采样流程、记录表和提交要求。',
+        previewMode: 'pdf',
+        pdfPages: [
+          {
+            pageTitle: '第 1 页 · 采样流程',
+            pageHint: '按表演前、表演中、表演后三个阶段记录。',
+            blocks: [
+              { title: '流程', content: '到达录音点 -> 试听环境声 -> 开始闪记 -> 标注时间点 -> 提交声音变化图', tone: 'table' },
+              { title: '提醒', content: '录音时不要靠近音响设备，不影响他人通行。', tone: 'tip' },
+            ],
+          },
+          {
+            pageTitle: '第 2 页 · 记录表',
+            pageHint: '记录声音强弱、来源和你的判断。',
+            blocks: [
+              { title: '记录表', content: '时间 | 声音来源 | 强弱变化 | 可能原因 | 证据编号', tone: 'table' },
+              { content: '示例：14:05 | 观众掌声 | 明显变强 | 表演开始 | 音频 01', tone: 'paragraph' },
+            ],
+          },
+        ],
+      },
     ],
   },
   {
     id: 'task_demo_05',
     title: '家庭观察日记',
-    description: '记录一次家庭研学观察，完成感想和照片上传。',
-    intro: '围绕家庭周边自然观察或基地打卡，整理观察过程、照片和个人感受，形成家庭研学作品。',
+    description: '家庭自然寻宝、调查和创作研究都在这里完成。',
+    intro: '围绕家庭周边自然观察或基地打卡，完成自然寻宝、现场调查、观察感想和创作作品。',
     taskType: '家庭研学活动',
     taskDescription: '本次活动由家长协助陪同完成，学生需要记录观察过程并提交家庭研学感想。',
     status: 'in_progress',
     dueAt: now,
     category: 'study',
     target: '个人',
-    requirement: '完成 1 份家庭观察感想，并上传 2 张现场照片。',
+    requirement: '完成家庭观察感想、自然寻宝、现场调查、问答挑战和观察创作。',
     infoSummary: '社区自然观察点 · 家庭研学活动',
     worksSubmitted: 0,
-    worksRequired: 2,
+    worksRequired: 5,
     score: 76,
     rating: 'B',
     sequence: 5,
     timeLimit: '今晚 20:00 前',
+    capabilityTags: ['独立自主', '勤于反思', '表达能力', '审美能力', '尊重生命'],
+    capabilityTagSource: 'manual',
     taskSheets: [
       {
         id: 'sheet_demo_08',
-        title: '家庭观察感想',
+        title: '闪记日记：家庭观察感想',
         topicType: '感想',
         workCategory: '观察型',
         workMode: '独立完成',
-        requirement: '写下本次家庭观察最深的 3 个发现，并补充感想。',
+        workKind: 'rich_text',
+        requirement: '用闪记和问问整理本次家庭观察最深的 3 个发现。',
         mediaTypes: ['文字'],
         status: '进行中',
         submissionStatus: '待提交',
-        reviewStatus: '待自评',
         workForm: [
-          { id: 'sheet_08_find_1', kind: 'fill_blank', label: '发现一', placeholder: '写一个你最先观察到的现象' },
-          { id: 'sheet_08_find_2', kind: 'fill_blank', label: '发现二', placeholder: '再写一个你觉得特别的地方' },
-          { id: 'sheet_08_find_3', kind: 'fill_blank', label: '发现三', placeholder: '写一个你回家后还记得的画面' },
+          { id: 'sheet_08_find_1', kind: 'fill_blank', label: '发现一', placeholder: '写一个你最先观察到的现象', tools: ['ask', 'flash_note', 'voice_text'] },
+          { id: 'sheet_08_find_2', kind: 'fill_blank', label: '发现二', placeholder: '再写一个你觉得特别的地方', tools: ['ask', 'flash_note', 'voice_text'] },
+          { id: 'sheet_08_find_3', kind: 'fill_blank', label: '发现三', placeholder: '写一个你回家后还记得的画面', tools: ['ask', 'flash_note', 'voice_text'] },
           {
             id: 'sheet_08_mood',
             kind: 'single_choice',
             label: '这次家庭观察更像哪种体验',
             options: ['安静观察', '边走边讨论', '家长带着一起分析', '自己主导记录'],
+            tools: ['ask'],
           },
         ],
       },
       {
-        id: 'sheet_demo_09',
-        title: '家庭观察画作',
-        topicType: '画作',
-        workCategory: '创作型',
+        id: 'sheet_demo_08_treasure',
+        title: '寻宝收集：找到 3 个自然线索',
+        topicType: '寻宝收集',
+        workCategory: '探究型',
         workMode: '独立完成',
-        requirement: '拍摄或上传你的观察画作，并写 1 句说明。',
+        workKind: 'image',
+        gameplayKind: 'treasure_collect',
+        requirement: '在社区或家庭研学点寻找 3 个自然线索，拍照上传并写出收集进度。',
         mediaTypes: ['照片', '文字'],
         status: '待开始',
         submissionStatus: '待填写',
-        reviewStatus: '待自评',
         workForm: [
-          { id: 'sheet_09_photo', kind: 'image_upload', label: '上传观察画作', helper: '画面要完整清晰', limitText: '上传 1 张图片', required: false },
-          { id: 'sheet_09_desc', kind: 'fill_blank', label: '一句作品说明', placeholder: '说说你为什么这样画' },
+          { id: 'sheet_08_treasure_photo', kind: 'image_upload', label: '上传自然线索照片', helper: '可以是植物、昆虫、水边痕迹、标识牌', limitText: '最多上传 3 张', required: false, tools: ['identify', 'camera'] },
+          { id: 'sheet_08_treasure_progress', kind: 'fill_blank', label: '收集进度', placeholder: '例如：已找到 2/3 个自然线索', tools: ['ask', 'flash_note', 'voice_text'] },
+          {
+            id: 'sheet_08_treasure_kind',
+            kind: 'multiple_choice',
+            label: '你找到了哪些自然线索',
+            options: ['植物叶片', '昆虫活动', '水边痕迹', '科普标识'],
+            tools: ['ask'],
+          },
+        ],
+      },
+      {
+        id: 'sheet_demo_08_survey',
+        title: '现场调查：哪种观察方式最有效',
+        topicType: '调查',
+        workCategory: '论证型',
+        workMode: '独立完成',
+        workKind: 'rich_text',
+        gameplayKind: 'survey',
+        requirement: '家庭研学后选择你认为最有效的观察方式，并补充理由。',
+        mediaTypes: ['文字'],
+        status: '待开始',
+        submissionStatus: '待填写',
+        workForm: [
+          {
+            id: 'sheet_08_survey_choice',
+            kind: 'single_choice',
+            label: '你认为哪种观察方式最有效',
+            options: ['安静观察 5 分钟', '边拍照边记录', '请家长提问', '先问问再验证'],
+            tools: ['ask'],
+          },
+          { id: 'sheet_08_survey_reason', kind: 'fill_blank', label: '选择理由', placeholder: '写出你为什么选择这种方式', tools: ['ask', 'flash_note', 'voice_text'] },
+        ],
+      },
+      {
+        id: 'sheet_demo_09',
+        title: '创作研究：家庭观察画作',
+        topicType: '画作',
+        workCategory: '创作型',
+        workMode: '独立完成',
+        workKind: 'image',
+        gameplayKind: 'creative_research',
+        requirement: '根据家庭观察完成一张创作，可以用 AI 绘图或拍照上传作品。',
+        mediaTypes: ['照片', '文字'],
+        status: '待开始',
+        submissionStatus: '待填写',
+        workForm: [
+          { id: 'sheet_09_photo', kind: 'image_upload', label: '上传观察画作', helper: '画面要完整清晰，可上传手绘或 AI 绘图', limitText: '上传 1 张图片', required: false, tools: ['ai_draw', 'camera', 'identify'] },
+          { id: 'sheet_09_desc', kind: 'fill_blank', label: '一句作品说明', placeholder: '说说你为什么这样画', tools: ['ask', 'ai_draw', 'flash_note', 'voice_text'] },
+        ],
+      },
+      {
+        id: 'sheet_demo_09_qa',
+        title: '问答挑战：为什么这里最值得继续观察',
+        topicType: '问答',
+        workCategory: '研究型',
+        workMode: '独立完成',
+        workKind: 'flash_note',
+        gameplayKind: 'qa_research',
+        requirement: '根据家庭研学研究后，用录音和照片回答：为什么这个观察点最值得继续观察？',
+        mediaTypes: ['音频', '照片', '文字'],
+        status: '待开始',
+        submissionStatus: '待填写',
+        workForm: [
+          { id: 'sheet_09_qa_answer', kind: 'fill_blank', label: '你的观察答案', placeholder: '写出你为什么认为这里值得继续观察', tools: ['ask', 'flash_note', 'voice_text'] },
+          { id: 'sheet_09_qa_audio', kind: 'audio_upload', label: '上传语音答案', helper: '可用语音闪记保存研究回答', limitText: '上传 1 段音频', required: false, tools: ['flash_note'] },
+          { id: 'sheet_09_qa_photo', kind: 'image_upload', label: '上传现场证据照片', helper: '拍下能支持判断的观察点或现象', limitText: '上传 1 张图片', required: false, tools: ['identify', 'camera'] },
         ],
       },
     ],
     resourcePacks: [
+      {
+        id: 'resource_demo_ai_05',
+        title: 'AI 家庭观察指导',
+        type: 'ai',
+        summary: '根据家庭观察场景生成家长提问、学生记录和作品整理建议。',
+        previewMode: 'ai',
+        allowEditPrompt: true,
+        defaultPrompt:
+          '请为“家庭观察日记”研学活动生成一份家庭观察指导资源，内容包含观察步骤、家长提问建议、学生记录模板、自然线索收集方法、作品整理建议和安全提醒。要求亲子共用，表达温和清楚。',
+      },
       {
         id: 'resource_demo_07',
         title: '家庭观察指南',
@@ -1266,6 +1707,8 @@ export const demoTasks: DemoTask[] = [
     score: 0,
     sequence: 6,
     timeLimit: '今天 19:00 前',
+    capabilityTags: ['逻辑思维', '资源整合', '表达能力', '创新能力', '快速学习'],
+    capabilityTagSource: 'manual',
     taskSheets: [
       {
         id: 'sheet_demo_10',
@@ -1273,11 +1716,11 @@ export const demoTasks: DemoTask[] = [
         topicType: '创作地图',
         workCategory: '创作型',
         workMode: '独立完成',
+        workKind: 'image',
         requirement: '以创作地图形式呈现场馆路线与重点展区。',
         mediaTypes: ['照片', '文字'],
         status: '待开始',
         submissionStatus: '待填写',
-        reviewStatus: '待自评',
         workForm: [
           { id: 'sheet_10_map', kind: 'image_upload', label: '上传导览创作地图', helper: '拍清路线和标注', limitText: '上传 1 张图片', required: false },
           { id: 'sheet_10_key', kind: 'fill_blank', label: '最重要的展区', placeholder: '写出一个你最想推荐的展区' },
@@ -1290,11 +1733,11 @@ export const demoTasks: DemoTask[] = [
         topicType: '感想',
         workCategory: '记录型',
         workMode: '独立完成',
+        workKind: 'rich_text',
         requirement: '写 1 段路线说明，介绍你的导览顺序和理由。',
         mediaTypes: ['文字'],
         status: '待开始',
         submissionStatus: '待填写',
-        reviewStatus: '待自评',
         workForm: [
           { id: 'sheet_11_order', kind: 'fill_blank', label: '你的导览顺序', placeholder: '按照先后顺序写出路线' },
           {
@@ -1308,6 +1751,16 @@ export const demoTasks: DemoTask[] = [
       },
     ],
     resourcePacks: [
+      {
+        id: 'resource_demo_ai_06',
+        title: 'AI 导览讲解稿',
+        type: 'ai',
+        summary: '根据导览地图任务生成路线说明和小讲解员表达稿。',
+        previewMode: 'ai',
+        allowEditPrompt: true,
+        defaultPrompt:
+          '请为“海洋馆导览地图”研学活动生成一份导览讲解资源，内容包含导览路线、重点场馆说明、地图标注建议、讲解词模板、分工建议和安全提醒。要求适合学生制作导览地图并进行口头展示。',
+      },
       {
         id: 'resource_demo_09',
         title: '导览地图示例',
@@ -1355,6 +1808,187 @@ export const demoTasks: DemoTask[] = [
       },
     ],
   },
+  {
+    id: 'task_demo_07',
+    title: '趣味任务集',
+    description: '打卡、寻宝、创作、问答、调查一次体验。',
+    intro: '把研学任务拆成更有趣的挑战：到点打卡、寻宝收集、AI 辅助创作、语音问答和现场调查。',
+    taskType: '团队研学活动',
+    taskDescription: '本任务集用于演示研学宝 AI 研学任务的趣味化完成方式。',
+    status: 'todo',
+    dueAt: now,
+    category: 'study',
+    target: '个人',
+    requirement: '任选一个趣味任务开始，使用题目下方工具完成采集并提交作品。',
+    infoSummary: '海洋馆全馆 · 趣味挑战',
+    worksSubmitted: 0,
+    worksRequired: 5,
+    score: 0,
+    sequence: 7,
+    timeLimit: '今天 19:30 前',
+    capabilityTags: ['实践能力', '问题解决', '创新能力', '表达能力', '智能素养'],
+    capabilityTagSource: 'manual',
+    taskSheets: [
+      {
+        id: 'sheet_demo_12',
+        title: '竞速打卡：找到海豚馆入口',
+        topicType: '打卡记录',
+        workCategory: '打卡型',
+        workMode: '独立完成',
+        workKind: 'checkin_treasure',
+        gameplayKind: 'speed_checkin',
+        requirement: '在 10 分钟内到达海豚馆入口或找到入口标志物，完成拍照打卡。',
+        mediaTypes: ['照片', '文字', '定位打卡'],
+        status: '待开始',
+        submissionStatus: '待填写',
+        workForm: [
+          { id: 'sheet_12_checkin', kind: 'image_upload', label: '上传打卡照片', helper: '照片需带地点和时间水印', limitText: '上传 1 张图片', required: false, tools: ['checkin', 'camera'] },
+          { id: 'sheet_12_mark', kind: 'fill_blank', label: '你找到了哪个标志物', placeholder: '例如：海豚馆入口蓝色指示牌', tools: ['ask', 'flash_note', 'voice_text'] },
+        ],
+      },
+      {
+        id: 'sheet_demo_13',
+        title: '寻宝收集：找到 3 个海洋线索',
+        topicType: '寻宝收集',
+        workCategory: '探究型',
+        workMode: '独立完成',
+        workKind: 'image',
+        gameplayKind: 'treasure_collect',
+        requirement: '寻找 3 个指定海洋线索，至少拍照上传 2 个，并写出收集进度。',
+        mediaTypes: ['照片', '文字'],
+        status: '待开始',
+        submissionStatus: '待填写',
+        workForm: [
+          { id: 'sheet_13_collect_photo', kind: 'image_upload', label: '上传收集到的线索照片', helper: '例如标本、指示牌、互动装置', limitText: '最多上传 3 张', required: false, tools: ['camera', 'identify'] },
+          { id: 'sheet_13_progress', kind: 'fill_blank', label: '收集进度', placeholder: '例如：已找到 2/3 个线索', tools: ['ask', 'flash_note', 'voice_text'] },
+          {
+            id: 'sheet_13_kind',
+            kind: 'multiple_choice',
+            label: '你收集到了哪些线索',
+            options: ['动物标本', '科普标牌', '互动装置', '导师提示卡'],
+            tools: ['ask'],
+          },
+        ],
+      },
+      {
+        id: 'sheet_demo_14',
+        title: '创作研究：设计海洋守护徽章',
+        topicType: '创作地图',
+        workCategory: '创作型',
+        workMode: '独立完成',
+        workKind: 'image',
+        gameplayKind: 'creative_research',
+        requirement: '根据海洋保护主题完成一份创作，可以使用 AI 绘图或 AI 视频辅助构思。',
+        mediaTypes: ['照片', '视频', '文字'],
+        status: '待开始',
+        submissionStatus: '待填写',
+        workForm: [
+          { id: 'sheet_14_idea', kind: 'fill_blank', label: '创作想法', placeholder: '写出你想表达的海洋守护主题', tools: ['ask', 'ai_draw', 'ai_video', 'flash_note', 'voice_text'] },
+          { id: 'sheet_14_image', kind: 'image_upload', label: '上传创作作品', helper: '可以上传手绘作品或 AI 绘图作品', limitText: '最多上传 2 张', required: false, tools: ['ai_draw', 'camera'] },
+          { id: 'sheet_14_video', kind: 'video_upload', label: '上传创作说明视频', helper: '可选，用 15 秒说明创意', limitText: '上传 1 段视频', required: false, tools: ['ai_video', 'flash_note'] },
+        ],
+      },
+      {
+        id: 'sheet_demo_15',
+        title: '问答挑战：为什么海豚会结队',
+        topicType: '问答',
+        workCategory: '研究型',
+        workMode: '独立完成',
+        workKind: 'flash_note',
+        gameplayKind: 'qa_research',
+        requirement: '研究后用录音和照片回答问题：为什么海豚常常结队活动？',
+        mediaTypes: ['音频', '照片', '文字'],
+        status: '待开始',
+        submissionStatus: '待填写',
+        workForm: [
+          { id: 'sheet_15_answer', kind: 'fill_blank', label: '你的答案', placeholder: '写出研究后的判断', tools: ['ask', 'flash_note', 'voice_text'] },
+          { id: 'sheet_15_audio', kind: 'audio_upload', label: '上传语音答案', helper: '可用闪记保存录音', limitText: '上传 1 段音频', required: false, tools: ['flash_note'] },
+          { id: 'sheet_15_photo', kind: 'image_upload', label: '上传观察照片', helper: '拍下能支持答案的现场证据', limitText: '上传 1 张图片', required: false, tools: ['identify', 'camera'] },
+        ],
+      },
+      {
+        id: 'sheet_demo_16',
+        title: '现场调查：哪种保护方式最有效',
+        topicType: '调查',
+        workCategory: '论证型',
+        workMode: '独立完成',
+        workKind: 'rich_text',
+        gameplayKind: 'survey',
+        requirement: '研学研究后选择你认为最有效的保护方式，并补充理由。',
+        mediaTypes: ['文字'],
+        status: '待开始',
+        submissionStatus: '待填写',
+        workForm: [
+          {
+            id: 'sheet_16_choice',
+            kind: 'single_choice',
+            label: '你认为哪种保护方式最有效',
+            options: ['减少一次性塑料', '设置安静观演区', '加强科普讲解', '增加垃圾分类点'],
+            tools: ['ask'],
+          },
+          { id: 'sheet_16_reason', kind: 'fill_blank', label: '选择理由', placeholder: '写出你调查或观察后的理由', tools: ['ask', 'flash_note', 'voice_text'] },
+        ],
+      },
+    ],
+    resourcePacks: [
+      {
+        id: 'resource_demo_ai_07',
+        title: 'AI 趣味任务攻略',
+        type: 'ai',
+        summary: '按竞速、寻宝、创作、问答和调查任务生成完成攻略。',
+        previewMode: 'ai',
+        allowEditPrompt: true,
+        defaultPrompt:
+          '请为“趣味任务集”研学活动生成一份任务攻略资源，内容包含竞速打卡方法、寻宝收集提示、创作研究建议、问答挑战思路、现场调查问题和小组协作提醒。要求有趣、清晰、可执行。',
+      },
+      {
+        id: 'resource_demo_11',
+        title: '趣味任务说明卡',
+        type: 'doc',
+        summary: '包含打卡、寻宝、创作、问答、调查的完成规则。',
+        previewMode: 'doc',
+        docSections: [
+          {
+            title: '完成方式',
+            imageLabel: '挑战流程',
+            description: '每道题都可以使用题目下方的工具完成采集，采纳后会进入作品。',
+            accent: 'blue',
+          },
+          {
+            title: '提交提醒',
+            imageLabel: '作品证据',
+            description: '照片、音频、视频和 AI 结果都要能在作品详情中回看。',
+            accent: 'green',
+          },
+        ],
+      },
+      {
+        id: 'resource_demo_pdf_07',
+        title: '趣味任务流程表',
+        type: 'pdf',
+        summary: '包含五类趣味任务的完成顺序、提交材料和评分提醒。',
+        previewMode: 'pdf',
+        pdfPages: [
+          {
+            pageTitle: '第 1 页 · 任务总览',
+            pageHint: '先完成打卡和寻宝，再整理创作与问答内容。',
+            blocks: [
+              { title: '顺序', content: '竞速打卡 -> 寻宝收集 -> 创作研究 -> 问答挑战 -> 现场调查', tone: 'table' },
+              { title: '提交物', content: '定位打卡、照片证据、创作图、问答答案、调查选择与理由', tone: 'table' },
+            ],
+          },
+          {
+            pageTitle: '第 2 页 · 小组提醒',
+            pageHint: '每个成员至少承担一个明确角色。',
+            blocks: [
+              { content: '组长负责节奏，记录员负责整理证据，观察员负责拍照，讲解员负责最后表达。', tone: 'paragraph' },
+              { content: '竞速不等于奔跑，所有打卡必须在安全前提下完成。', tone: 'tip' },
+            ],
+          },
+        ],
+      },
+    ],
+  },
 ];
 
 export const demoTaskWorks: DemoTaskWork[] = [
@@ -1368,9 +2002,13 @@ export const demoTaskWorks: DemoTaskWork[] = [
     topicType: '感想',
     workMode: '独立完成',
     type: '图片',
+    workKind: 'image',
     summary: '上传了 1 张主池照片，并补了一句观察。',
     textContent: '我看到海豚会先并排游动，再一起跃出水面，像在合作表演。',
     media: [{ id: 'media_work_01', type: '照片', title: '海豚主池照片', url: '/mock/dolphin-photo.jpg' }],
+    attachments: [{ id: 'media_work_01', type: '照片', title: '海豚主池照片', url: '/mock/dolphin-photo.jpg' }],
+    capabilityTags: ['观察能力', '提问能力', '科学素养', '表达能力', '探究能力'],
+    canResubmit: true,
     formAnswers: [
       { fieldId: 'sheet_01_observe', kind: 'fill_blank', label: '观察到了什么行为', value: '海豚先并排游动，再同时跃出水面。' },
       { fieldId: 'sheet_01_reason', kind: 'fill_blank', label: '你觉得这个行为说明了什么', value: '我觉得它们像是在合作完成训练动作。' },
@@ -1405,16 +2043,21 @@ export const demoTaskWorks: DemoTaskWork[] = [
     taskId: 'task_demo_02',
     taskSheetId: 'sheet_demo_02',
     authorName: '小明',
-    groupName: '海豚探索队',
+    groupName: '1组：海豚探索队',
     title: '倡议卡第一版',
     workCategory: '学习型',
     topicType: '感想',
     workMode: '独立完成',
     type: '文字',
+    workKind: 'rich_text',
     summary: '已写主题、口号和 1 条建议。',
     textContent: '少用一次性塑料，保护海洋动物的家园。',
     voiceTranscript: '少用一次性塑料，保护海洋动物的家园。',
     media: [],
+    attachments: [],
+    capabilityTags: ['合作能力', '创新能力', '表达能力', '环境意识', '协作能力'],
+    audioPreview: { title: '语音转写预览', duration: '00:12' },
+    canResubmit: true,
     formAnswers: [
       { fieldId: 'sheet_02_theme', kind: 'fill_blank', label: '倡议主题', value: '减少一次性塑料' },
       { fieldId: 'sheet_02_slogan', kind: 'fill_blank', label: '倡议口号', value: '少用一件塑料，多护一片海洋。' },
@@ -1450,6 +2093,7 @@ export const demoTaskWorks: DemoTaskWork[] = [
     topicType: '创作地图',
     workMode: '小组协作',
     type: '图片',
+    workKind: 'flash_note',
     summary: '已经提交小组倡议地图，并补充了重点区域和倡议说明。',
     textContent: '我们建议在出口区域增加海洋垃圾分类互动装置，并在观演区设置低塑提醒牌。',
     voiceTranscript: '我们建议在出口区域增加海洋垃圾分类互动装置，并在观演区设置低塑提醒牌。',
@@ -1457,6 +2101,14 @@ export const demoTaskWorks: DemoTaskWork[] = [
       { id: 'media_work_03', type: '照片', title: '倡议地图照片', url: '/mock/eco-map.jpg' },
       { id: 'media_work_04', type: '视频', title: '小组解说视频', url: '/mock/eco-video.mp4' },
     ],
+    attachments: [
+      { id: 'media_work_03', type: '照片', title: '倡议地图照片', url: '/mock/eco-map.jpg' },
+      { id: 'media_work_04', type: '视频', title: '小组解说视频', url: '/mock/eco-video.mp4', duration: '00:23' },
+      { id: 'flash_ref_01', type: '闪记引用', title: '出口区观察闪记', url: '', flashNoteId: 'flash_work_01' },
+    ],
+    capabilityTags: ['合作能力', '创新能力', '表达能力', '环境意识', '协作能力'],
+    linkedFlashNotes: [{ id: 'flash_work_01', title: '出口区观察闪记' }],
+    canResubmit: true,
     formAnswers: [
       { fieldId: 'sheet_03_title', kind: 'fill_blank', label: '地图主题', value: '海洋馆低塑行动图' },
       { fieldId: 'sheet_03_spot', kind: 'fill_blank', label: '需要重点改进的馆区位置', value: '出口互动区，因为离场时最容易产生包装垃圾。' },
@@ -1542,10 +2194,14 @@ export const demoTaskWorks: DemoTaskWork[] = [
     topicType: '感想',
     workMode: '独立完成',
     type: '文字',
-    summary: '已写下家庭观察中的三个发现。',
+    workKind: 'rich_text',
+    summary: '已完成家庭观察中的三个发现整理并提交。',
     textContent: '我发现社区小池塘边有很多蜻蜓，水边植物可以给小动物提供躲藏的地方。',
     voiceTranscript: '我发现社区小池塘边有很多蜻蜓，水边植物可以给小动物提供躲藏的地方。',
     media: [],
+    attachments: [],
+    capabilityTags: ['独立自主', '勤于反思', '表达能力', '审美能力', '尊重生命'],
+    canResubmit: true,
     formAnswers: [
       { fieldId: 'sheet_08_find_1', kind: 'fill_blank', label: '发现一', value: '池塘边蜻蜓特别多，而且总在水面附近飞。' },
       { fieldId: 'sheet_08_find_2', kind: 'fill_blank', label: '发现二', value: '水边植物比草地里的植物更高，也更密。' },
@@ -1569,7 +2225,163 @@ export const demoTaskWorks: DemoTaskWork[] = [
     growthValueDelta: 8,
     capabilityScoreDelta: 0.5,
     updatedAt: '今天 19:02',
-    status: '草稿',
+    status: '已提交',
+  },
+  {
+    id: 'work_demo_07',
+    taskId: 'task_demo_05',
+    taskSheetId: 'sheet_demo_08_treasure',
+    authorName: '小明',
+    title: '家庭自然线索收集',
+    workCategory: '探究型',
+    topicType: '寻宝收集',
+    workMode: '独立完成',
+    type: '图片',
+    workKind: 'image',
+    summary: '已收集 3 个自然线索并上传关键照片。',
+    textContent: '我找到了芦苇叶片、蜻蜓停留点和池边科普牌三个自然线索。',
+    media: [
+      { id: 'media_work_08', type: '照片', title: '芦苇线索照片', url: '/mock/task-photo.jpg' },
+      { id: 'media_work_09', type: '照片', title: '池边科普牌', url: '/mock/dolphin-photo.jpg' },
+    ],
+    attachments: [
+      { id: 'media_work_08', type: '照片', title: '芦苇线索照片', url: '/mock/task-photo.jpg' },
+      { id: 'media_work_09', type: '照片', title: '池边科普牌', url: '/mock/dolphin-photo.jpg' },
+    ],
+    capabilityTags: ['独立自主', '勤于反思', '表达能力', '审美能力', '尊重生命'],
+    canResubmit: true,
+    formAnswers: [
+      {
+        fieldId: 'sheet_08_treasure_photo',
+        kind: 'image_upload',
+        label: '上传自然线索照片',
+        files: [
+          { id: 'media_work_08', type: '照片', title: '芦苇线索照片', url: '/mock/task-photo.jpg' },
+          { id: 'media_work_09', type: '照片', title: '池边科普牌', url: '/mock/dolphin-photo.jpg' },
+        ],
+      },
+      { fieldId: 'sheet_08_treasure_progress', kind: 'fill_blank', label: '收集进度', value: '已找到 3/3 个自然线索。' },
+      {
+        fieldId: 'sheet_08_treasure_kind',
+        kind: 'multiple_choice',
+        label: '你找到了哪些自然线索',
+        value: ['植物叶片', '昆虫活动', '科普标识'],
+      },
+    ],
+    teacherReview: { status: '待评价' },
+    growthValueDelta: 10,
+    capabilityScoreDelta: 0.6,
+    updatedAt: '今天 19:06',
+    status: '已提交',
+  },
+  {
+    id: 'work_demo_08',
+    taskId: 'task_demo_05',
+    taskSheetId: 'sheet_demo_08_survey',
+    authorName: '小明',
+    title: '家庭观察方式调查',
+    workCategory: '论证型',
+    topicType: '调查',
+    workMode: '独立完成',
+    type: '文字',
+    workKind: 'rich_text',
+    summary: '已完成观察方式选择并补充理由。',
+    textContent: '我觉得先安静观察 5 分钟最有效，因为这样能先看到稳定现象，再决定拍什么。',
+    media: [],
+    attachments: [],
+    capabilityTags: ['独立自主', '勤于反思', '表达能力', '审美能力', '尊重生命'],
+    canResubmit: true,
+    formAnswers: [
+      {
+        fieldId: 'sheet_08_survey_choice',
+        kind: 'single_choice',
+        label: '你认为哪种观察方式最有效',
+        value: ['安静观察 5 分钟'],
+      },
+      { fieldId: 'sheet_08_survey_reason', kind: 'fill_blank', label: '选择理由', value: '先安静观察更容易发现重复出现的现象，再去拍照会更有针对性。' },
+    ],
+    teacherReview: { status: '待评价' },
+    growthValueDelta: 8,
+    capabilityScoreDelta: 0.4,
+    updatedAt: '今天 19:08',
+    status: '已提交',
+  },
+  {
+    id: 'work_demo_09',
+    taskId: 'task_demo_05',
+    taskSheetId: 'sheet_demo_09',
+    authorName: '小明',
+    title: '家庭观察画作',
+    workCategory: '创作型',
+    topicType: '画作',
+    workMode: '独立完成',
+    type: '图片',
+    workKind: 'image',
+    summary: '已上传家庭观察画作并写出作品说明。',
+    textContent: '我把池塘边的蜻蜓和芦苇画在一起，想表现它们共享同一个环境。',
+    media: [{ id: 'media_work_10', type: '照片', title: '家庭观察画作', url: '/mock/ai-proof-screenshot.png' }],
+    attachments: [{ id: 'media_work_10', type: '照片', title: '家庭观察画作', url: '/mock/ai-proof-screenshot.png' }],
+    capabilityTags: ['独立自主', '勤于反思', '表达能力', '审美能力', '尊重生命'],
+    canResubmit: true,
+    formAnswers: [
+      {
+        fieldId: 'sheet_09_photo',
+        kind: 'image_upload',
+        label: '上传观察画作',
+        files: [{ id: 'media_work_10', type: '照片', title: '家庭观察画作', url: '/mock/ai-proof-screenshot.png' }],
+      },
+      { fieldId: 'sheet_09_desc', kind: 'fill_blank', label: '一句作品说明', value: '蜻蜓、芦苇和水面是一起组成这个小生态的。' },
+    ],
+    teacherReview: { status: '待评价' },
+    growthValueDelta: 12,
+    capabilityScoreDelta: 0.7,
+    updatedAt: '今天 19:10',
+    status: '已提交',
+  },
+  {
+    id: 'work_demo_10',
+    taskId: 'task_demo_05',
+    taskSheetId: 'sheet_demo_09_qa',
+    authorName: '小明',
+    title: '家庭观察问答挑战',
+    workCategory: '研究型',
+    topicType: '问答',
+    workMode: '独立完成',
+    type: '音频',
+    workKind: 'flash_note',
+    summary: '已用语音和照片回答为什么这里值得继续观察。',
+    textContent: '这里值得继续观察，因为同一处地方能同时看到植物、昆虫和水边环境的变化。',
+    media: [
+      { id: 'media_work_11', type: '音频', title: '家庭观察语音答案', url: '/mock/audio-note.mp3', duration: '00:18' },
+      { id: 'media_work_12', type: '照片', title: '观察点证据照片', url: '/mock/task-photo.jpg' },
+    ],
+    attachments: [
+      { id: 'media_work_11', type: '音频', title: '家庭观察语音答案', url: '/mock/audio-note.mp3', duration: '00:18' },
+      { id: 'media_work_12', type: '照片', title: '观察点证据照片', url: '/mock/task-photo.jpg' },
+    ],
+    capabilityTags: ['独立自主', '勤于反思', '表达能力', '审美能力', '尊重生命'],
+    audioPreview: { title: '家庭观察语音答案', duration: '00:18' },
+    canResubmit: true,
+    formAnswers: [
+      { fieldId: 'sheet_09_qa_answer', kind: 'fill_blank', label: '你的观察答案', value: '这里能同时观察到植物、昆虫和水边环境变化，所以最值得继续观察。' },
+      {
+        fieldId: 'sheet_09_qa_audio',
+        kind: 'audio_upload',
+        label: '上传语音答案',
+        files: [{ id: 'media_work_11', type: '音频', title: '家庭观察语音答案', url: '/mock/audio-note.mp3', duration: '00:18' }],
+      },
+      {
+        fieldId: 'sheet_09_qa_photo',
+        kind: 'image_upload',
+        label: '上传现场证据照片',
+        files: [{ id: 'media_work_12', type: '照片', title: '观察点证据照片', url: '/mock/task-photo.jpg' }],
+      },
+    ],
+    teacherReview: { status: '待评价' },
+    growthValueDelta: 11,
+    capabilityScoreDelta: 0.6,
+    updatedAt: '今天 19:12',
+    status: '已提交',
   },
   {
     id: 'work_demo_05',
@@ -1582,9 +2394,13 @@ export const demoTaskWorks: DemoTaskWork[] = [
     topicType: '创作地图',
     workMode: '小组协作',
     type: '图片',
+    workKind: 'image',
     summary: '补充了出口区域和垃圾分类互动点的说明。',
     textContent: '我把出口区域和垃圾分类装置的位置补在了地图上，还加了一条提醒路线。',
     media: [{ id: 'media_work_05', type: '照片', title: '陈同学地图照片', url: '/mock/peer-map-chen.jpg' }],
+    attachments: [{ id: 'media_work_05', type: '照片', title: '陈同学地图照片', url: '/mock/peer-map-chen.jpg' }],
+    capabilityTags: ['合作能力', '创新能力', '表达能力', '环境意识', '协作能力'],
+    canResubmit: false,
     formAnswers: [
       { fieldId: 'sheet_03_title', kind: 'fill_blank', label: '地图主题', value: '出口区低塑提醒图' },
       { fieldId: 'sheet_03_spot', kind: 'fill_blank', label: '需要重点改进的馆区位置', value: '出口区域，因为人流集中、垃圾容易堆积。' },
@@ -1611,15 +2427,22 @@ export const demoTaskWorks: DemoTaskWork[] = [
     groupName: '海豚探索队',
     title: '海洋守护主题海报',
     workCategory: '创作型',
-    topicType: '画作',
+    topicType: '讲解视频',
     workMode: '小组协作',
     type: '视频',
+    workKind: 'explain_video',
     summary: '海报和解说视频已经上传，突出海洋动物保护主题。',
     textContent: '我们的海报主文案是“把垃圾带走，把海洋留给未来”。',
     media: [
       { id: 'media_work_06', type: '照片', title: '主题海报照片', url: '/mock/poster-li.jpg' },
       { id: 'media_work_07', type: '视频', title: '李同学解说视频', url: '/mock/poster-li-video.mp4' },
     ],
+    attachments: [
+      { id: 'media_work_06', type: '照片', title: '主题海报照片', url: '/mock/poster-li.jpg' },
+      { id: 'media_work_07', type: '视频', title: '李同学解说视频', url: '/mock/poster-li-video.mp4', duration: '00:15' },
+    ],
+    capabilityTags: ['合作能力', '创新能力', '表达能力', '环境意识', '协作能力'],
+    canResubmit: false,
     formAnswers: [
       { fieldId: 'sheet_04_title', kind: 'fill_blank', label: '海报主题', value: '海洋守护行动' },
       { fieldId: 'sheet_04_copy', kind: 'fill_blank', label: '海报主文案', value: '把垃圾带走，把海洋留给未来。' },
@@ -1956,29 +2779,133 @@ export const demoTeams: DemoTeam[] = [
     destination: '深圳海洋馆',
     studentCount: 24,
     joinStatus: 'joined',
+    lifecycleStatus: '进行中',
+    membershipStatus: '已加入',
+    sourceType: '学校团体研学',
+    schoolName: '南山实验学校',
+    canScanJoin: true,
+    canCodeJoin: true,
     isActive: true,
   },
   {
     id: 'team_demo_02',
     name: '生态农场春游团',
-    organizationName: '科苑小学',
-    status: '未开始',
+    organizationName: '恒超研学',
+    status: '待出发',
     studyDate: '2026.04.20',
     days: 1,
     destination: '南山生态农场',
     studentCount: 18,
-    joinStatus: 'joinable',
+    joinStatus: 'joined',
+    lifecycleStatus: '待出行',
+    membershipStatus: '已加入',
+    sourceType: '机构团体研学',
+    canScanJoin: true,
+    canCodeJoin: true,
   },
   {
     id: 'team_demo_03',
     name: '植物园观察营',
-    organizationName: '福田实验学校',
+    organizationName: '南山实验学校',
     status: '已结束',
     studyDate: '2026.03.28',
     days: 2,
     destination: '深圳植物园',
     studentCount: 20,
     joinStatus: 'ended',
+    lifecycleStatus: '已结束',
+    membershipStatus: '历史可查看',
+    sourceType: '学校团体研学',
+    schoolName: '南山实验学校',
+  },
+  {
+    id: 'team_demo_04',
+    name: '鹏城湿地探究营',
+    organizationName: '南山实验学校',
+    status: '审核中',
+    studyDate: '2026.04.23',
+    days: 1,
+    destination: '深圳湾湿地',
+    studentCount: 30,
+    joinStatus: 'joinable',
+    lifecycleStatus: '招募中',
+    membershipStatus: '待审批',
+    sourceType: '学校团体研学',
+    schoolName: '南山实验学校',
+    canScanJoin: true,
+    canCodeJoin: true,
+  },
+  {
+    id: 'team_demo_05',
+    name: '冷湖少年科创营',
+    organizationName: '恒超研学',
+    status: '推荐中',
+    studyDate: '2026.05.01',
+    days: 3,
+    destination: '青海冷湖',
+    studentCount: 40,
+    joinStatus: 'joinable',
+    lifecycleStatus: '招募中',
+    membershipStatus: '未加入',
+    sourceType: '研学旅行推荐',
+    shareTarget: 'parent',
+    shareSummary: '面向家长分享的研学旅行推荐团，报名与购买在小程序中完成。',
+    canScanJoin: false,
+    canCodeJoin: false,
+  },
+  {
+    id: 'team_demo_06',
+    name: '西双版纳雨林观察营',
+    organizationName: '恒超研学',
+    status: '推荐中',
+    studyDate: '2026.05.10',
+    days: 4,
+    destination: '云南西双版纳',
+    studentCount: 32,
+    joinStatus: 'joinable',
+    lifecycleStatus: '招募中',
+    membershipStatus: '未加入',
+    sourceType: '研学旅行推荐',
+    shareTarget: 'parent',
+    shareSummary: '面向家长分享的自然生态主题研学团，重点体验雨林观察、植物识别和夜观课程。',
+    canScanJoin: false,
+    canCodeJoin: false,
+  },
+  {
+    id: 'team_demo_07',
+    name: '敦煌丝路艺术营',
+    organizationName: '星野研学',
+    status: '推荐中',
+    studyDate: '2026.05.18',
+    days: 5,
+    destination: '甘肃敦煌',
+    studentCount: 28,
+    joinStatus: 'joinable',
+    lifecycleStatus: '招募中',
+    membershipStatus: '未加入',
+    sourceType: '研学旅行推荐',
+    shareTarget: 'parent',
+    shareSummary: '面向家长分享的历史艺术主题研学团，包含壁画临摹、丝路故事和博物馆课程。',
+    canScanJoin: false,
+    canCodeJoin: false,
+  },
+  {
+    id: 'team_demo_08',
+    name: '珠海航天探索营',
+    organizationName: '未来星研学',
+    status: '推荐中',
+    studyDate: '2026.06.01',
+    days: 2,
+    destination: '珠海太空中心',
+    studentCount: 36,
+    joinStatus: 'joinable',
+    lifecycleStatus: '招募中',
+    membershipStatus: '未加入',
+    sourceType: '研学旅行推荐',
+    shareTarget: 'parent',
+    shareSummary: '面向家长分享的航天科技主题研学团，适合对火箭、卫星和太空任务感兴趣的学生。',
+    canScanJoin: false,
+    canCodeJoin: false,
   },
 ];
 
@@ -1988,19 +2915,22 @@ export const demoTeamDetails: Record<string, DemoTeamDetail> = {
     teamSummary: '今天围绕海洋馆研学任务进行团队协作、观察记录和现场展示。',
     handbookTitle: '海洋馆研学小队守则',
     groupName: '海豚探索队',
-    groupRole: '记录员',
+    groupRole: '组长',
     badge: '蓝鲸徽章',
     joinMode: '授权码加入',
     joinCode: '240514',
     myMember: {
       id: 'member_demo_me_01',
       name: '小明',
-      roleName: '记录员',
-      note: '负责记录观察重点并整理提交作品。',
+      roleName: '组长',
+      rolePreset: '组长',
+      note: '本轮演示默认以组长身份进入，可修改小组名称、徽章和岗位。',
       isCurrentStudent: true,
+      canManageRoles: true,
+      canManageGroupProfile: true,
     },
     myGroupId: 'group_demo_01',
-    myRole: '记录员',
+    myRole: '组长',
     myRank: { score: 94, rank: 2, total: 24 },
     myGroupRank: { score: 96, rank: 1, total: 3 },
     handbookMaterials: [
@@ -2034,31 +2964,56 @@ export const demoTeamDetails: Record<string, DemoTeamDetail> = {
             pageTitle: '第 2 页 任务流程',
             blocks: [
               { title: '流程', content: '先看手册，再完成个人记录，最后汇总小组观点并准备展示。' },
-              { title: '提交顺序', content: '记录员先检查作品是否齐全，再由组员分别完成自评与互评。', tone: 'table' },
+              { title: '提交顺序', content: '记录员先检查作品是否齐全，再由组长确认素材已同步到任务作品。', tone: 'table' },
             ],
           },
         ],
+      },
+      {
+        id: 'handbook_material_05',
+        title: '海豚观察讲解视频',
+        type: 'video',
+        previewMode: 'video',
+        summary: '出发前先看 2 分钟观察示范，熟悉讲解顺序和站位。',
+        coverImage: '海豚馆视频封面',
+        duration: '02:18',
+      },
+      {
+        id: 'handbook_material_06',
+        title: 'AI 观察参考卡',
+        type: 'ai_reference',
+        previewMode: 'ai_reference',
+        summary: '根据海豚观察任务整理出的 AI 追问建议和表达模板。',
+        aiSummary: '建议从“它在做什么、为什么会这样、我有什么证据”三个角度和专家继续讨论。',
+        questions: ['海豚为什么喜欢结队活动？', '我拍到的动作能说明什么？', '怎么把观察结果讲清楚？'],
       },
     ],
     groups: [
       {
         id: 'group_demo_01',
+        serialNo: 1,
+        customName: '海豚探索队',
+        displayName: '1组：海豚探索队',
         name: '海豚探索队',
         topic: '负责海豚主池观察、路线记录和展示说明。',
         badgeTitle: '蓝鲸徽章',
         badgeEmoji: '🐋',
+        badgeImage: 'ai-badge-whale.png',
         score: 96,
         rank: 1,
         joined: true,
         members: [
-          { id: 'member_demo_01', name: '陈同学', roleName: '组长', note: '负责分工与集合提醒。', canManageRoles: true, canManageGroupProfile: true },
-          { id: 'member_demo_me_01', name: '小明', roleName: '记录员', note: '负责记录观察重点并整理提交作品。', isCurrentStudent: true },
-          { id: 'member_demo_02', name: '李同学', roleName: '观察员', note: '负责拍照和现场观察。' },
-          { id: 'member_demo_03', name: '王同学', roleName: '讲解员', note: '负责展示说明和汇报。' },
+          { id: 'member_demo_01', name: '陈同学', roleName: '记录员', rolePreset: '记录员', note: '负责分工提醒和素材汇总。' },
+          { id: 'member_demo_me_01', name: '小明', roleName: '组长', rolePreset: '组长', note: '本轮演示默认以组长身份进入。', isCurrentStudent: true, canManageRoles: true, canManageGroupProfile: true },
+          { id: 'member_demo_02', name: '李同学', roleName: '观察员', rolePreset: '观察员', note: '负责拍照和现场观察。' },
+          { id: 'member_demo_03', name: '王同学', roleName: '讲解员', rolePreset: '讲解员', note: '负责展示说明和汇报。' },
         ],
       },
       {
         id: 'group_demo_02',
+        serialNo: 2,
+        customName: '海狮观察队',
+        displayName: '2组：海狮观察队',
         name: '海狮观察队',
         topic: '负责海狮表演观察和互动记录。',
         badgeTitle: '海狮徽章',
@@ -2066,14 +3021,17 @@ export const demoTeamDetails: Record<string, DemoTeamDetail> = {
         score: 92,
         rank: 2,
         members: [
-          { id: 'member_demo_04', name: '张同学', roleName: '组长', note: '负责带队完成海狮馆观察。', canManageRoles: true, canManageGroupProfile: true },
-          { id: 'member_demo_05', name: '周同学', roleName: '记录员' },
-          { id: 'member_demo_06', name: '吴同学', roleName: '摄影师' },
-          { id: 'member_demo_07', name: '郑同学', roleName: '安全员' },
+          { id: 'member_demo_04', name: '张同学', roleName: '组长', rolePreset: '组长', note: '负责带队完成海狮馆观察。', canManageRoles: true, canManageGroupProfile: true },
+          { id: 'member_demo_05', name: '周同学', roleName: '记录员', rolePreset: '记录员' },
+          { id: 'member_demo_06', name: '吴同学', roleName: '摄影师', rolePreset: '摄影员' },
+          { id: 'member_demo_07', name: '郑同学', roleName: '安全员', rolePreset: '安全员' },
         ],
       },
       {
         id: 'group_demo_03',
+        serialNo: 3,
+        customName: '企鹅记录队',
+        displayName: '3组：企鹅记录队',
         name: '企鹅记录队',
         topic: '负责企鹅馆路线记录与习性整理。',
         badgeTitle: '企鹅徽章',
@@ -2081,20 +3039,96 @@ export const demoTeamDetails: Record<string, DemoTeamDetail> = {
         score: 88,
         rank: 3,
         members: [
-          { id: 'member_demo_08', name: '何同学', roleName: '组长', canManageRoles: true, canManageGroupProfile: true },
-          { id: 'member_demo_09', name: '马同学', roleName: '观察员' },
-          { id: 'member_demo_10', name: '许同学', roleName: '记录员' },
-          { id: 'member_demo_11', name: '孙同学', roleName: '汇报员' },
+          { id: 'member_demo_08', name: '何同学', roleName: '组长', rolePreset: '组长', canManageRoles: true, canManageGroupProfile: true },
+          { id: 'member_demo_09', name: '马同学', roleName: '观察员', rolePreset: '观察员' },
+          { id: 'member_demo_10', name: '许同学', roleName: '记录员', rolePreset: '记录员' },
+          { id: 'member_demo_11', name: '孙同学', roleName: '汇报员', rolePreset: '讲解员' },
         ],
       },
     ],
     reviewConfig: {
       allowSelfReview: true,
       allowPeerReview: true,
+      evaluationItems: [
+        {
+          id: 'team_eval_process_01',
+          phase: '过程性评价',
+          dimension: '形成性评价',
+          coreIndicator: '1.认真参与实践',
+          scores: [
+            { role: '学生自评', score: 8.8 },
+            { role: '同学互评', score: 9.0 },
+            { role: '老师评价', score: 9.2 },
+          ],
+          note: '能按时参与观察、记录和集合，现场投入度较高。',
+        },
+        {
+          id: 'team_eval_process_02',
+          phase: '过程性评价',
+          dimension: '形成性评价',
+          coreIndicator: '2.团队分工协作',
+          scores: [
+            { role: '学生自评', score: 9.4 },
+            { role: '同学互评', score: 9.3 },
+            { role: '老师评价', score: 9.5 },
+          ],
+          note: '组内岗位明确，组长能推动记录员、观察员和讲解员协作。',
+        },
+        {
+          id: 'team_eval_process_03',
+          phase: '过程性评价',
+          dimension: '形成性评价',
+          coreIndicator: '3.记录完整性',
+          scores: [
+            { role: '学生自评', score: 9.0 },
+            { role: '同学互评', score: 8.8 },
+            { role: '老师评价', score: 9.1 },
+          ],
+          note: '观察记录有照片、文字和路线信息，个别证据还可补充来源说明。',
+        },
+        {
+          id: 'team_eval_summary_01',
+          phase: '总结性评价',
+          dimension: '总结性评价',
+          coreIndicator: '1.理解生态基本概念，有主动保护生态的意识',
+          scores: [
+            { role: '小组自评', score: 8.9 },
+            { role: '同学互评', score: 9.1 },
+            { role: '专家评价', score: 9.0 },
+          ],
+          note: '能把海洋动物行为与生态保护意识联系起来。',
+        },
+        {
+          id: 'team_eval_summary_02',
+          phase: '总结性评价',
+          dimension: '总结性评价',
+          coreIndicator: '2.成果设计科学创新，实用性较强',
+          scores: [
+            { role: '小组自评', score: 8.7 },
+            { role: '同学互评', score: 8.6 },
+            { role: '专家评价', score: 8.8 },
+          ],
+          note: '成果有明确主题和行动建议，创新表达还可继续增强。',
+        },
+        {
+          id: 'team_eval_summary_03',
+          phase: '总结性评价',
+          dimension: '总结性评价',
+          coreIndicator: '3.成果展示清晰，表现效果好',
+          scores: [
+            { role: '小组自评', score: 9.2 },
+            { role: '同学互评', score: 9.0 },
+            { role: '专家评价', score: 9.3 },
+          ],
+          note: '讲解分工清楚，展示节奏完整，能回应现场问题。',
+        },
+      ],
       rubricItems: [
         { id: 'team_review_01', dimension: '岗位完成度', standard: '今天是否主动完成自己的岗位工作。' },
-        { id: 'team_review_02', dimension: '协作配合度', standard: '是否与组员积极配合、按时响应。' },
-        { id: 'team_review_03', dimension: '规范意识', standard: '是否遵守集合、安全和礼仪要求。' },
+        { id: 'team_review_02', dimension: '协作主动性', standard: '是否主动与组员协作并补位。' },
+        { id: 'team_review_03', dimension: '现场表达力', standard: '是否能清楚表达观察与结论。' },
+        { id: 'team_review_04', dimension: '规范与安全意识', standard: '是否遵守集合、安全和礼仪要求。' },
+        { id: 'team_review_05', dimension: '问题发现与思考', standard: '是否提出了有价值的问题和判断。' },
       ],
       selfReviewTask: { id: 'team_self_review_01', title: '团队协作自评', role: '自评', summary: '对今天在小组中的表现逐项自评。', status: '待完成', enabled: true },
       peerReviewTask: { id: 'team_peer_review_01', title: '组内互评', role: '互评', summary: '选择一名组员填写互评。', status: '待完成', enabled: true },
@@ -2132,7 +3166,7 @@ export const demoTeamDetails: Record<string, DemoTeamDetail> = {
       id: 'member_demo_me_02',
       name: '小明',
       roleName: '待分配',
-      note: '输入授权码后自动加入团队，再选择小组。',
+      note: '你已进入待出行名单，出发前可先查看手册和集合提醒。',
       isCurrentStudent: true,
     },
     myRole: '待分配',
@@ -2154,6 +3188,9 @@ export const demoTeamDetails: Record<string, DemoTeamDetail> = {
     groups: [
       {
         id: 'group_demo_04',
+        serialNo: 1,
+        customName: '向阳种植队',
+        displayName: '1组：向阳种植队',
         name: '向阳种植队',
         topic: '负责育苗区观察与记录。',
         badgeTitle: '向日葵徽章',
@@ -2161,12 +3198,15 @@ export const demoTeamDetails: Record<string, DemoTeamDetail> = {
         score: 0,
         rank: 0,
         members: [
-          { id: 'member_demo_12', name: '林同学', roleName: '组长', canManageRoles: true, canManageGroupProfile: true },
-          { id: 'member_demo_13', name: '赵同学', roleName: '记录员' },
+          { id: 'member_demo_12', name: '林同学', roleName: '组长', rolePreset: '组长', canManageRoles: true, canManageGroupProfile: true },
+          { id: 'member_demo_13', name: '赵同学', roleName: '记录员', rolePreset: '记录员' },
         ],
       },
       {
         id: 'group_demo_05',
+        serialNo: 2,
+        customName: '绿色行动队',
+        displayName: '2组：绿色行动队',
         name: '绿色行动队',
         topic: '负责环保倡议和农场分类记录。',
         badgeTitle: '树叶徽章',
@@ -2174,8 +3214,8 @@ export const demoTeamDetails: Record<string, DemoTeamDetail> = {
         score: 0,
         rank: 0,
         members: [
-          { id: 'member_demo_14', name: '谢同学', roleName: '组长', canManageRoles: true, canManageGroupProfile: true },
-          { id: 'member_demo_15', name: '许同学', roleName: '观察员' },
+          { id: 'member_demo_14', name: '谢同学', roleName: '组长', rolePreset: '组长', canManageRoles: true, canManageGroupProfile: true },
+          { id: 'member_demo_15', name: '许同学', roleName: '观察员', rolePreset: '观察员' },
         ],
       },
     ],
@@ -2193,7 +3233,7 @@ export const demoTeamDetails: Record<string, DemoTeamDetail> = {
     id: 'team_demo_03',
     teamSummary: '植物园观察营已结束，可回看历史资料与研学记录。',
     handbookTitle: '植物园观察营资料',
-    groupName: '叶脉记录队',
+    groupName: '1组：叶脉记录队',
     groupRole: '观察员',
     badge: '树叶徽章',
     joinMode: '授权码加入',
@@ -2229,6 +3269,9 @@ export const demoTeamDetails: Record<string, DemoTeamDetail> = {
     groups: [
       {
         id: 'group_demo_06',
+        serialNo: 1,
+        customName: '叶脉记录队',
+        displayName: '1组：叶脉记录队',
         name: '叶脉记录队',
         topic: '负责植物纹理与叶片变化观察。',
         badgeTitle: '树叶徽章',
@@ -2237,9 +3280,9 @@ export const demoTeamDetails: Record<string, DemoTeamDetail> = {
         rank: 2,
         joined: true,
         members: [
-          { id: 'member_demo_16', name: '郭同学', roleName: '组长', canManageRoles: true, canManageGroupProfile: true },
-          { id: 'member_demo_me_03', name: '小明', roleName: '观察员', isCurrentStudent: true },
-          { id: 'member_demo_17', name: '蒋同学', roleName: '记录员' },
+          { id: 'member_demo_16', name: '郭同学', roleName: '组长', rolePreset: '组长', canManageRoles: true, canManageGroupProfile: true },
+          { id: 'member_demo_me_03', name: '小明', roleName: '观察员', rolePreset: '观察员', isCurrentStudent: true },
+          { id: 'member_demo_17', name: '蒋同学', roleName: '记录员', rolePreset: '记录员' },
         ],
       },
     ],
@@ -2260,6 +3303,247 @@ export const demoTeamDetails: Record<string, DemoTeamDetail> = {
       { id: 'ranking_04', name: '花语探索队', score: 93, trend: 'up' },
       { id: 'ranking_05', name: '叶脉记录队', score: 90, trend: 'flat' },
     ],
+  },
+  team_demo_04: {
+    id: 'team_demo_04',
+    teamSummary: '湿地探究营正在招募中，已提交申请，等待导师审批后确认入营。',
+    handbookTitle: '湿地探究营出行说明',
+    groupName: '待审批',
+    groupRole: '待审批',
+    badge: '待分配',
+    joinMode: '授权码加入',
+    joinCode: '240423',
+    myMember: {
+      id: 'member_demo_me_04',
+      name: '小明',
+      roleName: '待审批',
+      note: '扫码申请已提交，导师审批通过后会进入待出行。',
+      isCurrentStudent: true,
+    },
+    myRole: '待审批',
+    myRank: { score: 0, rank: 0, total: 30 },
+    myGroupRank: { score: 0, rank: 0, total: 0 },
+    handbookMaterials: [
+      {
+        id: 'handbook_material_07',
+        title: '湿地观察预习卡',
+        type: 'ai_reference',
+        previewMode: 'ai_reference',
+        summary: '审批通过前可先看推荐问题，提前预习湿地生态相关知识。',
+        aiSummary: '建议先理解候鸟、潮汐和红树林之间的关系，再准备观察问题。',
+        questions: ['红树林为什么重要？', '候鸟停留会看哪些环境条件？'],
+      },
+    ],
+    groups: [],
+    reviewConfig: {
+      allowSelfReview: false,
+      allowPeerReview: false,
+      rubricItems: [],
+      selfReviewTask: { id: 'team_self_review_04', title: '团队协作自评', role: '自评', summary: '审批通过后开放。', status: '待完成', enabled: false },
+      peerReviewTask: { id: 'team_peer_review_04', title: '组内互评', role: '互评', summary: '审批通过后开放。', status: '待完成', enabled: false },
+    },
+    personalRankings: [],
+    groupRankings: [],
+  },
+  team_demo_05: {
+    id: 'team_demo_05',
+    teamSummary: '研学旅行推荐团面向家长分享，设备端仅做展示和分享入口。',
+    handbookTitle: '冷湖少年科创营推荐说明',
+    groupName: '暂不分组',
+    groupRole: '暂不分配',
+    badge: '推荐团',
+    joinMode: '授权码加入',
+    joinCode: 'N/A',
+    myMember: {
+      id: 'member_demo_me_05',
+      name: '小明',
+      roleName: '未报名',
+      note: '可把推荐链接分享给家长，在小程序中查看和报名。',
+      isCurrentStudent: true,
+    },
+    myRole: '未报名',
+    myRank: { score: 0, rank: 0, total: 0 },
+    myGroupRank: { score: 0, rank: 0, total: 0 },
+    handbookMaterials: [
+      {
+        id: 'handbook_material_08',
+        title: '冷湖科创营行程亮点',
+        type: 'video',
+        previewMode: 'video',
+        summary: '3 天 2 夜科创营精彩内容预览。',
+        coverImage: '冷湖营地预告片',
+        duration: '01:48',
+      },
+      {
+        id: 'handbook_material_09',
+        title: '家长选团 AI 参考',
+        type: 'ai_reference',
+        previewMode: 'ai_reference',
+        summary: '帮助家长判断课程亮点、适龄范围和准备事项。',
+        aiSummary: '推荐重点关注行程强度、住宿安排、科创主题与孩子兴趣匹配度。',
+        questions: ['适合几年级学生？', '家长需要准备什么？', '报名在哪个小程序完成？'],
+      },
+    ],
+    groups: [],
+    reviewConfig: {
+      allowSelfReview: false,
+      allowPeerReview: false,
+      rubricItems: [],
+      selfReviewTask: { id: 'team_self_review_05', title: '团队协作自评', role: '自评', summary: '推荐团不开放。', status: '待完成', enabled: false },
+      peerReviewTask: { id: 'team_peer_review_05', title: '组内互评', role: '互评', summary: '推荐团不开放。', status: '待完成', enabled: false },
+    },
+    personalRankings: [],
+    groupRankings: [],
+  },
+  team_demo_06: {
+    id: 'team_demo_06',
+    teamSummary: '研学旅行推荐团面向家长分享，设备端展示雨林观察课程亮点和出行信息。',
+    handbookTitle: '西双版纳雨林观察营推荐说明',
+    groupName: '暂不分组',
+    groupRole: '暂不分配',
+    badge: '推荐团',
+    joinMode: '授权码加入',
+    joinCode: 'N/A',
+    myMember: {
+      id: 'member_demo_me_06',
+      name: '小明',
+      roleName: '未报名',
+      note: '可发送给家长，在小程序中查看行程和报名。',
+      isCurrentStudent: true,
+    },
+    myRole: '未报名',
+    myRank: { score: 0, rank: 0, total: 0 },
+    myGroupRank: { score: 0, rank: 0, total: 0 },
+    handbookMaterials: [
+      {
+        id: 'handbook_material_10',
+        title: '雨林观察行程亮点',
+        type: 'video',
+        previewMode: 'video',
+        summary: '展示热带植物识别、昆虫观察和夜观安全须知。',
+        coverImage: '雨林观察预告片',
+        duration: '01:36',
+      },
+      {
+        id: 'handbook_material_11',
+        title: '家长选团 AI 参考',
+        type: 'ai_reference',
+        previewMode: 'ai_reference',
+        summary: '帮助家长了解雨林研学的适龄范围、课程强度和装备准备。',
+        aiSummary: '推荐重点关注防蚊、防晒、夜观安全和孩子对自然观察的兴趣。',
+        questions: ['需要准备哪些装备？', '夜观活动安全吗？', '适合第一次参加研学的孩子吗？'],
+      },
+    ],
+    groups: [],
+    reviewConfig: {
+      allowSelfReview: false,
+      allowPeerReview: false,
+      rubricItems: [],
+      selfReviewTask: { id: 'team_self_review_06', title: '团队协作自评', role: '自评', summary: '推荐团不开放。', status: '待完成', enabled: false },
+      peerReviewTask: { id: 'team_peer_review_06', title: '组内互评', role: '互评', summary: '推荐团不开放。', status: '待完成', enabled: false },
+    },
+    personalRankings: [],
+    groupRankings: [],
+  },
+  team_demo_07: {
+    id: 'team_demo_07',
+    teamSummary: '研学旅行推荐团面向家长分享，设备端展示敦煌艺术和丝路文化课程亮点。',
+    handbookTitle: '敦煌丝路艺术营推荐说明',
+    groupName: '暂不分组',
+    groupRole: '暂不分配',
+    badge: '推荐团',
+    joinMode: '授权码加入',
+    joinCode: 'N/A',
+    myMember: {
+      id: 'member_demo_me_07',
+      name: '小明',
+      roleName: '未报名',
+      note: '可发送给家长，在小程序中查看行程和报名。',
+      isCurrentStudent: true,
+    },
+    myRole: '未报名',
+    myRank: { score: 0, rank: 0, total: 0 },
+    myGroupRank: { score: 0, rank: 0, total: 0 },
+    handbookMaterials: [
+      {
+        id: 'handbook_material_12',
+        title: '敦煌艺术课程亮点',
+        type: 'video',
+        previewMode: 'video',
+        summary: '展示壁画临摹、色彩观察和丝路故事课程。',
+        coverImage: '敦煌艺术预告片',
+        duration: '01:42',
+      },
+      {
+        id: 'handbook_material_13',
+        title: '家长选团 AI 参考',
+        type: 'ai_reference',
+        previewMode: 'ai_reference',
+        summary: '帮助家长判断孩子是否适合历史艺术主题研学。',
+        aiSummary: '推荐重点关注行程天数、文化课程比例和孩子对绘画表达的兴趣。',
+        questions: ['没有绘画基础可以参加吗？', '每天课程强度如何？', '家长端能看到哪些行程信息？'],
+      },
+    ],
+    groups: [],
+    reviewConfig: {
+      allowSelfReview: false,
+      allowPeerReview: false,
+      rubricItems: [],
+      selfReviewTask: { id: 'team_self_review_07', title: '团队协作自评', role: '自评', summary: '推荐团不开放。', status: '待完成', enabled: false },
+      peerReviewTask: { id: 'team_peer_review_07', title: '组内互评', role: '互评', summary: '推荐团不开放。', status: '待完成', enabled: false },
+    },
+    personalRankings: [],
+    groupRankings: [],
+  },
+  team_demo_08: {
+    id: 'team_demo_08',
+    teamSummary: '研学旅行推荐团面向家长分享，设备端展示航天科技课程和场馆体验信息。',
+    handbookTitle: '珠海航天探索营推荐说明',
+    groupName: '暂不分组',
+    groupRole: '暂不分配',
+    badge: '推荐团',
+    joinMode: '授权码加入',
+    joinCode: 'N/A',
+    myMember: {
+      id: 'member_demo_me_08',
+      name: '小明',
+      roleName: '未报名',
+      note: '可发送给家长，在小程序中查看行程和报名。',
+      isCurrentStudent: true,
+    },
+    myRole: '未报名',
+    myRank: { score: 0, rank: 0, total: 0 },
+    myGroupRank: { score: 0, rank: 0, total: 0 },
+    handbookMaterials: [
+      {
+        id: 'handbook_material_14',
+        title: '航天探索行程亮点',
+        type: 'video',
+        previewMode: 'video',
+        summary: '展示火箭结构认知、卫星任务体验和太空中心参访。',
+        coverImage: '航天探索预告片',
+        duration: '01:30',
+      },
+      {
+        id: 'handbook_material_15',
+        title: '家长选团 AI 参考',
+        type: 'ai_reference',
+        previewMode: 'ai_reference',
+        summary: '帮助家长了解航天主题研学的学习重点和准备事项。',
+        aiSummary: '推荐重点关注课程是否偏实践、孩子对工程结构的兴趣和出行安排。',
+        questions: ['课程是否包含动手制作？', '适合低年级学生吗？', '报名后在哪里查看集合信息？'],
+      },
+    ],
+    groups: [],
+    reviewConfig: {
+      allowSelfReview: false,
+      allowPeerReview: false,
+      rubricItems: [],
+      selfReviewTask: { id: 'team_self_review_08', title: '团队协作自评', role: '自评', summary: '推荐团不开放。', status: '待完成', enabled: false },
+      peerReviewTask: { id: 'team_peer_review_08', title: '组内互评', role: '互评', summary: '推荐团不开放。', status: '待完成', enabled: false },
+    },
+    personalRankings: [],
+    groupRankings: [],
   },
 };
 
@@ -2284,10 +3568,23 @@ export const demoTeamBadges: DemoTeamBadge[] = [
 export const demoReports: DemoReport[] = [
   {
     id: 'report_demo_01',
+    teamId: 'team_demo_01',
     title: '海洋馆研学报告',
     status: 'generated',
     publishedAt: now,
     summary: '已汇总海洋观察、团队协作和表达表现，可同步给家长查看。',
+    certificateId: 'certificate_demo_01',
+    certificateTitle: '海洋馆研学证书',
+  },
+  {
+    id: 'report_demo_02',
+    teamId: 'team_demo_03',
+    title: '植物园观察营报告',
+    status: 'generated',
+    publishedAt: '2026-03-29T10:00:00.000Z',
+    summary: '历史研学报告已归档，可回看路线观察和小组表现。',
+    certificateId: 'certificate_demo_02',
+    certificateTitle: '植物园观察营证书',
   },
 ];
 
@@ -2308,6 +3605,544 @@ export const demoPlazaContent: DemoPlazaContent[] = [
   },
 ];
 
+type DemoPlazaAgentSeed = {
+  id: string;
+  title: string;
+  shortTitle: string;
+  logo: string;
+  accent: DemoPlazaAgent['accent'];
+  category: DemoPlazaCategory;
+  expertName: string;
+  operatorName: string;
+  oneLineIntro: string;
+  tag: string;
+  desc: string;
+  scenes: [string, string, string];
+  newsTitle: string;
+  newsSummary: string;
+  courseTitle: string;
+  courseSummary: string;
+  challengeTitle: string;
+  challengeSummary: string;
+  targetPath?: string;
+};
+
+function buildDemoPlazaAgent(seed: DemoPlazaAgentSeed): DemoPlazaAgent {
+  return {
+    id: seed.id,
+    title: seed.title,
+    shortTitle: seed.shortTitle,
+    logo: seed.logo,
+    accent: seed.accent,
+    desc: seed.desc,
+    expertName: seed.expertName,
+    expertAvatarOrLogo: seed.logo,
+    operatorName: seed.operatorName,
+    oneLineIntro: seed.oneLineIntro,
+    companionModes: ['text', 'voice', 'image'],
+    tag: seed.tag,
+    category: seed.category,
+    scenes: seed.scenes,
+    openPath: '/ask',
+    subscriptionSummary: `可订阅 ${seed.title} 的资讯、课程和专题挑战提醒。`,
+    news: [
+      {
+        id: `${seed.id}_news_01`,
+        title: seed.newsTitle,
+        summary: seed.newsSummary,
+        publishedAt: '今天 09:00',
+        autoNext: true,
+        audioDuration: '01:08',
+        paragraphs: [
+          seed.newsSummary,
+          `本期内容适合结合“${seed.scenes[0]}”“${seed.scenes[1]}”等场景继续追问。`,
+          '听完后可以直接进入专家伴学、课程或专题挑战继续学习。',
+        ],
+      },
+    ],
+    courses: [
+      {
+        id: `${seed.id}_course_01`,
+        title: seed.courseTitle,
+        summary: seed.courseSummary,
+        tutor: seed.expertName,
+        isPreviewFree: true,
+        progress: 0,
+        resumeHint: '还没有开始学习',
+        chapters: [
+          {
+            id: `${seed.id}_lesson_01`,
+            title: `第 1 课 ${seed.title}怎么入门`,
+            duration: '08:20',
+            status: '待学习',
+          },
+          {
+            id: `${seed.id}_lesson_02`,
+            title: `第 2 课 ${seed.title}怎么用在真实任务里`,
+            duration: '09:10',
+            status: '待学习',
+          },
+        ],
+        notes: [],
+      },
+    ],
+    challenges: [
+      {
+        id: `${seed.id}_challenge_01`,
+        title: seed.challengeTitle,
+        mode: '个人挑战',
+        summary: seed.challengeSummary,
+        status: '待开始',
+        targetPath: seed.targetPath ?? '/tasks',
+      },
+    ],
+  };
+}
+
+const demoExpandedPlazaAgents: DemoPlazaAgent[] = [
+  buildDemoPlazaAgent({
+    id: 'plaza_agent_09',
+    title: 'AI动漫',
+    shortTitle: 'AI动漫',
+    logo: '漫',
+    accent: 'pink',
+    category: '科技',
+    expertName: '动漫创作教练',
+    operatorName: 'AI 动漫工坊',
+    oneLineIntro: '把角色、分镜和故事灵感变成能展示的动漫创意。',
+    tag: '动漫创作',
+    desc: '围绕角色设定、故事板、镜头设计和 AI 动漫创作提供伴学、课程与挑战。',
+    scenes: ['设计动漫角色', '整理故事分镜', '把观察改编成动漫情节'],
+    newsTitle: 'AI 动漫课堂开始流行“观察改编”练习',
+    newsSummary: '把真实观察到的人物、场景和动作改编成动漫情节，更适合研学创作展示。',
+    courseTitle: 'AI 动漫创作入门课',
+    courseSummary: '从角色设定、分镜草图到画面表达，完成一次动漫创作体验。',
+    challengeTitle: '观察故事改编挑战',
+    challengeSummary: '把一次研学观察改编成 3 格动漫分镜并讲清楚角色动作。',
+    targetPath: '/tasks/task_demo_01',
+  }),
+  buildDemoPlazaAgent({
+    id: 'plaza_agent_10',
+    title: 'AI编程',
+    shortTitle: 'AI编程',
+    logo: '码',
+    accent: 'blue',
+    category: '科技',
+    expertName: '少儿编程教练',
+    operatorName: '腾讯青训营',
+    oneLineIntro: '把问题拆开、把步骤排好，再让 AI 帮你写出可运行思路。',
+    tag: '编程启蒙',
+    desc: '提供算法启蒙、项目拆解、代码示例和编程任务伴学，适合科技研学与创客活动。',
+    scenes: ['设计小程序逻辑', '理解机器人指令', '把观察流程写成步骤'],
+    newsTitle: 'AI 编程启蒙更强调“先想清楚再动手”',
+    newsSummary: '越来越多编程课程把问题拆解和流程表达放在写代码之前，帮助孩子形成结构化思维。',
+    courseTitle: 'AI 编程启蒙课',
+    courseSummary: '从步骤思维、条件判断到简单项目设计，建立编程基本感觉。',
+    challengeTitle: '观察流程编程挑战',
+    challengeSummary: '把一次研学观察过程写成清晰步骤，并说明哪里适合用程序自动完成。',
+  }),
+  buildDemoPlazaAgent({
+    id: 'plaza_agent_11',
+    title: '3D打印',
+    shortTitle: '3D打印',
+    logo: '打',
+    accent: 'orange',
+    category: '科技',
+    expertName: '创客制造导师',
+    operatorName: '创客实验室',
+    oneLineIntro: '从一个想法到一个实体模型，帮你看懂 3D 打印的设计逻辑。',
+    tag: '创客制造',
+    desc: '围绕三维建模、实体制作、结构验证和创客作品展示提供完整学习支持。',
+    scenes: ['设计小模型', '理解结构与支撑', '把创意做成实体作品'],
+    newsTitle: '校园创客课开始用 3D 打印做研学模型',
+    newsSummary: '学生会先根据观察对象画出结构草图，再把模型打印出来用于展示和讲解。',
+    courseTitle: '3D 打印创客课',
+    courseSummary: '认识建模、切片、打印和展示四个关键环节，完成一件创客作品。',
+    challengeTitle: '模型结构观察挑战',
+    challengeSummary: '选择一个研学对象，提出适合做成 3D 模型的结构方案。',
+  }),
+  buildDemoPlazaAgent({
+    id: 'plaza_agent_12',
+    title: '机器人',
+    shortTitle: '机器人',
+    logo: '机',
+    accent: 'teal',
+    category: '科技',
+    expertName: '机器人导师',
+    operatorName: '机器人创新实验室',
+    oneLineIntro: '帮你理解机器人怎么感知、怎么行动、怎么完成任务。',
+    tag: '机器人探索',
+    desc: '聚焦机器人结构、感知、执行与任务设计，适合机器人研学和科技馆任务。',
+    scenes: ['观察机器人动作', '理解传感器作用', '设计机器人任务路线'],
+    newsTitle: '服务机器人正在进入更多公共学习场景',
+    newsSummary: '从讲解、运输到巡视，机器人开始在真实场景中承担更多具体任务。',
+    courseTitle: '机器人观察课',
+    courseSummary: '认识机器人结构、传感器和任务逻辑，学会用问题去观察机器人。',
+    challengeTitle: '机器人任务设计挑战',
+    challengeSummary: '为一个机器人设计一条服务路线，并说明它需要哪些感知能力。',
+  }),
+  buildDemoPlazaAgent({
+    id: 'plaza_agent_13',
+    title: '卫星航天',
+    shortTitle: '卫星航天',
+    logo: '航',
+    accent: 'purple',
+    category: '科技',
+    expertName: '航天科普导师',
+    operatorName: '卫星航天研究社',
+    oneLineIntro: '让遥远的卫星、火箭和航天任务变成孩子能理解的知识。',
+    tag: '航天启蒙',
+    desc: '围绕火箭发射、卫星功能、太空任务和航天探索精神提供伴学支持。',
+    scenes: ['理解卫星用途', '认识火箭发射过程', '把航天知识讲给同学听'],
+    newsTitle: '小型卫星任务越来越适合青少年科普学习',
+    newsSummary: '通过观测、通信和环境监测案例，孩子更容易理解卫星为什么重要。',
+    courseTitle: '卫星航天启蒙课',
+    courseSummary: '从火箭、卫星到太空任务，建立航天探索的基础知识地图。',
+    challengeTitle: '我的太空任务设想',
+    challengeSummary: '为一颗想象中的小卫星设计功能，并说明它能帮助人们解决什么问题。',
+  }),
+  buildDemoPlazaAgent({
+    id: 'plaza_agent_14',
+    title: '华大基因',
+    shortTitle: '华大基因',
+    logo: '基',
+    accent: 'green',
+    category: '科技',
+    expertName: '生命科学导师',
+    operatorName: '华大基因',
+    oneLineIntro: '把抽象的基因、生命与健康知识讲成孩子能听懂的故事。',
+    tag: '生命科学',
+    desc: '提供基因、生命科学、健康科普和实验观察相关的资讯、课程与问答能力。',
+    scenes: ['认识基因基础概念', '理解生命多样性', '连接健康与科学观察'],
+    newsTitle: '生命科学课程开始强调“从观察到证据”',
+    newsSummary: '学生通过样本、现象和数据建立生命科学理解，不再只是记结论。',
+    courseTitle: '生命科学观察课',
+    courseSummary: '从细胞、基因到生命现象，建立基础生命科学认知。',
+    challengeTitle: '生命现象观察挑战',
+    challengeSummary: '记录一个你观察到的生命现象，并用证据解释你的判断。',
+  }),
+  buildDemoPlazaAgent({
+    id: 'plaza_agent_15',
+    title: '腾讯青训营',
+    shortTitle: '青训营',
+    logo: '腾',
+    accent: 'blue',
+    category: '科技',
+    expertName: '科技项目教练',
+    operatorName: '腾讯青训营',
+    oneLineIntro: '用项目化方式带你理解技术、合作和表达。',
+    tag: '项目研学',
+    desc: '围绕技术项目、团队协作、问题拆解与成果展示提供项目化伴学能力。',
+    scenes: ['做科技小项目', '练习任务拆解', '准备项目展示讲解'],
+    newsTitle: '越来越多科技营开始用真实项目训练表达力',
+    newsSummary: '学生不仅要做出结果，也要学会说明自己如何发现问题、验证方案和完成展示。',
+    courseTitle: '科技项目启航课',
+    courseSummary: '从选题、分工到展示，体验一次完整的科技项目研学。',
+    challengeTitle: '项目路演挑战',
+    challengeSummary: '围绕一个科技主题做出项目提案，并讲清问题、方案和分工。',
+  }),
+  buildDemoPlazaAgent({
+    id: 'plaza_agent_16',
+    title: '奇趣科学',
+    shortTitle: '奇趣科学',
+    logo: '趣',
+    accent: 'orange',
+    category: '科技',
+    expertName: '科学实验老师',
+    operatorName: '奇趣科学社',
+    oneLineIntro: '把好奇心留住，再把它变成真正的问题和实验。',
+    tag: '科学实验',
+    desc: '以趣味实验、现象观察和问题追问为主线，帮助孩子建立科学探究兴趣。',
+    scenes: ['观察有趣现象', '做简单科学实验', '把好奇变成问题'],
+    newsTitle: '趣味科学课正在把“先猜想”放到实验前面',
+    newsSummary: '先说出自己的猜想，再观察结果，孩子更容易建立真正的探究意识。',
+    courseTitle: '奇趣科学实验课',
+    courseSummary: '用好玩的科学现象带出观察、猜想、验证和表达。',
+    challengeTitle: '现象猜想挑战',
+    challengeSummary: '选择一个有趣现象，说出你的猜想并记录验证过程。',
+  }),
+  buildDemoPlazaAgent({
+    id: 'plaza_agent_17',
+    title: '5D理工(冷湖实验室)',
+    shortTitle: '5D理工',
+    logo: '理',
+    accent: 'teal',
+    category: '科技',
+    expertName: '理工探究导师',
+    operatorName: '冷湖实验室',
+    oneLineIntro: '把理工思维放进真实观察和未来场景里。',
+    tag: '理工探索',
+    desc: '围绕未来科技、理工方法、跨学科观察和实验室案例提供系统化伴学。',
+    scenes: ['理解前沿理工案例', '把观察转成实验想法', '连接真实场景与未来科技'],
+    newsTitle: '前沿实验室越来越重视跨学科问题解决',
+    newsSummary: '从材料到能源，从观测到设计，理工学习正在更强调真实问题和跨学科整合。',
+    courseTitle: '5D 理工探索课',
+    courseSummary: '从真实案例出发理解理工方法，建立前沿科技观察视角。',
+    challengeTitle: '未来科技设想挑战',
+    challengeSummary: '结合一次观察经历，提出一个未来科技应用设想并说明价值。',
+  }),
+  buildDemoPlazaAgent({
+    id: 'plaza_agent_18',
+    title: '一人公司',
+    shortTitle: '一人公司',
+    logo: '一',
+    accent: 'orange',
+    category: '商业',
+    expertName: '商业实践导师',
+    operatorName: '一人公司实验室',
+    oneLineIntro: '从一个人怎么发现需求、设计产品到完成表达，理解小商业闭环。',
+    tag: '商业实践',
+    desc: '围绕需求发现、产品思维、个人表达与价值交换，帮助孩子理解微型商业模型。',
+    scenes: ['观察用户需求', '设计自己的小产品', '练习讲清价值主张'],
+    newsTitle: '儿童商业启蒙开始强调“一个人也能做成小项目”',
+    newsSummary: '从发现需求到做出样品，再到说明价值，孩子可以体验完整的小商业流程。',
+    courseTitle: '一人公司启蒙课',
+    courseSummary: '认识需求、产品、宣传和交付，理解一个小商业项目如何运转。',
+    challengeTitle: '我的小产品挑战',
+    challengeSummary: '围绕一个真实需求设计小产品，并说明它帮谁解决了什么问题。',
+  }),
+  buildDemoPlazaAgent({
+    id: 'plaza_agent_19',
+    title: '少年马斯克',
+    shortTitle: '少年马斯克',
+    logo: '马',
+    accent: 'blue',
+    category: '商业',
+    expertName: '创新创业教练',
+    operatorName: '少年马斯克',
+    oneLineIntro: '把想象力、行动力和商业思维放到一个真实项目里。',
+    tag: '创新商业',
+    desc: '聚焦创新创业、产品构想、表达展示和少年商业体验项目。',
+    scenes: ['构思创新项目', '做产品表达展示', '练习商业路演'],
+    newsTitle: '青少年创业项目更看重问题意识和行动方案',
+    newsSummary: '好的项目不只是点子新，还要说清它解决了谁的什么问题。',
+    courseTitle: '少年创新项目课',
+    courseSummary: '从问题发现、方案设计到路演表达，体验一次少年创业项目。',
+    challengeTitle: '创新项目路演挑战',
+    challengeSummary: '为一个校园或生活问题做出创新方案，并用 1 分钟讲清价值。',
+  }),
+  buildDemoPlazaAgent({
+    id: 'plaza_agent_20',
+    title: '财商思维',
+    shortTitle: '财商思维',
+    logo: '财',
+    accent: 'green',
+    category: '商业',
+    expertName: '财商启蒙老师',
+    operatorName: '财商成长营',
+    oneLineIntro: '用孩子听得懂的话理解金钱、选择、计划和价值。',
+    tag: '财商启蒙',
+    desc: '从储蓄、预算、价值交换到消费决策，帮助孩子形成基础财商思维。',
+    scenes: ['理解预算安排', '比较商品价值', '做消费选择判断'],
+    newsTitle: '财商教育越来越重视“会选择”而不是只会计算',
+    newsSummary: '孩子需要理解价值、延迟满足和预算安排，才能真正形成财商意识。',
+    courseTitle: '财商思维启蒙课',
+    courseSummary: '从储蓄、预算到价值判断，建立基础财商认知。',
+    challengeTitle: '预算安排挑战',
+    challengeSummary: '给一次活动做简单预算，并解释你为什么这样安排。',
+  }),
+  buildDemoPlazaAgent({
+    id: 'plaza_agent_21',
+    title: '商业模式',
+    shortTitle: '商业模式',
+    logo: '模',
+    accent: 'purple',
+    category: '商业',
+    expertName: '商业模型导师',
+    operatorName: '商业创想社',
+    oneLineIntro: '帮助孩子理解一件事为什么能长期做下去。',
+    tag: '模式思维',
+    desc: '围绕用户、价值、资源、合作和收入方式，带孩子理解基础商业模式。',
+    scenes: ['拆解一个店铺怎么运转', '理解服务和顾客关系', '比较不同商业方案'],
+    newsTitle: '商业模式课开始用身边案例解释“为什么能持续”',
+    newsSummary: '从便利店、文创店到线上服务，孩子更容易从身边案例理解商业模式。',
+    courseTitle: '商业模式观察课',
+    courseSummary: '从顾客、价值到交付，认识商业模式的基本组成。',
+    challengeTitle: '店铺模式拆解挑战',
+    challengeSummary: '观察一个真实店铺，说明它服务谁、提供什么、为什么有人愿意付费。',
+  }),
+  buildDemoPlazaAgent({
+    id: 'plaza_agent_22',
+    title: '商业工程学',
+    shortTitle: '商业工程',
+    logo: '工',
+    accent: 'teal',
+    category: '商业',
+    expertName: '商业系统导师',
+    operatorName: '商业工程实验室',
+    oneLineIntro: '把商业看成一个可以拆解、可以优化的系统工程。',
+    tag: '系统思维',
+    desc: '用系统化方法理解商业流程、协作链路、资源配置和执行效率。',
+    scenes: ['拆解服务流程', '思考资源配置', '设计更高效的执行方案'],
+    newsTitle: '商业学习开始引入流程拆解和系统优化方法',
+    newsSummary: '孩子通过流程图和角色分工，能更直观地理解商业如何运转与优化。',
+    courseTitle: '商业工程学入门课',
+    courseSummary: '从流程、角色、资源和效率四个维度理解商业系统。',
+    challengeTitle: '流程优化挑战',
+    challengeSummary: '挑选一个熟悉的服务流程，提出一个让它更顺畅的改进方案。',
+  }),
+  buildDemoPlazaAgent({
+    id: 'plaza_agent_23',
+    title: '第一性原理',
+    shortTitle: '第一性原理',
+    logo: '原',
+    accent: 'blue',
+    category: '商业',
+    expertName: '思维训练导师',
+    operatorName: '第一性思考营',
+    oneLineIntro: '帮助孩子把复杂问题拆回最基本的事实和条件。',
+    tag: '思维训练',
+    desc: '围绕拆解问题、回到本质、重建方案的过程，培养基础第一性思维。',
+    scenes: ['分析一个复杂问题', '拆掉习惯性答案', '重新提出更合理方案'],
+    newsTitle: '第一性原理开始进入青少年创新课程',
+    newsSummary: '先问“最基本的事实是什么”，再想办法，孩子更容易形成独立思考。',
+    courseTitle: '第一性思维训练课',
+    courseSummary: '从问题拆解、本质判断到重建方案，练习更底层的思考方式。',
+    challengeTitle: '问题拆解挑战',
+    challengeSummary: '选择一个常见问题，把它拆成最基础的三个事实再重新提出方案。',
+  }),
+  buildDemoPlazaAgent({
+    id: 'plaza_agent_24',
+    title: '樊登读书',
+    shortTitle: '樊登读书',
+    logo: '读',
+    accent: 'green',
+    category: '成长',
+    expertName: '阅读成长导师',
+    operatorName: '樊登读书',
+    oneLineIntro: '把阅读输入变成真正会说、会写、会表达的能力。',
+    tag: '阅读成长',
+    desc: '围绕阅读理解、观点表达、亲子共读和成长课程提供长期伴学支持。',
+    scenes: ['读完后整理观点', '做亲子共读分享', '把一本书讲给别人听'],
+    newsTitle: '阅读陪伴正在从“读完一本书”转向“表达一本书”',
+    newsSummary: '越来越多阅读课程开始重视孩子读完后的表达、连接和行动。',
+    courseTitle: '阅读表达成长课',
+    courseSummary: '从阅读理解到表达输出，形成完整的阅读成长闭环。',
+    challengeTitle: '一本书讲给你听挑战',
+    challengeSummary: '挑选一本最近读过的书，用 1 分钟讲清它最值得分享的一个观点。',
+  }),
+  buildDemoPlazaAgent({
+    id: 'plaza_agent_25',
+    title: '千问智学',
+    shortTitle: '千问智学',
+    logo: '问',
+    accent: 'blue',
+    category: '成长',
+    expertName: '智能学习教练',
+    operatorName: '千问智学',
+    oneLineIntro: '把提问、理解和整理知识变成一套更聪明的学习方法。',
+    tag: '智能学习',
+    desc: '通过提问引导、知识整理、错题反思和学习策略，提升孩子的自主学习能力。',
+    scenes: ['不会时先追问', '整理学习方法', '复盘一次学习过程'],
+    newsTitle: 'AI 学习助手开始更重视“会不会提问”',
+    newsSummary: '好的问题能帮助孩子更快定位盲点，也更容易建立自主学习节奏。',
+    courseTitle: '提问式学习方法课',
+    courseSummary: '从会提问、会整理到会复盘，建立更主动的学习方式。',
+    challengeTitle: '我的提问清单挑战',
+    challengeSummary: '围绕一个学习主题提出 5 个好问题，并标出最值得追问的一个。',
+  }),
+  buildDemoPlazaAgent({
+    id: 'plaza_agent_26',
+    title: 'AI学习',
+    shortTitle: 'AI学习',
+    logo: '学',
+    accent: 'teal',
+    category: '成长',
+    expertName: 'AI 学习伙伴',
+    operatorName: 'AI 学习实验室',
+    oneLineIntro: '把 AI 变成学习助手，而不是只用来找答案。',
+    tag: '学习陪伴',
+    desc: '帮助孩子用 AI 做预习、整理、表达和复盘，建立更高质量的学习闭环。',
+    scenes: ['预习新主题', '整理课堂重点', '把知识做成自己的表达'],
+    newsTitle: 'AI 陪学开始从答题走向方法训练',
+    newsSummary: '真正有效的 AI 学习，不是代替思考，而是帮助孩子学会怎么思考。',
+    courseTitle: 'AI 学习方法课',
+    courseSummary: '从预习、整理到复盘，学习如何把 AI 用在真正有价值的地方。',
+    challengeTitle: 'AI 学习复盘挑战',
+    challengeSummary: '用 AI 帮你整理一次学习过程，并说出它最有帮助的一个地方。',
+  }),
+  buildDemoPlazaAgent({
+    id: 'plaza_agent_27',
+    title: '未来学校',
+    shortTitle: '未来学校',
+    logo: '未',
+    accent: 'purple',
+    category: '成长',
+    expertName: '未来教育导师',
+    operatorName: '未来学校研究社',
+    oneLineIntro: '带你理解未来学习可能长什么样，也帮你找到自己的学习节奏。',
+    tag: '未来教育',
+    desc: '围绕未来教育、项目学习、跨学科成长和学习方式升级提供内容与伴学能力。',
+    scenes: ['理解未来课堂', '体验项目式学习', '思考自己适合的学习方式'],
+    newsTitle: '未来学校更重视真实项目和跨学科学习',
+    newsSummary: '从做中学、在真实问题中学，正在成为越来越多未来教育场景的共同特征。',
+    courseTitle: '未来学校体验课',
+    courseSummary: '从课程样态到学习方式，认识未来教育的发展方向。',
+    challengeTitle: '我的理想课堂挑战',
+    challengeSummary: '设计一节你最想上的未来课堂，并说明它为什么更适合你学习。',
+  }),
+  buildDemoPlazaAgent({
+    id: 'plaza_agent_28',
+    title: '天赋测试',
+    shortTitle: '天赋测试',
+    logo: '赋',
+    accent: 'orange',
+    category: '成长',
+    expertName: '潜能发展导师',
+    operatorName: '潜能发展中心',
+    oneLineIntro: '帮助孩子看见自己的兴趣倾向、优势行为和发展方向。',
+    tag: '潜能发现',
+    desc: '通过兴趣线索、行为表现与能力特征，帮助孩子做更早期的天赋与优势识别。',
+    scenes: ['识别兴趣偏好', '理解自己的优势', '记录成长线索'],
+    newsTitle: '天赋探索越来越重视真实行为证据',
+    newsSummary: '孩子的优势不是凭感觉判断，而要结合长期行为、兴趣和任务表现来观察。',
+    courseTitle: '优势发现小课',
+    courseSummary: '从兴趣、行为和表现三条线索，看见自己的潜能方向。',
+    challengeTitle: '我的优势线索挑战',
+    challengeSummary: '记录最近一次任务中的亮点表现，并说出它可能反映了哪种优势。',
+  }),
+  buildDemoPlazaAgent({
+    id: 'plaza_agent_29',
+    title: '能力日图谱',
+    shortTitle: '能力图谱',
+    logo: '图',
+    accent: 'teal',
+    category: '成长',
+    expertName: '能力发展导师',
+    operatorName: '能力图谱研究室',
+    oneLineIntro: '把每天的任务表现慢慢沉淀成能看见的能力地图。',
+    tag: '能力发展',
+    desc: '围绕能力记录、成长趋势、阶段反馈和每日表现沉淀，帮助孩子看见成长轨迹。',
+    scenes: ['回看每日成长', '识别能力强项', '制定下一步提升计划'],
+    newsTitle: '能力图谱开始用于追踪孩子的长期成长变化',
+    newsSummary: '通过持续记录任务表现和学习行为，能力发展开始变得更可视、更容易讨论。',
+    courseTitle: '能力成长地图课',
+    courseSummary: '认识能力标签、成长趋势和阶段复盘的方法，学会看懂自己的成长图谱。',
+    challengeTitle: '一周成长复盘挑战',
+    challengeSummary: '回看一周任务表现，找出你最明显提升的一项能力并说明原因。',
+  }),
+  buildDemoPlazaAgent({
+    id: 'plaza_agent_30',
+    title: '生涯规划',
+    shortTitle: '生涯规划',
+    logo: '涯',
+    accent: 'blue',
+    category: '成长',
+    expertName: '生涯规划导师',
+    operatorName: '生涯规划中心',
+    oneLineIntro: '从兴趣、能力和未来想象出发，帮助孩子更早建立方向感。',
+    tag: '方向探索',
+    desc: '围绕职业想象、成长路径、兴趣能力连接和未来方向探索提供系统陪伴。',
+    scenes: ['想象未来职业', '连接兴趣和能力', '做成长方向规划'],
+    newsTitle: '儿童生涯规划正在从“职业介绍”走向“方向探索”',
+    newsSummary: '真正有用的生涯启蒙，不是过早确定职业，而是先看见兴趣、能力和可能性。',
+    courseTitle: '未来方向探索课',
+    courseSummary: '从兴趣、能力到职业想象，建立初步的生涯规划意识。',
+    challengeTitle: '我的未来方向卡',
+    challengeSummary: '写下一个你最感兴趣的未来方向，并说明你现在已经具备了哪些相关能力。',
+  }),
+];
+
 export const demoPlazaAgents: DemoPlazaAgent[] = [
   {
     id: 'plaza_agent_01',
@@ -2316,6 +4151,11 @@ export const demoPlazaAgents: DemoPlazaAgent[] = [
     logo: '科',
     accent: 'blue',
     desc: '适合观察装置、实验现象和科学原理的 AI 智能体，支持资讯、课程和挑战入口。',
+    expertName: '刘博士',
+    expertAvatarOrLogo: '刘',
+    operatorName: '腾讯青训营',
+    oneLineIntro: '把现场观察变成能继续追问的科学问题。',
+    companionModes: ['text', 'voice', 'image'],
     tag: '观察智能体',
     category: '科技',
     recent: true,
@@ -2387,8 +4227,13 @@ export const demoPlazaAgents: DemoPlazaAgent[] = [
     logo: '读',
     accent: 'green',
     desc: '提供古诗文导读、阅读表达训练和伴学课程，适合读书与表达类场景。',
+    expertName: '樊登老师',
+    expertAvatarOrLogo: '樊',
+    operatorName: '樊登读书',
+    oneLineIntro: '把阅读输入慢慢变成清楚表达。',
+    companionModes: ['text', 'voice', 'image'],
     tag: '伴学智能体',
-    category: '读书',
+    category: '成长',
     recent: true,
     scenes: ['读书打卡前预习', '古诗文朗读陪练', '阅读后表达训练'],
     openPath: '/ask',
@@ -2440,8 +4285,13 @@ export const demoPlazaAgents: DemoPlazaAgent[] = [
     logo: '海',
     accent: 'teal',
     desc: '问答、识物、知识卡和专家陪伴式学习联动，适合海洋馆研学与现场观察。',
+    expertName: '王专家',
+    expertAvatarOrLogo: '王',
+    operatorName: '海洋科普中心',
+    oneLineIntro: '看图、听描述、接着问，帮你把观察讲清楚。',
+    companionModes: ['text', 'voice', 'image'],
     tag: '专家智能体',
-    category: '学习',
+    category: '成长',
     recent: true,
     subscribed: true,
     scenes: ['拍拍后发给专家', '随时追问海洋知识', '接收海洋主题课程和资讯推送'],
@@ -2534,6 +4384,11 @@ export const demoPlazaAgents: DemoPlazaAgent[] = [
     logo: '绘',
     accent: 'pink',
     desc: '帮助孩子把观察内容转成画面表达，支持创作课程、点评建议和作品挑战。',
+    expertName: '周老师',
+    expertAvatarOrLogo: '周',
+    operatorName: 'AI 创作实验室',
+    oneLineIntro: '把脑子里的想法变成能展示的画面。',
+    companionModes: ['text', 'voice', 'image'],
     tag: '创作智能体',
     category: '创作',
     scenes: ['海报创作前找灵感', '完成草图后优化构图', '接收创作任务提醒'],
@@ -2589,8 +4444,13 @@ export const demoPlazaAgents: DemoPlazaAgent[] = [
     logo: '动',
     accent: 'orange',
     desc: '记录运动表现、提醒热身和恢复，适合活动前后的身体管理。',
+    expertName: '陈教练',
+    expertAvatarOrLogo: '陈',
+    operatorName: '少年健康计划',
+    oneLineIntro: '让活动前后都更会照顾自己的身体。',
+    companionModes: ['text', 'voice', 'image'],
     tag: '陪练智能体',
-    category: '运动',
+    category: '健康',
     scenes: ['活动前热身提醒', '运动后恢复建议', '记录运动挑战'],
     openPath: '/ask',
     subscriptionSummary: '可订阅运动打卡和健康提醒。',
@@ -2614,8 +4474,13 @@ export const demoPlazaAgents: DemoPlazaAgent[] = [
     logo: '责',
     accent: 'purple',
     desc: '围绕社会责任、公民道德和环保议题，提供观点整理与案例启发。',
+    expertName: '何老师',
+    expertAvatarOrLogo: '何',
+    operatorName: '未来学校研究社',
+    oneLineIntro: '把观点、案例和行动建议连成一条线。',
+    companionModes: ['text', 'voice', 'image'],
     tag: '思辨智能体',
-    category: '能力',
+    category: '成长',
     scenes: ['环保议题讨论', '社会责任案例阅读', '完成倡议类作品'],
     openPath: '/ask',
     subscriptionSummary: '支持订阅社会责任主题资讯和小组讨论提醒。',
@@ -2651,6 +4516,11 @@ export const demoPlazaAgents: DemoPlazaAgent[] = [
     logo: '商',
     accent: 'blue',
     desc: '用儿童能理解的方式认识交换、成本和价值，适合商业体验类主题。',
+    expertName: '马老师',
+    expertAvatarOrLogo: '马',
+    operatorName: '少年马斯克',
+    oneLineIntro: '用孩子能懂的话讲清价值、成本和交换。',
+    companionModes: ['text', 'voice', 'image'],
     tag: '启蒙智能体',
     category: '商业',
     scenes: ['职业体验前预习', '小摊位项目思考', '理解成本和价值'],
@@ -2682,6 +4552,11 @@ export const demoPlazaAgents: DemoPlazaAgent[] = [
     logo: '艺',
     accent: 'pink',
     desc: '聚合文艺赏析、创作表达和案例灵感，适合文艺与综合创作场景。',
+    expertName: '林老师',
+    expertAvatarOrLogo: '林',
+    operatorName: '文艺创作社',
+    oneLineIntro: '给表达一点灵感，也给创作一点方法。',
+    companionModes: ['text', 'voice', 'image'],
     tag: '创意智能体',
     category: '文艺',
     scenes: ['听艺术故事', '找创作灵感', '整理展示表达'],
@@ -2691,6 +4566,7 @@ export const demoPlazaAgents: DemoPlazaAgent[] = [
     courses: [],
     challenges: [],
   },
+  ...demoExpandedPlazaAgents,
 ];
 
 export const demoFriends: DemoFriend[] = [
@@ -2847,6 +4723,7 @@ export const demoCloudFiles: DemoCloudFile[] = [
 
 export const demoSettings: DemoSettingItem[] = [
   { id: 'setting_device', title: '设备绑定', summary: '查看绑定家长与设备码', path: '/settings/device' },
+  { id: 'setting_switch_account', title: '切换账号', summary: '切换当前设备已登录过的学员账号', path: '/settings/switch-account' },
   { id: 'setting_password', title: '锁屏密码', summary: '设置 4 位锁屏密码', path: '/settings/password' },
   { id: 'setting_face', title: '人脸识别', summary: '管理刷脸识别与快捷登录', path: '/settings/face' },
 ];

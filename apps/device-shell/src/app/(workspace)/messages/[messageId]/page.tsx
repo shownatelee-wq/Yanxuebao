@@ -3,13 +3,14 @@
 import { Button, Result, Space, Tag, Typography } from 'antd';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { demoMessages } from '../../../../lib/device-demo-data';
+import { useDeviceMessages } from '../../../../lib/device-message-data';
 
 const { Paragraph, Text } = Typography;
 
 export default function DeviceMessageDetailPage() {
   const params = useParams<{ messageId: string }>();
-  const item = demoMessages.find((entry) => entry.id === params.messageId);
+  const messages = useDeviceMessages();
+  const item = messages.find((entry) => entry.id === params.messageId);
 
   if (!item) {
     return <Result status="404" title="未找到消息" extra={<Link href="/messages"><Button>消息</Button></Link>} />;

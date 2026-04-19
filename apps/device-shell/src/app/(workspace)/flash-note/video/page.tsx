@@ -1,30 +1,41 @@
 'use client';
 
-import { Button, Typography, message } from 'antd';
-import { WatchHero, WatchSection, WatchActionButtons, WatchNextSteps } from '../../../../lib/watch-ui';
-
-const { Paragraph } = Typography;
+import { Button, Space, Tag } from 'antd';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { FlashNoteRecorder } from '../../../../components/flash-note-recorder';
 
 export default function DeviceFlashVideoPage() {
-  const [messageApi, contextHolder] = message.useMessage();
+  const router = useRouter();
 
   return (
     <div className="device-page-stack">
-      {contextHolder}
-      <WatchHero title="视频闪记" subtitle="记录现场视频内容。" />
-      <WatchSection title="录制状态">
-        <div className="device-capture-stage">
-          <span>视频</span>
-        </div>
-        <Paragraph type="secondary" style={{ margin: 0, fontSize: 11 }}>
-          支持将现场视频保存到闪记作品。
-        </Paragraph>
-        <Button type="primary" block style={{ marginTop: 10 }} onClick={() => messageApi.success('视频闪记已保存')}>
-          开始录制
-        </Button>
-      </WatchSection>
-      <WatchNextSteps text="视频内容可保存为闪记，也可用于任务作品。" />
-      <WatchActionButtons primary={{ label: '闪记作品', path: '/flash-note/works' }} secondary={{ label: '任务', path: '/tasks/new' }} />
+      <div className="device-hero-card device-stage-card" style={{ padding: 12 }}>
+        <Space direction="vertical" size={8} style={{ width: '100%' }}>
+          <Space wrap>
+            <Tag color="purple">视频闪记</Tag>
+            <Tag color="blue">自动开始录制</Tag>
+          </Space>
+          <p className="device-page-title">视频闪记</p>
+          <p className="device-page-subtle">进入页面后自动开始录像，结束后直接保存为可引用的视频闪记。</p>
+        </Space>
+      </div>
+
+      <FlashNoteRecorder
+        type="video_note"
+        sourceContext={{ source: 'flash-note-app' }}
+        saveButtonLabel="保存视频闪记"
+        onSaved={(note) => router.push(`/flash-note/${note.id}`)}
+      />
+
+      <div className="device-action-row">
+        <Link href="/flash-note/works">
+          <Button type="primary" block>闪记作品</Button>
+        </Link>
+        <Link href="/flash-note">
+          <Button block>闪记</Button>
+        </Link>
+      </div>
     </div>
   );
 }

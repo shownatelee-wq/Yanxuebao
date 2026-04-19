@@ -3,15 +3,27 @@
 import { BellOutlined, MessageOutlined, NotificationOutlined } from '@ant-design/icons';
 import { Badge, Button, Empty, Segmented, Space, Tag, Typography, message } from 'antd';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
-import { demoMessages, type DemoMessage } from '../../../lib/device-demo-data';
+import { useEffect, useMemo, useState } from 'react';
+import type { DemoMessage } from '../../../lib/device-demo-data';
+import { useDeviceMessages } from '../../../lib/device-message-data';
 
 const { Paragraph } = Typography;
 
 export default function DeviceMessagesPage() {
-  const [messages, setMessages] = useState<DemoMessage[]>(demoMessages);
+  const sourceMessages = useDeviceMessages();
+  const [messages, setMessages] = useState<DemoMessage[]>(sourceMessages);
   const [filter, setFilter] = useState<'all' | 'broadcast' | 'group' | 'family' | 'system' | 'subscription'>('all');
   const [messageApi, contextHolder] = message.useMessage();
+
+  useEffect(() => {
+    setMessages((current) => {
+      const readMap = new Map(current.map((item) => [item.id, item.read]));
+      return sourceMessages.map((item) => ({
+        ...item,
+        read: readMap.get(item.id) ?? item.read,
+      }));
+    });
+  }, [sourceMessages]);
 
   const filteredMessages = useMemo(() => {
     if (filter === 'all') {
@@ -21,6 +33,7 @@ export default function DeviceMessagesPage() {
   }, [filter, messages]);
 
   const unreadCount = useMemo(() => messages.filter((item) => !item.read).length, [messages]);
+  const subscriptionCount = useMemo(() => messages.filter((item) => item.type === 'subscription').length, [messages]);
 
   return (
     <div className="device-page-stack">
@@ -38,7 +51,8 @@ export default function DeviceMessagesPage() {
           <p className="device-page-title">消息</p>
           <div className="watch-status-pills">
             <span className="watch-status-pill">未读 {unreadCount}</span>
-            <span className="watch-status-pill">广播 / 群聊 / 家庭</span>
+            <span className="watch-status-pill">订阅 {subscriptionCount}</span>
+            <span className="watch-status-pill">广播 / 群聊 / 家庭 / 系统</span>
           </div>
         </Space>
       </div>

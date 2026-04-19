@@ -103,7 +103,7 @@ export default function DeviceIdentifyPage() {
           加入任务
         </Button>
         <Link href="/ask">
-          <Button type="primary" block>问问</Button>
+          <Button type="primary" block>专家伴学</Button>
         </Link>
       </div>
 

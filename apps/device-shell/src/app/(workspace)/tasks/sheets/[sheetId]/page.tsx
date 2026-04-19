@@ -44,7 +44,7 @@ export default function DeviceTaskSheetDetailPage() {
           <Tag color={sheet.submissionStatus === '已提交' ? 'green' : sheet.submissionStatus === '待提交' ? 'orange' : 'default'}>
             {sheet.submissionStatus}
           </Tag>
-          <Tag color="purple">{sheet.reviewStatus}</Tag>
+          {relatedWorks.length ? <Tag color="blue">可重新填写</Tag> : null}
         </div>
       </div>
 
@@ -75,7 +75,7 @@ export default function DeviceTaskSheetDetailPage() {
 
       <div className="device-action-row">
         <Link href={`/tasks/new?taskId=${task.id}&sheetId=${sheet.id}`}>
-          <Button type="primary" block>{relatedWorks.length ? '继续填写' : '填写作品'}</Button>
+          <Button type="primary" block>{relatedWorks.length ? '重新填写' : '填写作品'}</Button>
         </Link>
         <Link href={`/tasks/${task.id}`}>
           <Button block>研学活动</Button>

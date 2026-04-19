@@ -7,6 +7,25 @@ import { getDeviceLearningWorkItems, getDeviceTaskById } from '../../../../lib/d
 import { WatchInfoRow } from '../../../../lib/watch-ui';
 
 const { Paragraph, Text } = Typography;
+const GAMEPLAY_LABELS = {
+  speed_checkin: '竞速打卡',
+  treasure_collect: '寻宝收集',
+  creative_research: '创作研究',
+  qa_research: '问答挑战',
+  survey: '现场调查',
+} as const;
+
+function getResourceTag(resource: NonNullable<ReturnType<typeof getDeviceTaskById>>['resourcePacks'][number]) {
+  if (resource.previewMode === 'ai') {
+    return { color: 'cyan', label: 'AI资料' };
+  }
+
+  if (resource.previewMode === 'pdf') {
+    return { color: 'purple', label: 'PDF资料' };
+  }
+
+  return { color: 'green', label: '图文资料' };
+}
 
 export default function DeviceTaskDetailPage() {
   const params = useParams<{ taskId: string }>();
@@ -17,8 +36,11 @@ export default function DeviceTaskDetailPage() {
   }
 
   const learningWorks = getDeviceLearningWorkItems(task.id);
-  const firstPendingWork = learningWorks.find((item) => item.displayStatus === '未完成');
   const firstSubmittedWork = learningWorks.find((item) => item.displayStatus === '已提交');
+  const editorPath = `/tasks/new?taskId=${task.id}`;
+  const gameplayLabels = Array.from(new Set(task.taskSheets.map((sheet) => sheet.gameplayKind).filter(Boolean))).map(
+    (kind) => GAMEPLAY_LABELS[kind as keyof typeof GAMEPLAY_LABELS],
+  );
 
   return (
     <div className="device-page-stack">
@@ -38,6 +60,17 @@ export default function DeviceTaskDetailPage() {
               <span className="watch-status-pill">学习作品 {task.worksSubmitted}/{task.worksRequired}</span>
               <span className="watch-status-pill">资源包 {task.resourcePacks.length}</span>
             </div>
+            <Space wrap>
+              {gameplayLabels.map((label) => (
+                <Tag key={label} color="gold">{label}</Tag>
+              ))}
+            </Space>
+            <Space wrap>
+              {task.capabilityTags.map((tag) => (
+                <Tag key={tag} color="purple">{tag}</Tag>
+              ))}
+              <Tag color="blue">{task.capabilityTagSource === 'ai' ? 'AI 推荐' : '导师设置'}</Tag>
+            </Space>
           </Space>
         </div>
 
@@ -70,9 +103,7 @@ export default function DeviceTaskDetailPage() {
                   <div className="device-mini-item">
                     <div className="device-mini-item-title">
                       <span>{resource.title}</span>
-                      <Tag color={resource.previewMode === 'pdf' ? 'purple' : 'green'}>
-                        {resource.previewMode === 'pdf' ? 'PDF 预览' : '图文资料'}
-                      </Tag>
+                      <Tag color={getResourceTag(resource).color}>{getResourceTag(resource).label}</Tag>
                     </div>
                     <p className="device-mini-item-desc">{resource.summary}</p>
                   </div>
@@ -95,6 +126,11 @@ export default function DeviceTaskDetailPage() {
                     <span>{item.title}</span>
                     <Tag color={item.displayStatus === '已提交' ? 'green' : 'orange'}>{item.displayStatus}</Tag>
                   </div>
+                  {item.gameplayKind ? (
+                    <div className="device-action-chip-row" style={{ marginTop: 6 }}>
+                      <Tag color="gold">{GAMEPLAY_LABELS[item.gameplayKind as keyof typeof GAMEPLAY_LABELS]}</Tag>
+                    </div>
+                  ) : null}
                   <p className="device-mini-item-desc">
                     {item.workCategory} · {item.workMode} · {item.topicType}
                   </p>
@@ -108,13 +144,26 @@ export default function DeviceTaskDetailPage() {
         </div>
 
         <div className="watch-bottom-dock">
-          <div className="device-action-row single">
-            <Link href={firstPendingWork?.entryPath ?? firstSubmittedWork?.entryPath ?? `/tasks/${task.id}`}>
-              <Button type="primary" block>
-                {firstPendingWork ? '填写当前学习作品' : firstSubmittedWork ? '查看已提交作品' : '返回活动'}
-              </Button>
-            </Link>
-          </div>
+          {task.status === 'submitted' ? (
+            <div className="device-action-row">
+              <Link href={firstSubmittedWork?.entryPath ?? editorPath}>
+                <Button type="primary" block>
+                  查看作品
+                </Button>
+              </Link>
+              <Link href={editorPath}>
+                <Button block>重新填写作品</Button>
+              </Link>
+            </div>
+          ) : (
+            <div className="device-action-row single">
+              <Link href={editorPath}>
+                <Button type="primary" block>
+                  填写当前学习作品
+                </Button>
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </div>
