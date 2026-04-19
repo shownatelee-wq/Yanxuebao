@@ -15,6 +15,11 @@ export default [
   {
     ignores,
   },
+  {
+    plugins: {
+      '@next/next': nextPlugin,
+    },
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -33,15 +38,13 @@ export default [
   },
   {
     files: [
+      'src/**/*.{js,jsx,ts,tsx}',
       'apps/admin-web/**/*.{js,jsx,ts,tsx}',
       'apps/device-shell/**/*.{js,jsx,ts,tsx}',
       'apps/expert-web/**/*.{js,jsx,ts,tsx}',
       'apps/parent-web/**/*.{js,jsx,ts,tsx}',
       'apps/tutor-web/**/*.{js,jsx,ts,tsx}',
     ],
-    plugins: {
-      '@next/next': nextPlugin,
-    },
     rules: {
       ...nextPlugin.configs.recommended.rules,
       ...nextPlugin.configs['core-web-vitals'].rules,

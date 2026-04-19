@@ -37,6 +37,7 @@ import {
 } from 'antd';
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
+import NextImage from 'next/image';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { clearSession, getStoredSession } from '../lib/api';
@@ -3373,7 +3374,9 @@ export function MePageContent() {
       {contextHolder}
       <section className="tutor-me-profile">
         <div className="tutor-me-avatar">
-          {session?.avatar ? <img alt={session.displayName} src={session.avatar} /> : null}
+          {session?.avatar ? (
+            <NextImage alt={session.displayName} src={session.avatar} width={58} height={58} />
+          ) : null}
         </div>
         <div style={{ minWidth: 0, flex: 1 }}>
           <div className="tutor-me-name">{session?.displayName ?? '导师'}</div>
