@@ -2,10 +2,10 @@ import { Suspense } from 'react';
 import { ParentMobileApp } from '../../../components/parent-mobile-app';
 import { ParentRouteFallback } from '../../../components/parent-route-fallback';
 
-export default function ParentStudentsPage() {
+export default function ParentDiaryPage() {
   return (
     <Suspense fallback={<ParentRouteFallback />}>
-      <ParentMobileApp initialTab="home" />
+      <ParentMobileApp initialTab="diary" />
     </Suspense>
   );
 }

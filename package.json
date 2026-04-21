@@ -6,6 +6,7 @@
   "scripts": {
     "postinstall": "pnpm --filter @yanxuebao/config build && pnpm --filter @yanxuebao/types build && pnpm --filter @yanxuebao/ui build && pnpm --filter @yanxuebao/api prisma:generate",
     "dev": "turbo dev",
+    "parent": "pnpm --filter @yanxuebao/parent-web dev",
     "tutor": "pnpm --filter @yanxuebao/tutor-web exec next dev --port 3106",
     "tutor:build": "pnpm --filter @yanxuebao/tutor-web build",
     "dev:api": "pnpm --filter @yanxuebao/api dev",
