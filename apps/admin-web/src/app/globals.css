@@ -3,7 +3,9 @@ body {
   margin: 0;
   padding: 0;
   min-height: 100%;
-  background: #f5f7fb;
+  background:
+    radial-gradient(circle at top right, rgba(21, 94, 239, 0.08), transparent 24%),
+    linear-gradient(180deg, #f6f9ff 0%, #f5f7fb 100%);
   font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
 }
 
@@ -16,3 +18,215 @@ a {
   text-decoration: none;
 }
 
+body {
+  min-height: 100vh;
+}
+
+.center-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.login-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 10% 10%, rgba(21, 94, 239, 0.15), transparent 30%),
+    radial-gradient(circle at 90% 20%, rgba(3, 152, 85, 0.12), transparent 24%),
+    linear-gradient(160deg, #0f172a 0%, #13315c 55%, #1d4ed8 100%);
+}
+
+.city-login-screen {
+  background:
+    radial-gradient(circle at 12% 10%, rgba(3, 152, 85, 0.18), transparent 30%),
+    radial-gradient(circle at 88% 18%, rgba(21, 94, 239, 0.12), transparent 24%),
+    linear-gradient(160deg, #072d24 0%, #114232 45%, #155eef 100%);
+}
+
+.login-card {
+  width: min(460px, 100%);
+  border-radius: 24px;
+  box-shadow: 0 32px 60px rgba(6, 11, 25, 0.24);
+}
+
+.credential-card {
+  background: #f8fbff;
+}
+
+.eyebrow {
+  color: #155eef;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.console-root {
+  height: 100vh;
+  overflow: hidden;
+}
+
+.console-sider {
+  height: 100vh;
+  border-inline-end: 1px solid rgba(15, 23, 42, 0.06);
+  background: rgba(255, 255, 255, 0.88) !important;
+  backdrop-filter: blur(16px);
+}
+
+.console-sider .ant-layout-sider-children {
+  display: flex;
+  min-height: 0;
+  height: 100%;
+  flex-direction: column;
+}
+
+.console-brand {
+  flex: 0 0 auto;
+  padding: 24px 20px 16px;
+}
+
+.console-menu {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0 8px 16px;
+}
+
+.console-main {
+  min-width: 0;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.console-header {
+  flex: 0 0 auto;
+  height: 48px;
+  min-height: 48px;
+  padding: 0 20px 0 24px;
+  background: #ffffff !important;
+  border-bottom: 1px solid #e8edf4;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  box-shadow: none;
+}
+
+.console-bell {
+  color: #1f2937;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.account-trigger {
+  height: 48px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #1f2937;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font: inherit;
+}
+
+.account-trigger:hover .account-name {
+  color: #155eef;
+}
+
+.account-avatar {
+  color: #64748b;
+  background: #f1f5f9;
+}
+
+.account-name {
+  max-width: 180px;
+  overflow: hidden;
+  color: #1f2937;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-arrow {
+  color: #6b7280;
+  font-size: 11px;
+}
+
+.console-content {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 24px;
+}
+
+.list-toolbar {
+  border-radius: 14px;
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.04);
+}
+
+.list-toolbar .ant-card-body {
+  padding: 18px 24px 16px;
+}
+
+.list-toolbar .ant-form-item {
+  margin-bottom: 0;
+}
+
+.list-toolbar .ant-form-item-label {
+  padding-bottom: 6px;
+}
+
+.list-toolbar .ant-form-item-label > label {
+  color: #1f2937;
+  font-weight: 600;
+}
+
+.list-toolbar-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.ability-bar-track {
+  position: relative;
+  margin-top: 6px;
+  width: 100%;
+  height: 12px;
+  background: #e5e7eb;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.ability-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #155eef 0%, #57b6ff 100%);
+}
+
+.preview-page {
+  min-height: 100vh;
+  padding: 32px 24px;
+  background: linear-gradient(180deg, #eef4ff 0%, #f8fbff 100%);
+}
+
+.preview-card {
+  max-width: 880px;
+  margin: 0 auto;
+}

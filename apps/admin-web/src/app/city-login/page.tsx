@@ -8,22 +8,22 @@ import { getDefaultCredentials, getRoleHome, getStoredSession, loginWithCredenti
 
 const { Title, Paragraph, Text } = Typography;
 
-export default function LoginPage() {
+export default function CityLoginPage() {
   const router = useRouter();
   const [messageApi, contextHolder] = message.useMessage();
-  const defaults = getDefaultCredentials('operator');
+  const defaults = getDefaultCredentials('city_maintainer');
 
   useEffect(() => {
     const session = getStoredSession();
-    if (session?.role === 'operator') {
-      router.replace(getRoleHome('operator'));
+    if (session?.role === 'city_maintainer') {
+      router.replace(getRoleHome('city_maintainer'));
     }
   }, [router]);
 
   async function handleFinish(values: { account: string; password: string }) {
     try {
-      const session = loginWithCredentials(values.account, values.password, 'operator');
-      messageApi.success('已进入运营管理后台');
+      const session = loginWithCredentials(values.account, values.password, 'city_maintainer');
+      messageApi.success('已进入城市维护工作台');
       router.replace(getRoleHome(session.role));
     } catch (error) {
       messageApi.error(error instanceof Error ? error.message : '登录失败');
@@ -31,17 +31,17 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="login-screen">
+    <main className="login-screen city-login-screen">
       {contextHolder}
       <Card className="login-card" variant="borderless">
         <Space direction="vertical" size={20} style={{ width: '100%' }}>
           <Space direction="vertical" size={4}>
-            <Text className="eyebrow">研学宝运营管理后台</Text>
+            <Text className="eyebrow">城市数据维护入口</Text>
             <Title level={2} style={{ margin: 0 }}>
-              进入运营总控台
+              进入维护工作台
             </Title>
             <Paragraph type="secondary" style={{ margin: 0 }}>
-              用于管理机构、导师、任务库、设备订单与成长配置。
+              用于维护授权城市的基地与任务信息，并查看审核与业绩结果。
             </Paragraph>
           </Space>
           <Card size="small" className="credential-card">
@@ -49,7 +49,6 @@ export default function LoginPage() {
               <Text strong>常用账号</Text>
               <Text type="secondary">账号：{defaults.account}</Text>
               <Text type="secondary">密码：{defaults.password}</Text>
-              <Text type="secondary">兼职维护入口请使用下方链接进入。</Text>
             </Space>
           </Card>
           <Form layout="vertical" initialValues={defaults} onFinish={handleFinish}>
@@ -60,11 +59,11 @@ export default function LoginPage() {
               <Input.Password prefix={<LockOutlined />} placeholder="请输入密码" />
             </Form.Item>
             <Button block type="primary" htmlType="submit">
-              登录运营后台
+              登录维护工作台
             </Button>
           </Form>
-          <Button type="link" onClick={() => router.push('/city-login')}>
-            前往兼职维护员入口
+          <Button type="link" onClick={() => router.push('/login')}>
+            返回运营后台入口
           </Button>
         </Space>
       </Card>
