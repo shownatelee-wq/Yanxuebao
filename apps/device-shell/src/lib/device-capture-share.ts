@@ -1,57 +1,54 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { demoAlbumItems, type DemoAlbumItem } from './device-demo-data';
+import {
+  clearPendingForward,
+  getAlbumAssets,
+  getMediaAssetById,
+  getPendingForward,
+  saveMediaAsset,
+  savePendingForward,
+  type DeviceMediaAsset,
+} from './device-media-library';
+import { normalizeDeviceTimeValue } from './device-time';
 
-const DEVICE_CAPTURE_ASSETS_KEY = 'yanxuebao_device_capture_assets';
-const DEVICE_CAPTURE_SHARE_KEY = 'yanxuebao_device_capture_share';
-const DEVICE_CAPTURE_EVENT = 'yanxuebao:device-capture-change';
+const DEVICE_CAPTURE_EVENT = 'yanxuebao:device-capture-share-wrapper-change';
 
-export type DeviceCaptureAsset = DemoAlbumItem & {
-  summary: string;
-  target?: 'expert' | 'model';
-};
+export type DeviceCaptureAsset = Omit<DeviceMediaAsset, 'createdAt' | 'createdAtValue' | 'albumTab' | 'sourceApp' | 'canShareToTask'> &
+  Partial<Pick<DeviceMediaAsset, 'createdAt' | 'createdAtValue' | 'albumTab' | 'sourceApp' | 'canShareToTask'>> & {
+    capturedAt?: string;
+    target?: 'expert' | 'model';
+    agentId?: string;
+  };
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
-function buildInitialAssets(): DeviceCaptureAsset[] {
-  return demoAlbumItems.map((item) => ({
-    ...item,
-    summary: item.type === '照片' ? '适合发送给专家进行现场观察分析。' : '适合发送给专家或大模型做视频分析。',
-  }));
-}
-
-function readAssets() {
-  if (typeof window === 'undefined') {
-    return buildInitialAssets();
-  }
-
-  const raw = window.sessionStorage.getItem(DEVICE_CAPTURE_ASSETS_KEY);
-  if (!raw) {
-    const initial = buildInitialAssets();
-    window.sessionStorage.setItem(DEVICE_CAPTURE_ASSETS_KEY, JSON.stringify(initial));
-    return initial;
-  }
-
-  return JSON.parse(raw) as DeviceCaptureAsset[];
-}
-
-function writeAssets(nextAssets: DeviceCaptureAsset[]) {
+function emitChange() {
   if (typeof window !== 'undefined') {
-    window.sessionStorage.setItem(DEVICE_CAPTURE_ASSETS_KEY, JSON.stringify(nextAssets));
     window.dispatchEvent(new Event(DEVICE_CAPTURE_EVENT));
   }
 }
 
 export function saveCaptureAsset(asset: DeviceCaptureAsset) {
-  const assets = readAssets().filter((item) => item.id !== asset.id);
-  writeAssets([asset, ...assets]);
+  const createdAt = asset.createdAt ?? asset.capturedAt ?? '刚刚';
+  saveMediaAsset({
+    ...asset,
+    type: asset.type,
+    createdAt,
+    createdAtValue: asset.createdAtValue ?? normalizeDeviceTimeValue(createdAt),
+    albumTab: asset.albumTab ?? (asset.type === '视频' || asset.type === 'AI视频' ? 'video' : asset.type === '截图' ? 'screenshot' : 'photo'),
+    sourceApp: asset.sourceApp ?? 'capture',
+    canShareToTask: asset.canShareToTask ?? true,
+  });
+  emitChange();
 }
 
 export function getCaptureAssets() {
-  return clone(readAssets());
+  return clone(
+    getAlbumAssets().filter((item) => item.albumTab === 'photo' || item.albumTab === 'video'),
+  );
 }
 
 export function useCaptureAssets() {
@@ -65,34 +62,55 @@ export function useCaptureAssets() {
     sync();
     window.addEventListener('storage', sync);
     window.addEventListener(DEVICE_CAPTURE_EVENT, sync);
+    window.addEventListener('yanxuebao:device-media-library-change', sync);
     return () => {
       window.removeEventListener('storage', sync);
       window.removeEventListener(DEVICE_CAPTURE_EVENT, sync);
+      window.removeEventListener('yanxuebao:device-media-library-change', sync);
     };
   }, []);
 
   return assets;
 }
 
-export function saveCaptureShare(asset: DeviceCaptureAsset, target: 'expert' | 'model') {
-  if (typeof window !== 'undefined') {
-    const payload = { ...asset, target };
-    window.sessionStorage.setItem(DEVICE_CAPTURE_SHARE_KEY, JSON.stringify(payload));
-    window.dispatchEvent(new Event(DEVICE_CAPTURE_EVENT));
-  }
+export function saveCaptureShare(asset: DeviceCaptureAsset, target: 'expert' | 'model', agentId?: string) {
+  saveCaptureAsset(asset);
+  const timestamp = new Date().toISOString();
+  savePendingForward({
+    assetId: asset.id,
+    target,
+    agentId,
+    createdAt: timestamp,
+    createdAtValue: timestamp,
+  });
+  emitChange();
 }
 
 export function getCaptureShare() {
-  if (typeof window === 'undefined') {
+  const pendingForward = getPendingForward();
+  if (!pendingForward) {
     return null;
   }
 
-  const raw = window.sessionStorage.getItem(DEVICE_CAPTURE_SHARE_KEY);
-  return raw ? (JSON.parse(raw) as DeviceCaptureAsset) : null;
+  const asset = getMediaAssetById(pendingForward.assetId);
+  if (!asset) {
+    return null;
+  }
+
+  return {
+    ...asset,
+    target: pendingForward.target,
+    agentId: pendingForward.agentId,
+  };
+}
+
+export function clearCaptureShare() {
+  clearPendingForward();
+  emitChange();
 }
 
 export function useCaptureShare() {
-  const [share, setShare] = useState<DeviceCaptureAsset | null>(() => getCaptureShare());
+  const [share, setShare] = useState<ReturnType<typeof getCaptureShare>>(() => getCaptureShare());
 
   useEffect(() => {
     function sync() {
@@ -102,9 +120,11 @@ export function useCaptureShare() {
     sync();
     window.addEventListener('storage', sync);
     window.addEventListener(DEVICE_CAPTURE_EVENT, sync);
+    window.addEventListener('yanxuebao:device-media-library-change', sync);
     return () => {
       window.removeEventListener('storage', sync);
       window.removeEventListener(DEVICE_CAPTURE_EVENT, sync);
+      window.removeEventListener('yanxuebao:device-media-library-change', sync);
     };
   }, []);
 

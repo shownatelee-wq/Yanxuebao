@@ -38,11 +38,11 @@ export default function DeviceGrowthSelfTestResultPage() {
               <span>完成时间</span>
               <strong>{report.completedAt}</strong>
             </div>
-            <p className="device-mini-item-desc">结果已同步到能力指数与自测历史中。</p>
+            <p className="device-mini-item-desc">结果已同步到能力雷达与自测历史中。</p>
           </div>
         </div>
       </WatchSection>
-      <WatchNextSteps text="可查看完整自测报告，也可返回成长页继续查看能力指数变化。" />
+      <WatchNextSteps text="可查看完整自测报告，也可返回成长页继续查看能力雷达变化。" />
       <WatchActionButtons primary={{ label: '自测报告', path: `/growth/self-test/report?reportId=${report.id}` }} secondary={{ label: '成长', path: '/growth' }} />
     </div>
   );

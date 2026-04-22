@@ -19,9 +19,10 @@ import { Tag, Typography, message } from 'antd';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { getStoredSession } from '../../../lib/api';
-import { demoGrowthRecords, demoGroupChats, demoMicrochatThreads } from '../../../lib/device-demo-data';
+import { demoGrowthRecords } from '../../../lib/device-demo-data';
 import { useDeviceMessages } from '../../../lib/device-message-data';
 import { getDesktopPlazaAgents, usePlazaState } from '../../../lib/device-plaza-data';
+import { useDeviceSocialSnapshot } from '../../../lib/device-social-state';
 import { getDeviceTaskList } from '../../../lib/device-task-data';
 import { getCurrentJoinedTeam, getVisibleTeamsForList, useDeviceTeamSnapshot } from '../../../lib/device-team-data';
 
@@ -63,8 +64,8 @@ const mainScreenAppKeys = [
   'friends',
   'wallet',
   'moments',
-  'ai-draw',
-  'ai-video',
+  'ai-create',
+  'diary',
 ] as const;
 const toolScreenAppKeys = ['cloud', 'meeting', 'me', 'settings', 'sos'] as const;
 const noticeTabLabels: Record<NoticeTabKey, string> = {
@@ -91,9 +92,9 @@ const baseAppEntries: AppEntry[] = [
   { key: 'messages', title: '消息', path: '/messages', icon: <BellOutlined />, color: '#ff8a34' },
   { key: 'team', title: '更多团队', path: '/team', icon: <TeamOutlined />, color: '#2f6bff' },
   { key: 'capture', title: '拍拍', path: '/capture', icon: <CameraOutlined />, color: '#ff7b6b' },
-  { key: 'ask', title: '专家伴学', path: '/ask', icon: <SoundOutlined />, color: '#ffb400' },
+  { key: 'ask', title: '问问', path: '/ask', icon: <SoundOutlined />, color: '#ffb400' },
   { key: 'flash-note', title: '闪记', path: '/flash-note', icon: <ClockCircleOutlined />, color: '#18b7a0' },
-  { key: 'identify', title: '识物', path: '/identify', icon: <CameraOutlined />, color: '#ff4f83' },
+  { key: 'identify', title: 'AI识物', path: '/identify', icon: <CameraOutlined />, color: '#ff4f83' },
   { key: 'growth', title: '成长', path: '/growth', icon: <ReadOutlined />, color: '#8a57ff' },
   { key: 'courses', title: '课程', path: '/courses', icon: <BookOutlined />, color: '#ff8f32' },
   { key: 'chat', title: '聊天', path: '/chat', icon: <CommentOutlined />, color: '#4d6cff' },
@@ -104,8 +105,8 @@ const baseAppEntries: AppEntry[] = [
   { key: 'meeting', title: '会议', path: '/meeting', icon: <TeamOutlined />, color: '#7a5cff' },
   { key: 'friends', title: '好友', path: '/friends', icon: <TeamOutlined />, color: '#00a8a8' },
   { key: 'me', title: '我的', path: '/me', icon: <ReadOutlined />, color: '#4c7dff' },
-  { key: 'ai-draw', title: 'AI 绘画', path: '/ai-draw', icon: <AppstoreOutlined />, color: '#ff7f50' },
-  { key: 'ai-video', title: 'AI 视频', path: '/ai-video', icon: <VideoCameraOutlined />, color: '#ff4f8b' },
+  { key: 'ai-create', title: 'AI创作', path: '/ai-create', icon: <VideoCameraOutlined />, color: '#ff7f50' },
+  { key: 'diary', title: '研学日记', path: '/diary', icon: <BookOutlined />, color: '#18b7a0' },
   { key: 'settings', title: '设置', path: '/settings', icon: <AppstoreOutlined />, color: '#8c8c8c' },
   { key: 'sos', title: 'SoS', path: '/sos', icon: <AlertOutlined />, color: '#ff5a5f' },
 ];
@@ -139,6 +140,7 @@ export default function DeviceHomePage() {
   const plazaState = usePlazaState();
   const deviceMessages = useDeviceMessages();
   const teamSnapshot = useDeviceTeamSnapshot();
+  const socialSnapshot = useDeviceSocialSnapshot();
   const touchStartX = useRef<number | null>(null);
 
   async function loadHome() {
@@ -186,7 +188,7 @@ export default function DeviceHomePage() {
 
   const homeChatItems = useMemo(
     () => [
-      ...demoMicrochatThreads.map((thread) => ({
+      ...socialSnapshot.microchatThreads.map((thread) => ({
         id: thread.id,
         title: thread.title,
         summary: thread.lastMessage,
@@ -194,7 +196,7 @@ export default function DeviceHomePage() {
         tag: '微聊',
         path: `/microchat/${thread.id}`,
       })),
-      ...demoGroupChats.map((chat) => ({
+      ...socialSnapshot.groupChats.map((chat) => ({
         id: chat.id,
         title: chat.title,
         summary: chat.messages[chat.messages.length - 1]?.content ?? '暂无消息',
@@ -203,7 +205,7 @@ export default function DeviceHomePage() {
         path: `/group-chat/${chat.id}`,
       })),
     ],
-    [],
+    [socialSnapshot.groupChats, socialSnapshot.microchatThreads],
   );
 
   const desktopAgentEntries = useMemo<AppEntry[]>(
@@ -237,8 +239,8 @@ export default function DeviceHomePage() {
         }
         if (item.key === 'chat') {
           const unread =
-            demoMicrochatThreads.reduce((sum, thread) => sum + (thread.unread ?? 0), 0) +
-            demoGroupChats.reduce((sum, chat) => sum + (chat.unread ?? 0), 0);
+            socialSnapshot.microchatThreads.reduce((sum, thread) => sum + (thread.unread ?? 0), 0) +
+            socialSnapshot.groupChats.reduce((sum, chat) => sum + (chat.unread ?? 0), 0);
           return { ...item, badge: unread || undefined };
         }
         if (item.key === 'messages') {
@@ -247,7 +249,7 @@ export default function DeviceHomePage() {
         }
         return item;
       }),
-    [deviceMessages, visibleTasks.length],
+    [deviceMessages, socialSnapshot.groupChats, socialSnapshot.microchatThreads, visibleTasks.length],
   );
 
   const appEntryMap = useMemo(() => new Map(appEntriesWithBadges.map((item) => [item.key, item])), [appEntriesWithBadges]);

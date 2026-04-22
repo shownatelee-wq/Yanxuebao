@@ -22,12 +22,12 @@ export default function DeviceWalletPage() {
         <div className="watch-grid-panel long-grid">
           <div className="watch-inline-head">
             <span>支付入口</span>
-            <span>扫码 / 余额 / 卡管理</span>
+            <span>扫码支付 / 余额 / 卡管理</span>
           </div>
           <div className="device-plaza-grid">
             <Link href="/wallet/code" className="device-plaza-tile">
-              <strong style={{ fontSize: 12 }}>付款码</strong>
-              <span className="device-mini-item-desc">到店扫码</span>
+              <strong style={{ fontSize: 12 }}>扫码支付</strong>
+              <span className="device-mini-item-desc">打开扫码支付页</span>
             </Link>
             <Link href="/wallet/balance" className="device-plaza-tile">
               <strong style={{ fontSize: 12 }}>余额</strong>
@@ -65,7 +65,7 @@ export default function DeviceWalletPage() {
         </div>
 
         <div className="watch-bottom-dock">
-          <WatchActionButtons primary={{ label: '付款码', path: '/wallet/code' }} secondary={{ label: '支付卡', path: '/wallet/card' }} />
+          <WatchActionButtons primary={{ label: '扫码支付', path: '/wallet/code' }} secondary={{ label: '扫码支付', path: '/wallet/code' }} />
         </div>
       </div>
     </div>

@@ -121,7 +121,7 @@ export default function DevicePlazaAgentDetailPage() {
           <div className="device-plaza-grid">
             <Link href={`/ask?agentId=${item.id}`} className="device-plaza-tile">
               <BellOutlined style={{ fontSize: 18, color: '#ff8a34' }} />
-              <Text strong style={{ fontSize: 12 }}>专家伴学</Text>
+              <Text strong style={{ fontSize: 12 }}>问问</Text>
             </Link>
             <Link href={`/plaza/agents/${item.id}/news`} className="device-plaza-tile">
               <BellOutlined style={{ fontSize: 18, color: '#2f6bff' }} />

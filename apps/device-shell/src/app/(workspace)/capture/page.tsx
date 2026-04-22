@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { saveDemoDraft } from '../../../lib/demo-draft';
 import { saveCaptureAsset, saveCaptureShare, type DeviceCaptureAsset } from '../../../lib/device-capture-share';
+import { getPlazaAgents, getRecentPlazaAgents, usePlazaState } from '../../../lib/device-plaza-data';
 
 const { Paragraph, Text } = Typography;
 
@@ -73,7 +74,46 @@ export default function DeviceCapturePage() {
   const [currentAsset, setCurrentAsset] = useState<DeviceCaptureAsset | null>(null);
   const [messageApi, contextHolder] = message.useMessage();
   const router = useRouter();
+  const plazaState = usePlazaState();
   const timersRef = useRef<number[]>([]);
+  const commonAgents = useMemo(() => getRecentPlazaAgents(plazaState).slice(0, 3), [plazaState]);
+  const allAgents = useMemo(() => getPlazaAgents(plazaState).slice(0, 4), [plazaState]);
+  const forwardAgentCards = useMemo(() => {
+    const seen = new Set<string>();
+    const expertCards = [...commonAgents, ...allAgents]
+      .filter((agent) => {
+        if (seen.has(agent.id)) {
+          return false;
+        }
+        seen.add(agent.id);
+        return true;
+      })
+      .slice(0, 6)
+      .map((agent) => ({
+        id: agent.id,
+        type: 'ask' as const,
+        name: agent.title,
+        avatar: agent.logo,
+        tag: agent.tag,
+        accent: agent.accent,
+        description: agent.oneLineIntro,
+        helper: '带着刚拍内容继续问专家',
+      }));
+
+    return [
+      {
+        id: 'identify',
+        type: 'identify' as const,
+        name: 'AI识物',
+        avatar: '识',
+        tag: '自动讲解',
+        accent: 'pink' as const,
+        description: `自动识别${currentAsset?.primaryLabel ?? '画面对象'}，像 AI 朋友一样边讲边追问。`,
+        helper: '推荐先用它理解现场',
+      },
+      ...expertCards,
+    ];
+  }, [allAgents, commonAgents, currentAsset?.primaryLabel]);
 
   const result = useMemo(() => {
     const identifySource = currentAsset?.identifySource ?? (mode === 'photo' ? '拍照识别' : '关键帧识别');
@@ -146,11 +186,21 @@ export default function DeviceCapturePage() {
     timersRef.current.push(captureTimer);
   }
 
-  function handleSend(target: 'expert' | 'model') {
+  function getSafeAsset() {
     const asset = currentAsset ?? buildAsset();
     saveCaptureAsset(asset);
-    saveCaptureShare(asset, target);
-    router.push(target === 'expert' ? '/plaza/agents/plaza_agent_03' : '/ask?agentId=plaza_agent_03');
+    return asset;
+  }
+
+  function handleSendToIdentify() {
+    const asset = getSafeAsset();
+    router.push(`/identify?source=capture&assetId=${asset.id}&autoStart=1`);
+  }
+
+  function handleSendToAsk(agentId: string) {
+    const asset = getSafeAsset();
+    saveCaptureShare(asset, 'model', agentId);
+    router.push(`/ask?source=capture&assetId=${asset.id}&agentId=${agentId}`);
   }
 
   return (
@@ -258,13 +308,36 @@ export default function DeviceCapturePage() {
                 </Paragraph>
               </div>
             ) : null}
-            <div className="device-action-row">
-              <Button type="primary" block onClick={() => handleSend('expert')} disabled={stage !== 'identified'}>
-                发送给专家
-              </Button>
-              <Button block onClick={() => handleSend('model')} disabled={stage !== 'identified'}>
-                发送给大模型
-              </Button>
+            <div className="device-forward-panel">
+              <div className="device-forward-panel-head">
+                <p className="device-section-label">选择一个 AI 朋友继续探索</p>
+                <span>卡片会带着刚拍内容进入对应智能体</span>
+              </div>
+              <div className="device-forward-agent-list">
+                {forwardAgentCards.map((agent) => (
+                  <button
+                    key={agent.id}
+                    type="button"
+                    className="device-forward-agent-card"
+                    disabled={stage !== 'identified'}
+                    onClick={() => {
+                      if (agent.type === 'identify') {
+                        handleSendToIdentify();
+                        return;
+                      }
+                      handleSendToAsk(agent.id);
+                    }}
+                  >
+                    <span className={`device-forward-agent-avatar accent-${agent.accent}`}>{agent.avatar}</span>
+                    <span className="device-forward-agent-copy">
+                      <strong>{agent.name}</strong>
+                      <em>{agent.description}</em>
+                      <small>{agent.helper}</small>
+                    </span>
+                    <Tag color={agent.type === 'identify' ? 'red' : 'blue'}>{agent.tag}</Tag>
+                  </button>
+                ))}
+              </div>
             </div>
           </Space>
         ) : (

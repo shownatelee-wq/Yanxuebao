@@ -1,5 +1,8 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import { formatDeviceDisplayTime, normalizeDeviceTimeValue } from './device-time';
+
 export type FlashNoteType = 'voice_note' | 'video_note';
 export type FlashNoteStatus = 'draft' | 'saved' | 'synced';
 
@@ -22,6 +25,7 @@ export type FlashNoteItem = {
   type: FlashNoteType;
   status: FlashNoteStatus;
   createdAt: string;
+  createdAtValue: string;
   duration: string;
   transcript?: string;
   audio?: { url?: string; duration?: string; title?: string };
@@ -37,6 +41,7 @@ type LegacyFlashNote = Partial<FlashNoteItem> & {
 };
 
 export type FlashNoteInput = {
+  id?: string;
   title?: string;
   type: FlashNoteType;
   status?: FlashNoteStatus;
@@ -49,6 +54,7 @@ export type FlashNoteInput = {
 };
 
 const FLASH_NOTE_KEY = 'yanxuebao_device_flash_notes';
+const FLASH_NOTE_EVENT = 'yanxuebao:flash-note-change';
 
 const defaultNotes: FlashNoteItem[] = [
   {
@@ -56,7 +62,8 @@ const defaultNotes: FlashNoteItem[] = [
     title: '海豚表演观察闪记',
     type: 'voice_note',
     status: 'saved',
-    createdAt: new Date().toISOString(),
+    createdAt: formatDeviceDisplayTime(new Date().toISOString()),
+    createdAtValue: new Date().toISOString(),
     duration: '00:18',
     transcript: '海豚表演前会先绕场一圈，像在熟悉环境，我还看到饲养员提前做了手势提示。',
     audio: { title: '海豚表演口述', duration: '00:18', url: '/mock/flash-note-audio.mp3' },
@@ -71,7 +78,8 @@ const defaultNotes: FlashNoteItem[] = [
     title: '海狮互动视频闪记',
     type: 'video_note',
     status: 'saved',
-    createdAt: new Date().toISOString(),
+    createdAt: formatDeviceDisplayTime(new Date().toISOString()),
+    createdAtValue: new Date().toISOString(),
     duration: '00:24',
     transcript: '记录了海狮跟随口令完成动作的关键片段。',
     video: { title: '海狮互动视频', duration: '00:24', url: '/mock/explain-video.mp4', coverImage: '/mock/task-photo.jpg' },
@@ -112,7 +120,8 @@ function normalizeFlashNote(item: LegacyFlashNote, index: number): FlashNoteItem
     title: item.title ?? (transcript.slice(0, 12) || `闪记 ${index + 1}`),
     type,
     status: item.status ?? 'saved',
-    createdAt: item.createdAt ?? new Date().toISOString(),
+    createdAt: item.createdAt ? formatDeviceDisplayTime(normalizeDeviceTimeValue(item.createdAt)) : formatDeviceDisplayTime(new Date().toISOString()),
+    createdAtValue: item.createdAt ? normalizeDeviceTimeValue(item.createdAt) : new Date().toISOString(),
     duration: normalizeDuration(item.duration ?? item.audio?.duration ?? video?.duration),
     transcript,
     audio: type === 'voice_note' ? item.audio : undefined,
@@ -138,6 +147,7 @@ function persistFlashNotes(notes: FlashNoteItem[]) {
     return;
   }
   window.localStorage.setItem(FLASH_NOTE_KEY, JSON.stringify(notes));
+  window.dispatchEvent(new Event(FLASH_NOTE_EVENT));
 }
 
 export function getFlashNotes(): FlashNoteItem[] {
@@ -185,11 +195,12 @@ export function getFlashNoteMeta(note: FlashNoteItem) {
 
 export function saveFlashNote(input: FlashNoteInput) {
   const next: FlashNoteItem = {
-    id: `flash_note_${Date.now()}`,
+    id: input.id ?? `flash_note_${Date.now()}`,
     title: input.title ?? (input.transcript?.slice(0, 12) || (input.type === 'voice_note' ? '语音闪记' : '视频闪记')),
     type: input.type,
     status: input.status ?? 'saved',
-    createdAt: new Date().toISOString(),
+    createdAt: formatDeviceDisplayTime(new Date().toISOString()),
+    createdAtValue: new Date().toISOString(),
     duration: normalizeDuration(input.duration ?? input.audio?.duration ?? input.video?.duration),
     transcript: input.transcript?.trim() || undefined,
     audio: input.type === 'voice_note' ? input.audio : undefined,
@@ -207,21 +218,38 @@ export function saveFlashNote(input: FlashNoteInput) {
   return next;
 }
 
-export function updateFlashNote(id: string, input: { title?: string; transcript?: string }) {
+export function updateFlashNote(
+  id: string,
+  input: {
+    title?: string;
+    transcript?: string;
+    duration?: string;
+    status?: FlashNoteStatus;
+    audio?: FlashNoteItem['audio'];
+    video?: FlashNoteItem['video'];
+    photos?: FlashNotePhoto[];
+  },
+) {
   if (typeof window === 'undefined') {
     return null;
   }
 
   const notes = getFlashNotes();
   const next = notes.map((item) =>
-    item.id === id
-      ? {
-          ...item,
-          title: input.title?.trim() || item.title,
-          transcript: input.transcript?.trim() ?? item.transcript,
-          createdAt: new Date().toISOString(),
-        }
-      : item,
+        item.id === id
+          ? {
+              ...item,
+              title: input.title?.trim() || item.title,
+              transcript: input.transcript?.trim() ?? item.transcript,
+              duration: input.duration ? normalizeDuration(input.duration) : item.duration,
+              status: input.status ?? item.status,
+              audio: input.audio ?? item.audio,
+              video: input.video ?? item.video,
+              photos: input.photos ?? item.photos,
+              createdAt: formatDeviceDisplayTime(new Date().toISOString()),
+              createdAtValue: new Date().toISOString(),
+            }
+          : item,
   );
   persistFlashNotes(next);
   return next.find((item) => item.id === id) ?? null;
@@ -229,4 +257,39 @@ export function updateFlashNote(id: string, input: { title?: string; transcript?
 
 export function getFlashNoteById(id: string) {
   return getFlashNotes().find((item) => item.id === id) ?? null;
+}
+
+export function createDraftFlashNote(input: FlashNoteInput) {
+  return saveFlashNote({
+    ...input,
+    status: input.status ?? 'draft',
+  });
+}
+
+export function deleteFlashNote(id: string) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  persistFlashNotes(getFlashNotes().filter((item) => item.id !== id));
+}
+
+export function useFlashNotes() {
+  const [notes, setNotes] = useState<FlashNoteItem[]>(() => getFlashNotes());
+
+  useEffect(() => {
+    function sync() {
+      setNotes(getFlashNotes());
+    }
+
+    sync();
+    window.addEventListener('storage', sync);
+    window.addEventListener(FLASH_NOTE_EVENT, sync);
+    return () => {
+      window.removeEventListener('storage', sync);
+      window.removeEventListener(FLASH_NOTE_EVENT, sync);
+    };
+  }, []);
+
+  return notes;
 }

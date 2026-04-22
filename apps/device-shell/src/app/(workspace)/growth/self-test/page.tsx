@@ -23,6 +23,19 @@ export default function DeviceGrowthSelfTestPage() {
           ))}
         </div>
       </WatchSection>
+      <WatchSection title="互动聊天测试模式">
+        <div className="device-mini-item">
+          <div className="device-mini-item-title">
+            <span>AI 持续追问</span>
+          </div>
+          <p className="device-mini-item-desc">
+            通过语音或文字和 AI 连续对话，不限制题数，结束后自动生成本地自测报告。
+          </p>
+          <Link href="/growth/self-test/chat">
+            <Button type="primary" block style={{ marginTop: 10 }}>进入聊天测试</Button>
+          </Link>
+        </div>
+      </WatchSection>
       <WatchSection title="快速开始">
         <div className="device-action-row">
           <Link href="/growth/self-test/start?plane=all">

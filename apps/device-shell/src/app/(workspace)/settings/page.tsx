@@ -3,6 +3,7 @@
 import { Button } from 'antd';
 import { clearSession, getStoredDeviceAccountHistory, getStoredSession } from '../../../lib/api';
 import { demoSettings } from '../../../lib/device-demo-data';
+import { deviceIdentityProfile } from '../../../lib/device-workspace-state';
 import Link from 'next/link';
 
 export default function DeviceSettingsPage() {
@@ -34,7 +35,19 @@ export default function DeviceSettingsPage() {
               <div className="device-mini-item-title">
                 <span>设备绑定</span>
               </div>
-              <p className="device-mini-item-desc">{`YXB-DEV-0001 · ${session?.user.displayName ?? '当前学员'}`}</p>
+              <p className="device-mini-item-desc">{`${deviceIdentityProfile.deviceId} · ${session?.user.displayName ?? deviceIdentityProfile.studentName}`}</p>
+            </div>
+            <div className="device-mini-item watch-list-card">
+              <div className="device-mini-item-title">
+                <span>研学宝身份</span>
+              </div>
+              <p className="device-mini-item-desc">{`ID ${deviceIdentityProfile.yxbId} · 手机 ${deviceIdentityProfile.mobile}`}</p>
+            </div>
+            <div className="device-mini-item watch-list-card">
+              <div className="device-mini-item-title">
+                <span>家长绑定</span>
+              </div>
+              <p className="device-mini-item-desc">{deviceIdentityProfile.parentBound ? `已绑定 ${deviceIdentityProfile.parentName}` : '未绑定家长'}</p>
             </div>
             <div className="device-mini-item watch-list-card">
               <div className="device-mini-item-title">
@@ -57,29 +70,16 @@ export default function DeviceSettingsPage() {
           </div>
           <div className="device-mini-list">
             {demoSettings.map((item) => (
-              <Link key={item.id} href={item.path} className="device-card-link">
-                <div className="device-mini-item watch-list-card">
-                  <div className="device-mini-item-title">
-                    <span>{item.title}</span>
-                  </div>
-                  <p className="device-mini-item-desc">{item.summary}</p>
-                </div>
+              <Link key={item.id} href={item.path} className="device-settings-button">
+                <span>{item.title}</span>
+                <em>{item.summary}</em>
+                <strong>›</strong>
               </Link>
             ))}
           </div>
         </div>
-        <div className="watch-bottom-dock">
-          <div className="device-action-row">
-            <Link href="/settings/device">
-              <Button type="primary" block>设备绑定</Button>
-            </Link>
-            <Link href="/settings/face">
-              <Button block>人脸识别</Button>
-            </Link>
-          </div>
-          <div className="device-action-row single" style={{ marginTop: 10 }}>
-            <Button danger block onClick={handleLogout}>退出登录</Button>
-          </div>
+        <div className="watch-list-panel long-list">
+          <Button danger block onClick={handleLogout}>退出登录</Button>
         </div>
       </div>
     </div>

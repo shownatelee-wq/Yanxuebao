@@ -3,12 +3,12 @@
 import { Button, Result, Space, Tag } from 'antd';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { demoMeetings } from '../../../../lib/device-demo-data';
+import { getMeetingById } from '../../../../lib/device-workspace-state';
 import { WatchActionButtons, WatchInfoRow } from '../../../../lib/watch-ui';
 
 export default function DeviceMeetingDetailPage() {
   const params = useParams<{ meetingId: string }>();
-  const meeting = demoMeetings.find((item) => item.id === params.meetingId);
+  const meeting = getMeetingById(params.meetingId);
 
   if (!meeting) {
     return <Result status="404" title="未找到会议" extra={<Link href="/meeting"><Button>返回会议</Button></Link>} />;
@@ -34,10 +34,11 @@ export default function DeviceMeetingDetailPage() {
         <Space direction="vertical" size={8} style={{ width: '100%' }}>
           <WatchInfoRow label="参会成员" value={meeting.participants.join('、')} />
           <WatchInfoRow label="AI 纪要" value={meeting.summary} />
+          <WatchInfoRow label="分享链接" value={meeting.shareLink} />
         </Space>
       </div>
       <div className="watch-bottom-dock">
-        <WatchActionButtons primary={{ label: '对讲', path: `/meeting/${meeting.id}/talk` }} secondary={{ label: '纪要', path: `/meeting/${meeting.id}/summary` }} />
+        <WatchActionButtons primary={{ label: '进入会议', path: `/meeting/${meeting.id}/talk` }} secondary={{ label: '纪要', path: `/meeting/${meeting.id}/summary` }} />
       </div>
       </div>
     </div>

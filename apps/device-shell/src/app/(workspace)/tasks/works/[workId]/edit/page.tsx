@@ -3,17 +3,34 @@
 import { AudioOutlined } from '@ant-design/icons';
 import { Button, Form, Input, Radio, Result, Select, Space, Tag, message } from 'antd';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { getDeviceTaskById, getDeviceTaskWorkById } from '../../../../../../lib/device-task-data';
 
 export default function DeviceTaskWorkEditPage() {
   const params = useParams<{ workId: string }>();
+  const searchParams = useSearchParams();
   const [messageApi, contextHolder] = message.useMessage();
   const work = getDeviceTaskWorkById(params.workId);
   const task = work ? getDeviceTaskById(work.taskId) : undefined;
 
   if (!work || !task) {
     return <Result status="404" title="未找到作品" extra={<Link href="/tasks"><Button>返回任务</Button></Link>} />;
+  }
+
+  if (searchParams.get('readonly') === '1') {
+    const teamId = searchParams.get('teamId') ?? '';
+    return (
+      <Result
+        status="info"
+        title="历史团队作品仅支持查看"
+        subTitle="该团队已结束，不能继续修改或提交作品。"
+        extra={
+          <Link href={`/tasks/works/${work.id}?teamId=${teamId}&readonly=1`}>
+            <Button type="primary">返回作品详情</Button>
+          </Link>
+        }
+      />
+    );
   }
 
   return (

@@ -29,6 +29,9 @@ export default function DeviceFlashNoteDetailPage() {
             </Tag>
           </Space>
           <p className="device-page-title">{note.title}</p>
+          <p className="device-page-subtle">
+            创建时间：{new Date(note.createdAt).toLocaleString('zh-CN', { hour12: false })}
+          </p>
           <div className="device-action-chip-row">
             {getFlashNoteMeta(note).map((meta) => (
               <Tag key={`${note.id}-${meta}`} color="cyan">{meta}</Tag>

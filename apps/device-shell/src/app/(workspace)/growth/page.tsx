@@ -17,9 +17,9 @@ export default function DeviceGrowthPage() {
               <p className="device-page-title">成长</p>
               <DeviceLevelBadge level={currentLevel} />
             </Space>
-            <p className="device-page-subtle">围绕能力指数、能力自测、成长值和成长商城查看你的成长进度。</p>
+            <p className="device-page-subtle">围绕能力雷达、能力自测、成长值和成长商城查看你的成长进度。</p>
             <div className="device-growth-summary-grid">
-              <DeviceGrowthStatCard label="当前能力指数" value={currentIndex.toFixed(1)} helper="16 个能力指标平均值" />
+              <DeviceGrowthStatCard label="当前能力雷达" value={currentIndex.toFixed(1)} helper="16 个能力指标平均值" />
               <DeviceGrowthStatCard label="可用成长值" value={String(availableGrowthValue)} tone="green" helper="可用于兑换奖励商品" />
             </div>
           </Space>
@@ -53,8 +53,8 @@ export default function DeviceGrowthPage() {
         <div className="watch-grid-panel">
           <div className="device-plaza-grid">
             <Link href="/growth/index" className="device-plaza-tile">
-              <strong style={{ fontSize: 12 }}>能力指数</strong>
-              <span className="device-mini-item-desc">看能力水平图、雷达图和 16 项能力元素</span>
+              <strong style={{ fontSize: 12 }}>能力雷达</strong>
+              <span className="device-mini-item-desc">看能力框架图、雷达图和 16 项能力元素</span>
             </Link>
             <Link href="/growth/self-test" className="device-plaza-tile">
               <strong style={{ fontSize: 12 }}>能力自测</strong>

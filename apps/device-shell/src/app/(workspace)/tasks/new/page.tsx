@@ -73,6 +73,11 @@ function buildInitialValues(fields: DemoWorkFormField[], answers: DemoWorkAnswer
       return;
     }
 
+    if (answer && 'files' in answer && field.kind === 'link_upload') {
+      initialValues[field.id] = answer.files.map((item) => item.summary ?? `${item.type}：${item.title}`).join('\n');
+      return;
+    }
+
     if (answer && 'value' in answer) {
       initialValues[field.id] = answer.kind === 'single_choice' ? answer.value[0] : answer.value;
     }
@@ -163,6 +168,21 @@ function buildAudioPreviewBySheet(task: DemoTask, workBySheetId: Record<string, 
   return nextMap;
 }
 
+function buildAcceptedByFieldBySheet(task: DemoTask, workBySheetId: Record<string, ReturnType<typeof getDeviceTaskWorkBySheetId>>) {
+  const nextMap: AcceptedFieldState = {};
+
+  task.taskSheets.forEach((sheet) => {
+    const fieldMediaEntries =
+      workBySheetId[sheet.id]?.formAnswers
+        ?.filter((answer): answer is Extract<DemoWorkAnswer, { files: DemoWorkMedia[] }> => 'files' in answer && answer.files.length > 0)
+        .map((answer) => [answer.fieldId, answer.files] as const) ?? [];
+
+    nextMap[sheet.id] = Object.fromEntries(fieldMediaEntries);
+  });
+
+  return nextMap;
+}
+
 function hasFilledValue(value: unknown) {
   if (Array.isArray(value)) {
     return value.length > 0;
@@ -175,6 +195,7 @@ function validateSheetInputs(
   sheet: DeviceTaskSheet,
   values: FormValues,
   uploads: Record<string, UploadFile[]>,
+  acceptedByField: Record<string, DemoWorkMedia[]>,
   strict = false,
 ) {
   let hasContent = false;
@@ -184,6 +205,18 @@ function validateSheetInputs(
     const required = field.required ?? true;
     const uploadFiles = uploads[field.id] ?? [];
     const value = values[field.id];
+    const acceptedMedia = acceptedByField[field.id] ?? [];
+
+    if (field.kind === 'link_upload') {
+      const hasAcceptedResult = acceptedMedia.length > 0 || hasFilledValue(value);
+      if (hasAcceptedResult) {
+        hasContent = true;
+      }
+      if (strict && required && !hasAcceptedResult) {
+        fieldErrors[field.id] = `请先完成“${field.label}”`;
+      }
+      return;
+    }
 
     if (field.kind.includes('upload')) {
       if (uploadFiles.length) {
@@ -269,7 +302,7 @@ export default function DeviceTaskNewPage() {
     setQuickMediaBySheet(buildQuickMediaBySheet(task, currentWorkBySheetId));
     setLinkedFlashNotesBySheet(buildLinkedFlashNotesBySheet(task, currentWorkBySheetId));
     setAudioPreviewBySheet(buildAudioPreviewBySheet(task, currentWorkBySheetId));
-    setAcceptedByFieldBySheet({});
+    setAcceptedByFieldBySheet(buildAcceptedByFieldBySheet(task, currentWorkBySheetId));
     setDirtySheetIds([]);
     setSheetErrors({});
     setSubmitNotice(null);
@@ -281,6 +314,23 @@ export default function DeviceTaskNewPage() {
   }
 
   const activeTask = task;
+  const isReadonlyContext = searchParams.get('readonly') === '1';
+
+  if (isReadonlyContext) {
+    const teamId = searchParams.get('teamId') ?? '';
+    return (
+      <Result
+        status="info"
+        title="历史团队任务仅支持查看"
+        subTitle="该团队已结束，不能继续填写或提交学习作品。"
+        extra={
+          <Link href={`/tasks/${activeTask.id}${teamId ? `?teamId=${teamId}&readonly=1` : ''}`}>
+            <Button type="primary">返回任务详情</Button>
+          </Link>
+        }
+      />
+    );
+  }
 
   function markSheetDirty(sheetId: string) {
     setDirtySheetIds((current) => (current.includes(sheetId) ? current : [...current, sheetId]));
@@ -413,26 +463,36 @@ export default function DeviceTaskNewPage() {
   function applyVoiceToField(sheetId: string, field: DemoWorkFormField) {
     markSheetDirty(sheetId);
     const currentValue = String(form.getFieldValue([sheetId, field.id]) ?? '').trim();
-    const voiceText = `${field.label}：补充了一条现场口述内容。`;
+    const voiceText =
+      field.kind === 'link_upload'
+        ? '语音记录：已把这次 AI 探究过程转成文字并回填到当前作品。'
+        : `${field.label}：补充了一条现场口述内容。`;
+    const voiceMedia: DemoWorkMedia = {
+      id: `${sheetId}-${field.id}-voice-${Date.now()}`,
+      type: '音频',
+      title: field.kind === 'link_upload' ? 'AI探究语音记录' : `${field.label} 语音输入`,
+      url: '/mock/voice-to-text.mp3',
+      duration: '00:08',
+      summary: field.kind === 'link_upload' ? '已用语音补充一次 AI 探究过程记录。' : undefined,
+    };
     form.setFieldValue([sheetId, field.id], currentValue ? `${currentValue}\n${voiceText}` : voiceText);
     setAudioPreviewBySheet((current) => ({
       ...current,
-      [sheetId]: { title: `${field.label} 语音输入`, duration: '00:08' },
+      [sheetId]: { title: voiceMedia.title, duration: voiceMedia.duration },
     }));
-    addQuickMedia(sheetId, {
-      id: `${sheetId}-${field.id}-voice-${Date.now()}`,
-      type: '音频',
-      title: `${field.label} 语音输入`,
-      url: '/mock/voice-to-text.mp3',
-      duration: '00:08',
-    });
-    messageApi.success('已完成语音转文字演示');
+    addQuickMedia(sheetId, voiceMedia);
+    rememberFieldMedia(sheetId, field, [voiceMedia]);
+    messageApi.success(field.kind === 'link_upload' ? '已完成语音记录并回填 AI 探究结果' : '已完成语音转文字演示');
   }
 
   function renderFieldTools(sheet: DeviceTaskSheet, field: DemoWorkFormField) {
     const defaultTools: DemoWorkFormField['tools'] =
       field.kind === 'fill_blank'
         ? ['ask', 'flash_note', 'voice_text']
+        : field.kind === 'link_upload'
+          ? sheet.workKind === 'ai_link'
+            ? ['voice_text', 'ask', 'identify', 'ai_draw', 'ai_video', 'flash_note']
+            : ['ask']
         : field.kind === 'single_choice' || field.kind === 'multiple_choice'
           ? ['ask']
           : field.kind === 'image_upload'
@@ -448,7 +508,22 @@ export default function DeviceTaskNewPage() {
     const tools: Array<{ key: string; label: string; icon: ReactNode; onClick: () => void; primary?: boolean }> = [];
 
     if (toolKeys.includes('ask')) {
-      tools.push({ key: 'ask', label: '问问', icon: <SendOutlined />, onClick: () => openTool('ask', sheet.id, field), primary: true });
+      tools.push({
+        key: 'ask',
+        label: '问问',
+        icon: <SendOutlined />,
+        onClick: () => openTool('ask', sheet.id, field),
+        primary: field.kind !== 'link_upload',
+      });
+    }
+    if (toolKeys.includes('voice_text') && field.kind === 'link_upload') {
+      tools.push({
+        key: 'voice-text',
+        label: field.kind === 'link_upload' ? '语音记录' : '语音输入',
+        icon: <AudioOutlined />,
+        onClick: () => applyVoiceToField(sheet.id, field),
+        primary: field.kind === 'link_upload',
+      });
     }
     if (toolKeys.includes('identify')) {
       tools.push({ key: 'identify', label: 'AI识图', icon: <CameraOutlined />, onClick: () => openTool('identify', sheet.id, field) });
@@ -629,10 +704,22 @@ export default function DeviceTaskNewPage() {
                     ? '拍照打卡'
                     : '拍照';
 
-    const askAnswer = `问问回答：可以从现场证据、自己的判断和还想继续研究的问题三个角度回答“${field.label}”。`;
-    const identifyAnswer = `AI识图结果：画面中发现了海洋动物、标志牌和观察位置，可作为“${field.label}”的证据。`;
-    const drawAnswer = `AI绘图作品：根据“${toolPrompt || field.label}”生成一张研学创作图。`;
-    const videoAnswer = `AI视频作品：根据“${toolPrompt || field.label}”生成 15 秒研学展示视频。`;
+    const askAnswer =
+      field.kind === 'link_upload'
+        ? `问问过程：AI 已围绕“${field.label}”帮我整理出观察证据、我的判断和下一步还可以追问的问题。`
+        : `问问回答：可以从现场证据、自己的判断和还想继续研究的问题三个角度回答“${field.label}”。`;
+    const identifyAnswer =
+      field.kind === 'link_upload'
+        ? `AI识图过程：我让 AI 帮忙识别现场画面，它提醒我关注海洋动物、标志牌和观察位置这些关键线索。`
+        : `AI识图结果：画面中发现了海洋动物、标志牌和观察位置，可作为“${field.label}”的证据。`;
+    const drawAnswer =
+      field.kind === 'link_upload'
+        ? `AI绘图过程：已根据“${toolPrompt || field.label}”生成研学创作图，可以作为本次 AI 创作的过程证明。`
+        : `AI绘图作品：根据“${toolPrompt || field.label}”生成一张研学创作图。`;
+    const videoAnswer =
+      field.kind === 'link_upload'
+        ? `AI视频过程：已根据“${toolPrompt || field.label}”生成 15 秒 AI 展示视频，可作为本次探究过程记录。`
+        : `AI视频作品：根据“${toolPrompt || field.label}”生成 15 秒研学展示视频。`;
 
     return (
       <Modal title={modalTitle} open centered width={kind === 'flash_create' ? 420 : 360} footer={null} onCancel={() => setActiveTool(null)}>
@@ -852,11 +939,26 @@ export default function DeviceTaskNewPage() {
           }
 
           if (field.kind === 'link_upload') {
+            const currentValue = String(form.getFieldValue([sheet.id, field.id]) ?? '').trim();
+            const acceptedRecords = acceptedByFieldBySheet[sheet.id]?.[field.id] ?? [];
+
             return (
               <Form.Item {...commonProps}>
-                <Form.Item name={[sheet.id, field.id]} noStyle>
-                  <Input placeholder="粘贴 AI 探究链接或作品链接" />
+                <Form.Item name={[sheet.id, field.id]} hidden>
+                  <Input />
                 </Form.Item>
+                <div className="device-smart-field-card">
+                  <div className="device-smart-field-head">
+                    <div>
+                      <strong>{acceptedRecords.length ? `已回填 ${acceptedRecords.length} 条 AI 过程结果` : '还没有 AI 探究过程记录'}</strong>
+                      <span>不用粘贴链接，直接点下方按钮，系统会把结果自动带回当前作品。</span>
+                    </div>
+                    <Tag color={acceptedRecords.length ? 'blue' : 'default'}>{acceptedRecords.length ? `${acceptedRecords.length} 条` : '待采集'}</Tag>
+                  </div>
+                  <div className={`device-smart-field-body${currentValue ? '' : ' empty'}`}>
+                    {currentValue || '支持语音记录、问问、AI识图、AI绘图、AI视频和闪记回填，更符合手表端交互。'}
+                  </div>
+                </div>
                 {renderFieldTools(sheet, field)}
                 {renderAcceptedForField(sheet.id, field.id)}
               </Form.Item>
@@ -959,7 +1061,13 @@ export default function DeviceTaskNewPage() {
 
       for (const sheet of activeTask.taskSheets) {
         const values = getSheetValues(allValues, sheet.id);
-        const validation = validateSheetInputs(sheet, values, uploadMapBySheet[sheet.id] ?? {}, false);
+        const validation = validateSheetInputs(
+          sheet,
+          values,
+          uploadMapBySheet[sheet.id] ?? {},
+          acceptedByFieldBySheet[sheet.id] ?? {},
+          false,
+        );
         const isDirty = dirtySheetIds.includes(sheet.id);
         const hasExistingWork = Boolean(currentWorkBySheetId[sheet.id]);
         const shouldSubmit = isDirty || (!hasExistingWork && validation.hasContent);
@@ -968,7 +1076,13 @@ export default function DeviceTaskNewPage() {
           continue;
         }
 
-        const strictValidation = validateSheetInputs(sheet, values, uploadMapBySheet[sheet.id] ?? {}, true);
+        const strictValidation = validateSheetInputs(
+          sheet,
+          values,
+          uploadMapBySheet[sheet.id] ?? {},
+          acceptedByFieldBySheet[sheet.id] ?? {},
+          true,
+        );
         if (Object.keys(strictValidation.fieldErrors).length) {
           nextSheetErrors[sheet.id] = strictValidation.fieldErrors;
           continue;
@@ -994,7 +1108,10 @@ export default function DeviceTaskNewPage() {
       for (const { sheet, values } of sheetsToSubmit) {
         const serializedParts: string[] = [];
         const formAnswers: DemoWorkAnswer[] = [];
-        const collectedMedia: DemoWorkMedia[] = [...(quickMediaBySheet[sheet.id] ?? [])];
+        const collectedMediaMap = new Map<string, DemoWorkMedia>();
+        (quickMediaBySheet[sheet.id] ?? []).forEach((item) => {
+          collectedMediaMap.set(item.id, item);
+        });
 
         for (const field of sheet.workForm) {
           if (field.kind === 'fill_blank') {
@@ -1021,16 +1138,27 @@ export default function DeviceTaskNewPage() {
 
           if (field.kind === 'link_upload') {
             const value = String(values[field.id] ?? '').trim();
-            if (value) {
-              const linkFile: DemoWorkMedia = {
-                id: `${sheet.id}-${field.id}-link`,
-                type: '链接',
-                title: field.label,
-                url: value,
-              };
-              serializedParts.push(`${field.label}：${value}`);
-              formAnswers.push({ fieldId: field.id, kind: field.kind, label: field.label, files: [linkFile] });
-              collectedMedia.push(linkFile);
+            const acceptedFiles = acceptedByFieldBySheet[sheet.id]?.[field.id] ?? [];
+
+            if (value || acceptedFiles.length) {
+              const linkFiles =
+                acceptedFiles.length > 0
+                  ? acceptedFiles
+                  : [
+                      {
+                        id: `${sheet.id}-${field.id}-record`,
+                        type: '链接' as const,
+                        title: field.label,
+                        url: '',
+                        summary: value,
+                      },
+                    ];
+
+              serializedParts.push(`${field.label}：${value || linkFiles.map((item) => `${item.type}·${item.title}`).join('、')}`);
+              formAnswers.push({ fieldId: field.id, kind: field.kind, label: field.label, files: linkFiles });
+              linkFiles.forEach((item) => {
+                collectedMediaMap.set(item.id, item);
+              });
             }
             continue;
           }
@@ -1069,7 +1197,9 @@ export default function DeviceTaskNewPage() {
           if (uploadedFiles.length) {
             serializedParts.push(`${field.label}：${uploadedFiles.map((item) => `${item.title} (${item.url})`).join('、')}`);
             formAnswers.push({ fieldId: field.id, kind: field.kind, label: field.label, files: uploadedFiles });
-            collectedMedia.push(...uploadedFiles);
+            uploadedFiles.forEach((item) => {
+              collectedMediaMap.set(item.id, item);
+            });
           }
         }
 
@@ -1093,7 +1223,7 @@ export default function DeviceTaskNewPage() {
           task: activeTask,
           sheet,
           formAnswers,
-          media: collectedMedia,
+          media: [...collectedMediaMap.values()],
           summary,
           textContent,
           linkedFlashNotes: linkedFlashNotesBySheet[sheet.id],

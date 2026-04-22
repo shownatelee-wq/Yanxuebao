@@ -32,6 +32,7 @@ export default function DeviceTeamDetailPage() {
 
   const lifecycleTag = toLifecycleTag(team.lifecycleStatus);
   const isJoined = team.membershipStatus === '已加入';
+  const isHistorical = team.membershipStatus === '历史可查看' || team.lifecycleStatus === '已结束';
   const isTravelTeam = team.sourceType === '研学旅行推荐';
   const teamReport = demoReports.find((item) => item.teamId === team.id);
 
@@ -72,10 +73,19 @@ export default function DeviceTeamDetailPage() {
           </div>
         ) : null}
 
-        {isJoined && !isTravelTeam ? (
+        {isHistorical && !isTravelTeam ? (
+          <div className="device-compact-card">
+            <p className="device-section-label">历史团队只读</p>
+            <p className="device-mini-item-desc" style={{ margin: 0 }}>
+              该团队已结束，任务、作品、报告、证书、排行、手册和评价均可查看，但不能继续提交、编辑或报名。
+            </p>
+          </div>
+        ) : null}
+
+        {(isJoined || isHistorical) && !isTravelTeam ? (
           <>
             <div className="device-compact-card">
-              <p className="device-section-label">我的团队状态</p>
+              <p className="device-section-label">{isHistorical ? '历史团队状态' : '我的团队状态'}</p>
               <div className="device-detail-grid">
                 <WatchInfoRow label="当前小组" value={detail.groupName} />
                 <WatchInfoRow label="个人排行" value={`第 ${detail.myRank.rank} 名 / ${detail.myRank.total} 人`} />
@@ -86,15 +96,15 @@ export default function DeviceTeamDetailPage() {
               <div className="device-plaza-grid">
                 <Link href={`/team/${team.id}/groups`} className="device-plaza-tile">
                   <strong style={{ fontSize: 12 }}>小组</strong>
-                  <span className="device-mini-item-desc">查看小组列表与小组详情</span>
+                  <span className="device-mini-item-desc">{isHistorical ? '只读查看小组列表与详情' : '查看小组列表与小组详情'}</span>
                 </Link>
                 <Link href={`/team/${team.id}/handbook`} className="device-plaza-tile">
                   <strong style={{ fontSize: 12 }}>研学手册</strong>
-                  <span className="device-mini-item-desc">查看图文、PDF、视频和 AI 资料</span>
+                  <span className="device-mini-item-desc">{isHistorical ? '只读查看图文、PDF、视频和 AI 资料' : '查看图文、PDF、视频和 AI 资料'}</span>
                 </Link>
                 <Link href={`/team/${team.id}/tasks`} className="device-plaza-tile">
                   <strong style={{ fontSize: 12 }}>任务</strong>
-                  <span className="device-mini-item-desc">进入本次团队任务</span>
+                  <span className="device-mini-item-desc">{isHistorical ? '只读查看历史任务和作品' : '进入本次团队任务'}</span>
                 </Link>
                 <Link href={`/team/${team.id}/rankings`} className="device-plaza-tile">
                   <strong style={{ fontSize: 12 }}>团队排行</strong>
@@ -157,6 +167,10 @@ export default function DeviceTeamDetailPage() {
             ) : team.membershipStatus === '未加入' || team.membershipStatus === '待审批' ? (
               <Link href="/team/join">
                 <Button type="primary" block>{team.membershipStatus === '待审批' ? '查看审批进度' : '扫码入团'}</Button>
+              </Link>
+            ) : isHistorical ? (
+              <Link href={`/team/${team.id}/tasks`}>
+                <Button type="primary" block>只读查看任务</Button>
               </Link>
             ) : (
               <Link href={`/team/${team.id}/tasks`}>

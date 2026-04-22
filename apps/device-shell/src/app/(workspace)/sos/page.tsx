@@ -2,6 +2,7 @@
 
 import { Button, Space, Tag, Typography, message } from 'antd';
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { deviceBridge } from '../../../lib/device-bridge';
 import { demoSosFlow } from '../../../lib/device-demo-data';
 import { WatchHero, WatchSection, WatchActionButtons, WatchInfoRow } from '../../../lib/watch-ui';
@@ -9,11 +10,15 @@ import { WatchHero, WatchSection, WatchActionButtons, WatchInfoRow } from '../..
 const { Paragraph } = Typography;
 
 export default function DeviceSosPage() {
+  const searchParams = useSearchParams();
+  const source = searchParams.get('source');
+  const autoStart = searchParams.get('autoStart') === '1';
   const [loading, setLoading] = useState(false);
   const [locationText, setLocationText] = useState('');
   const [phase, setPhase] = useState<'ready' | 'recording' | 'confirm' | 'sent'>('ready');
   const [countdown, setCountdown] = useState(demoSosFlow.recordingSeconds);
   const [messageApi, contextHolder] = message.useMessage();
+  const [hasAutoStarted, setHasAutoStarted] = useState(false);
 
   useEffect(() => {
     if (phase !== 'recording') {
@@ -46,6 +51,15 @@ export default function DeviceSosPage() {
     messageApi.success(`${mode}已完成，求助信息已发送`);
   }
 
+  useEffect(() => {
+    if (!autoStart || hasAutoStarted || phase !== 'ready' || loading) {
+      return;
+    }
+
+    setHasAutoStarted(true);
+    void handleSos();
+  }, [autoStart, hasAutoStarted, loading, phase]);
+
   return (
     <div className="device-page-stack">
       {contextHolder}
@@ -55,8 +69,17 @@ export default function DeviceSosPage() {
         tags={[
           { label: '紧急求助', color: 'red' },
           { label: '定位已就绪', color: 'blue' },
+          ...(source === 'assistant' ? [{ label: '语音助手发起', color: 'gold' as const }] : []),
         ]}
       />
+      {source === 'assistant' ? (
+        <div className="device-compact-card">
+          <p className="device-section-label">助手转入说明</p>
+          <Paragraph style={{ margin: 0, fontSize: 12 }}>
+            当前求助由语音助手发起，已自动进入定位与录音准备流程。
+          </Paragraph>
+        </div>
+      ) : null}
       <WatchSection title="求助状态">
         <Space direction="vertical" size={8} style={{ width: '100%' }}>
           <WatchInfoRow label="求助对象" value={demoSosFlow.recipients.join(' + ')} />

@@ -4,7 +4,8 @@ import { Button, Empty, Space, Tag, message } from 'antd';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { fetchWithMode, getStoredSession } from '../../../lib/api';
-import { demoDiaries, demoFavorites, demoReports } from '../../../lib/device-demo-data';
+import { demoFavorites, demoReports } from '../../../lib/device-demo-data';
+import { useDeviceDiarySnapshot } from '../../../lib/device-diary-data';
 import { getPurchasedCourses, useCourseState } from '../../../lib/device-course-data';
 
 type Profile = { id: string; account: string; displayName: string; role: string; studentId?: string };
@@ -17,6 +18,7 @@ export default function DeviceMePage() {
   const session = getStoredSession();
   const courseState = useCourseState();
   const courses = getPurchasedCourses(courseState);
+  const diaries = useDeviceDiarySnapshot();
 
   async function loadMe() {
     try {
@@ -140,8 +142,8 @@ export default function DeviceMePage() {
       <div className="device-compact-card">
         <p className="device-section-label">研学日记</p>
         <div className="device-mini-list">
-          {demoDiaries.map((item) => (
-            <Link key={item.id} href={`/me/diaries/${item.id}`} className="device-card-link">
+          {diaries.map((item) => (
+            <Link key={item.id} href={`/diary/${item.id}`} className="device-card-link">
               <div className="device-mini-item">
                 <div className="device-mini-item-title">
                   <span>{item.title}</span>

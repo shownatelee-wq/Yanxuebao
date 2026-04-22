@@ -2,8 +2,9 @@
 
 import { Button, Result, Space, Tag, Typography } from 'antd';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { getDeviceLearningWorkItems, getDeviceTaskById } from '../../../../lib/device-task-data';
+import { useParams, useSearchParams } from 'next/navigation';
+import { getDeviceLearningWorkItems, getDeviceTaskById, getDeviceTaskDisplayMeta } from '../../../../lib/device-task-data';
+import { useDeviceTeamSnapshot } from '../../../../lib/device-team-data';
 import { WatchInfoRow } from '../../../../lib/watch-ui';
 
 const { Paragraph, Text } = Typography;
@@ -29,18 +30,28 @@ function getResourceTag(resource: NonNullable<ReturnType<typeof getDeviceTaskByI
 
 export default function DeviceTaskDetailPage() {
   const params = useParams<{ taskId: string }>();
+  const searchParams = useSearchParams();
+  const { teams } = useDeviceTeamSnapshot();
   const task = getDeviceTaskById(params.taskId);
 
   if (!task) {
     return <Result status="404" title="未找到研学活动" extra={<Link href="/tasks"><Button>返回任务</Button></Link>} />;
   }
 
+  const teamId = searchParams.get('teamId') ?? '';
+  const contextTeam = teamId ? teams.find((item) => item.id === teamId) : undefined;
+  const isReadonlyQuery = searchParams.get('readonly') === '1';
+  const isReadonlyContext =
+    isReadonlyQuery && (!contextTeam || contextTeam.membershipStatus === '历史可查看' || contextTeam.lifecycleStatus === '已结束');
+  const readonlySuffix = isReadonlyContext ? `?teamId=${teamId}&readonly=1` : '';
   const learningWorks = getDeviceLearningWorkItems(task.id);
   const firstSubmittedWork = learningWorks.find((item) => item.displayStatus === '已提交');
   const editorPath = `/tasks/new?taskId=${task.id}`;
+  const readonlyWorkPath = (path: string) => (isReadonlyContext ? `${path}${path.includes('?') ? '&' : '?'}teamId=${teamId}&readonly=1` : path);
   const gameplayLabels = Array.from(new Set(task.taskSheets.map((sheet) => sheet.gameplayKind).filter(Boolean))).map(
     (kind) => GAMEPLAY_LABELS[kind as keyof typeof GAMEPLAY_LABELS],
-  );
+  ).filter(Boolean);
+  const displayMeta = getDeviceTaskDisplayMeta(task);
 
   return (
     <div className="device-page-stack">
@@ -52,7 +63,9 @@ export default function DeviceTaskDetailPage() {
                 {task.status === 'submitted' ? '已完成' : task.status === 'todo' ? '待开始' : '进行中'}
               </Tag>
               <Tag color="cyan">{task.target}</Tag>
-              <Tag color="default">{task.taskType}</Tag>
+              <Tag color={displayMeta.categoryColor}>{displayMeta.categoryShortLabel}</Tag>
+              <Tag color={displayMeta.sourceColor}>{displayMeta.taskKindLabel}</Tag>
+              <Tag color="default">来源：{displayMeta.sourceLabel}</Tag>
             </Space>
             <p className="device-page-title">{task.title}</p>
             <Paragraph style={{ margin: 0, fontSize: 12 }}>{task.taskDescription}</Paragraph>
@@ -61,6 +74,9 @@ export default function DeviceTaskDetailPage() {
               <span className="watch-status-pill">资源包 {task.resourcePacks.length}</span>
             </div>
             <Space wrap>
+              <Tag color="cyan">{displayMeta.publisherLabel}</Tag>
+              {task.source === 'assistant_ai' ? <Tag color="geekblue">AI助手生成</Tag> : null}
+              {isReadonlyContext ? <Tag color="default">历史团队只读</Tag> : null}
               {gameplayLabels.map((label) => (
                 <Tag key={label} color="gold">{label}</Tag>
               ))}
@@ -79,7 +95,10 @@ export default function DeviceTaskDetailPage() {
             <div className="device-mini-item watch-list-card">
               <Text strong style={{ fontSize: 12 }}>研学活动信息</Text>
               <div className="device-detail-grid" style={{ marginTop: 10 }}>
-                <WatchInfoRow label="活动类型" value={task.taskType} />
+                <WatchInfoRow label="任务分类" value={displayMeta.categoryLabel} />
+                <WatchInfoRow label="任务类型" value={displayMeta.taskKindLabel} />
+                <WatchInfoRow label="任务来源" value={displayMeta.sourceLabel} />
+                <WatchInfoRow label="发布方式" value={displayMeta.publisherLabel} />
                 <WatchInfoRow label="活动对象" value={task.target} />
                 <WatchInfoRow label="活动地点" value={task.infoSummary} />
                 <WatchInfoRow label="时间要求" value={task.timeLimit} />
@@ -90,6 +109,11 @@ export default function DeviceTaskDetailPage() {
               <Text strong style={{ fontSize: 12 }}>活动说明</Text>
               <p className="device-mini-item-desc" style={{ marginTop: 8 }}>{task.intro}</p>
               <p className="device-mini-item-desc">{task.requirement}</p>
+              {isReadonlyContext ? (
+                <p className="device-mini-item-desc" style={{ color: '#8a6d3b' }}>
+                  该任务来自已结束历史团队，仅支持查看任务、作品和资料，不能继续提交或修改。
+                </p>
+              ) : null}
             </div>
           </div>
           <div className="device-mini-item watch-list-card" style={{ marginTop: 10 }}>
@@ -120,7 +144,7 @@ export default function DeviceTaskDetailPage() {
           </div>
           <div className="device-mini-list">
             {learningWorks.map((item) => (
-              <Link key={item.sheetId} href={item.entryPath} className="device-card-link">
+              <Link key={item.sheetId} href={readonlyWorkPath(item.entryPath)} className="device-card-link">
                 <div className="device-mini-item watch-list-card">
                   <div className="device-mini-item-title">
                     <span>{item.title}</span>
@@ -144,7 +168,18 @@ export default function DeviceTaskDetailPage() {
         </div>
 
         <div className="watch-bottom-dock">
-          {task.status === 'submitted' ? (
+          {isReadonlyContext ? (
+            <div className="device-action-row">
+              <Link href={firstSubmittedWork ? readonlyWorkPath(firstSubmittedWork.entryPath) : `/team/${teamId}/tasks`}>
+                <Button type="primary" block>
+                  查看作品
+                </Button>
+              </Link>
+              <Link href={teamId ? `/team/${teamId}/tasks` : `/tasks/${task.id}${readonlySuffix}`}>
+                <Button block>返回历史团队任务</Button>
+              </Link>
+            </div>
+          ) : task.status === 'submitted' ? (
             <div className="device-action-row">
               <Link href={firstSubmittedWork?.entryPath ?? editorPath}>
                 <Button type="primary" block>

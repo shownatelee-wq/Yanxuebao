@@ -24,6 +24,26 @@ function buildPolygon(labels: string[], values: number[], radius: number) {
     .join(' ');
 }
 
+function displayCapabilityName(name: string) {
+  return name === '跨学科融合' ? '学科融合' : name;
+}
+
+function getFrameworkLevel(score: number) {
+  if (score >= 9) {
+    return 'excellent';
+  }
+  if (score >= 8) {
+    return 'great';
+  }
+  if (score >= 7) {
+    return 'good';
+  }
+  if (score >= 6) {
+    return 'improving';
+  }
+  return 'risk';
+}
+
 export function DeviceRadarCard({
   title,
   labels,
@@ -118,15 +138,30 @@ export function DeviceGrowthFrameworkChart({
 
   return (
     <div className="device-compact-card">
-      <p className="device-section-label">能力框架图</p>
+      <div className="watch-inline-head">
+        <p className="device-section-label" style={{ margin: 0 }}>能力框架图</p>
+        <span>五色分层</span>
+      </div>
+      <div className="device-growth-framework-legend">
+        <span className="level-excellent">绿色卓越</span>
+        <span className="level-great">蓝色优秀</span>
+        <span className="level-good">黄色良好</span>
+        <span className="level-improving">橙色待提升</span>
+        <span className="level-risk">红色待改进</span>
+      </div>
       <div className="device-growth-framework-grid">
         {planeGroups.map((group) => (
           <div key={group.planeKey} className="device-growth-framework-panel">
             <div className="device-growth-framework-lines" aria-hidden />
             <div className="device-growth-framework-nodes">
               {group.items.map((item) => (
-                <Link key={item.id} href={`/growth/capabilities/${item.id}`} className="device-growth-framework-node">
-                  <span>{item.elementKey}</span>
+                <Link
+                  key={item.id}
+                  href={`/growth/capabilities/${item.id}`}
+                  className={`device-growth-framework-node level-${getFrameworkLevel(item.score)}`}
+                >
+                  <span>{displayCapabilityName(item.elementKey)}</span>
+                  <em>{item.score.toFixed(1)}</em>
                 </Link>
               ))}
             </div>
@@ -144,7 +179,7 @@ export function DeviceCapabilityList({ capabilities }: { capabilities: DemoCapab
       {capabilities.map((item) => (
         <div key={item.id} className="device-mini-item watch-list-card">
           <div className="device-mini-item-title">
-            <span>{item.elementKey}</span>
+            <span>{displayCapabilityName(item.elementKey)}</span>
             <Tag color={item.level === '优秀' ? 'green' : item.level === '良好' ? 'blue' : item.level === '待提升' ? 'gold' : 'red'}>
               {item.score.toFixed(1)}
             </Tag>

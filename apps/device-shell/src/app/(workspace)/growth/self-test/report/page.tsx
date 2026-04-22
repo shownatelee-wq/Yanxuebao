@@ -38,7 +38,7 @@ export default function DeviceGrowthSelfTestReportPage() {
       />
 
       <DeviceRadarCard
-        title="最新能力指数雷达图"
+        title="最新能力雷达图"
         labels={report.rows.map((item) => item.elementKey)}
         primaryValues={report.rows.map((item) => item.latestIndex)}
         compareValues={report.rows.map((item) => item.average)}

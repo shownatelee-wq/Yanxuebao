@@ -3,9 +3,10 @@
 import { PlayCircleOutlined } from '@ant-design/icons';
 import { Button, Result, Space, Tag, Typography, message } from 'antd';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import type { DemoWorkAnswer, DemoWorkMedia } from '../../../../../lib/device-demo-data';
 import { getDeviceTaskById, getDeviceTaskWorkById } from '../../../../../lib/device-task-data';
+import { useDeviceTeamSnapshot } from '../../../../../lib/device-team-data';
 import { WatchInfoRow } from '../../../../../lib/watch-ui';
 
 const { Paragraph } = Typography;
@@ -33,7 +34,7 @@ function getAnswerKindLabel(answer: DemoWorkAnswer) {
   if (answer.kind === 'audio_upload') {
     return '音频附件';
   }
-  return '链接证据';
+  return 'AI过程记录';
 }
 
 function getMediaTagColor(type: DemoWorkMedia['type']) {
@@ -54,13 +55,23 @@ function getMediaTagColor(type: DemoWorkMedia['type']) {
 
 export default function DeviceTaskWorkDetailPage() {
   const params = useParams<{ workId: string }>();
+  const searchParams = useSearchParams();
   const [messageApi, contextHolder] = message.useMessage();
+  const { teams } = useDeviceTeamSnapshot();
   const work = getDeviceTaskWorkById(params.workId);
   const task = work ? getDeviceTaskById(work.taskId) : undefined;
 
   if (!work || !task) {
     return <Result status="404" title="未找到作品" extra={<Link href="/tasks"><Button>返回任务</Button></Link>} />;
   }
+
+  const teamId = searchParams.get('teamId') ?? '';
+  const contextTeam = teamId ? teams.find((item) => item.id === teamId) : undefined;
+  const isReadonlyContext =
+    searchParams.get('readonly') === '1' &&
+    (!contextTeam || contextTeam.membershipStatus === '历史可查看' || contextTeam.lifecycleStatus === '已结束');
+  const readonlySuffix = isReadonlyContext ? `?teamId=${teamId}&readonly=1` : '';
+  const taskDetailPath = `/tasks/${task.id}${readonlySuffix}`;
 
   return (
     <div className="device-page-stack">
@@ -92,8 +103,13 @@ export default function DeviceTaskWorkDetailPage() {
               <WatchInfoRow label="完成方式" value={work.workMode} />
               <WatchInfoRow label="提交人" value={work.authorName} />
               <WatchInfoRow label="更新时间" value={work.updatedAt} />
-              <WatchInfoRow label="重新填写" value={work.canResubmit ? '支持覆盖更新' : '当前仅查看'} />
+              <WatchInfoRow label="重新填写" value={isReadonlyContext ? '历史团队只读' : work.canResubmit ? '支持覆盖更新' : '当前仅查看'} />
             </div>
+            {isReadonlyContext ? (
+              <Paragraph style={{ margin: '10px 0 0', fontSize: 11, color: '#8a6d3b' }}>
+                该作品来自已结束历史团队，仅支持查看，不能重新填写或修改提交。
+              </Paragraph>
+            ) : null}
             <Paragraph style={{ margin: '10px 0 0', fontSize: 11 }}>{work.summary}</Paragraph>
           </div>
         </div>
@@ -132,8 +148,10 @@ export default function DeviceTaskWorkDetailPage() {
                                 播放
                               </Button>
                             ) : null}
-                            {file.type === '链接' ? (
-                              <Button size="small" onClick={() => messageApi.success('已打开 AI 探究链接演示')}>打开</Button>
+                            {file.type === '链接' || file.type === 'AI识图' || file.type === 'AI回答' || file.type === 'AI绘图' ? (
+                              <Link href={file.type === 'AI识图' ? '/identify' : file.type === 'AI绘图' ? '/ai-create' : '/ask'}>
+                                <Button size="small">查看</Button>
+                              </Link>
                             ) : null}
                             <Tag color={getMediaTagColor(file.type)}>{file.type}</Tag>
                           </div>
@@ -175,8 +193,10 @@ export default function DeviceTaskWorkDetailPage() {
                           播放
                         </Button>
                       ) : null}
-                      {item.type === '链接' ? (
-                        <Button size="small" onClick={() => messageApi.success('已打开 AI 探究链接演示')}>打开</Button>
+                      {item.type === '链接' || item.type === 'AI识图' || item.type === 'AI回答' || item.type === 'AI绘图' ? (
+                        <Link href={item.type === 'AI识图' ? '/identify' : item.type === 'AI绘图' ? '/ai-create' : '/ask'}>
+                          <Button size="small">查看</Button>
+                        </Link>
                       ) : null}
                       <Tag color={getMediaTagColor(item.type)}>{item.type}</Tag>
                     </div>
@@ -228,14 +248,25 @@ export default function DeviceTaskWorkDetailPage() {
         </div>
 
         <div className="watch-bottom-dock">
-          <div className="device-action-row">
-            <Link href={`/tasks/new?taskId=${task.id}&sheetId=${work.taskSheetId ?? ''}`}>
-              <Button type="primary" block>{work.canResubmit ? '重新填写' : '查看原表单'}</Button>
-            </Link>
-            <Link href={`/tasks/${task.id}`}>
-              <Button block>返回任务</Button>
-            </Link>
-          </div>
+          {isReadonlyContext ? (
+            <div className="device-action-row">
+              <Link href={taskDetailPath}>
+                <Button type="primary" block>返回任务详情</Button>
+              </Link>
+              <Link href={teamId ? `/team/${teamId}/tasks` : '/tasks'}>
+                <Button block>返回历史团队任务</Button>
+              </Link>
+            </div>
+          ) : (
+            <div className="device-action-row">
+              <Link href={`/tasks/new?taskId=${task.id}&sheetId=${work.taskSheetId ?? ''}`}>
+                <Button type="primary" block>{work.canResubmit ? '重新填写' : '查看原表单'}</Button>
+              </Link>
+              <Link href={`/tasks/${task.id}`}>
+                <Button block>返回任务</Button>
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </div>

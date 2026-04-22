@@ -115,14 +115,14 @@ export default function DeviceCourseDetailPage() {
       </div>
 
       <div className="device-compact-card">
-        <p className="device-section-label">专家伴学</p>
+        <p className="device-section-label">问问</p>
         <div className="device-mini-item watch-list-card">
           <div className="device-mini-item-title">
             <span>{course.aiCompanionTitle}</span>
             <Tag color="blue">课程上下文</Tag>
           </div>
           <p className="device-mini-item-desc">
-            从课程界面进入专家伴学后，会带着当前课程内容继续提问，关闭后返回课程详情。
+            从课程界面进入问问后，会带着当前课程内容继续提问，关闭后返回课程详情。
           </p>
         </div>
       </div>
@@ -143,7 +143,7 @@ export default function DeviceCourseDetailPage() {
           {primaryActionLabel}
         </Button>
         <Link href="/ask?agentId=plaza_agent_03">
-          <Button block>专家伴学</Button>
+          <Button block>问问</Button>
         </Link>
       </div>
       <div className="device-action-row" style={{ marginTop: 10 }}>

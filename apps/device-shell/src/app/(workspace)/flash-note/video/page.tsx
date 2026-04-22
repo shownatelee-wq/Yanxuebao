@@ -17,14 +17,15 @@ export default function DeviceFlashVideoPage() {
             <Tag color="blue">自动开始录制</Tag>
           </Space>
           <p className="device-page-title">视频闪记</p>
-          <p className="device-page-subtle">进入页面后自动开始录像，结束后直接保存为可引用的视频闪记。</p>
+          <p className="device-page-subtle">进入页面后自动生成视频草稿并持续保存，结束后可直接引用。</p>
         </Space>
       </div>
 
       <FlashNoteRecorder
         type="video_note"
         sourceContext={{ source: 'flash-note-app' }}
-        saveButtonLabel="保存视频闪记"
+        mode="autosave"
+        saveButtonLabel="删除闪记"
         onSaved={(note) => router.push(`/flash-note/${note.id}`)}
       />
 

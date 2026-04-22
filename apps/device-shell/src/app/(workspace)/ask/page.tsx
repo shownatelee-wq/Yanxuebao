@@ -1,220 +1,219 @@
 'use client';
 
-import { AudioOutlined, SendOutlined } from '@ant-design/icons';
-import { Button, Input, Space, Tag, Typography, message } from 'antd';
+import {
+  AppstoreOutlined,
+  AudioOutlined,
+  CameraOutlined,
+  DownOutlined,
+  PictureOutlined,
+  SendOutlined,
+} from '@ant-design/icons';
+import { Button, Input, Modal, Segmented, Typography, message } from 'antd';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { saveDemoDraft } from '../../../lib/demo-draft';
-import { useCaptureShare } from '../../../lib/device-capture-share';
-import { getPlazaAgentById, usePlazaState } from '../../../lib/device-plaza-data';
+import { useMemo, useState } from 'react';
+import { clearCaptureShare, useCaptureShare } from '../../../lib/device-capture-share';
+import {
+  getMediaAssetById,
+  saveScreenshotAsset,
+  useDeviceMediaLibrary,
+  type DeviceMediaAsset,
+} from '../../../lib/device-media-library';
+import {
+  getPlazaAgentById,
+  getPlazaAgents,
+  getRecentPlazaAgents,
+  usePlazaState,
+} from '../../../lib/device-plaza-data';
 
 const { Paragraph, Text } = Typography;
+
+type ChatMessage = {
+  id: string;
+  role: 'assistant' | 'user';
+  content: string;
+  asset?: DeviceMediaAsset | null;
+};
+
+function buildAssistantReply(agentName: string, prompt: string, asset?: DeviceMediaAsset | null) {
+  if (asset) {
+    return `我已经带着“${asset.title}”继续分析。${asset.summary} 结合你的问题“${prompt}”，建议你把现场证据、自己的判断和下一步追问分开整理。`;
+  }
+
+  return `${agentName} 已收到你的问题：“${prompt}”。我会先帮你提炼关键词，再给出适合手表端提交作品的简短答案。`;
+}
 
 export default function DeviceAskPage() {
   const searchParams = useSearchParams();
   const [messageApi, contextHolder] = message.useMessage();
-  const sharedAsset = useCaptureShare();
-  const state = usePlazaState();
-  const agentId = searchParams.get('agentId') ?? 'plaza_agent_03';
-  const mode = searchParams.get('mode');
-  const isCourseQa = mode === 'course_qa';
-  const courseId = searchParams.get('courseId') ?? '';
-  const courseTitle = searchParams.get('courseTitle') ?? '当前课程';
-  const courseSummary = searchParams.get('courseSummary') ?? '';
-  const incomingQuestion = searchParams.get('question');
-  const activeAgent = getPlazaAgentById(agentId, state) ?? state.agents[0];
-  const defaultQuestion = incomingQuestion ?? '海豚为什么喜欢结队活动？';
-  const [question, setQuestion] = useState(defaultQuestion);
-  const [submittedQuestion, setSubmittedQuestion] = useState(defaultQuestion);
-  const [aiThinking, setAiThinking] = useState(isCourseQa);
+  const plazaState = usePlazaState();
+  useDeviceMediaLibrary();
+  const captureShare = useCaptureShare();
+  const queryAgentId = searchParams.get('agentId') ?? captureShare?.agentId ?? 'plaza_agent_03';
+  const queryAssetId = searchParams.get('assetId') ?? captureShare?.id ?? '';
+  const attachedAsset = queryAssetId ? getMediaAssetById(queryAssetId) : captureShare ?? null;
+  const [activeAgentId, setActiveAgentId] = useState(queryAgentId);
+  const [agentPanelOpen, setAgentPanelOpen] = useState(false);
+  const [agentScope, setAgentScope] = useState<'常用' | '全部'>('常用');
+  const [inputValue, setInputValue] = useState(
+    searchParams.get('question') ??
+      (attachedAsset ? `帮我分析这${attachedAsset.type === '视频' ? '段视频' : '张图片'}最值得追问什么？` : '海豚为什么喜欢结队活动？'),
+  );
+  const activeAgent = getPlazaAgentById(activeAgentId, plazaState) ?? plazaState.agents[0];
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      id: 'assistant_welcome',
+      role: 'assistant',
+      content: activeAgent
+        ? `你好，我是${activeAgent.expertName}。你可以用文字、语音、图片、AI识物结果或 AI 创作结果继续问我。`
+        : '你好，我是问问，可以帮你分析研学任务、照片、视频和 AI 记录。',
+      asset: attachedAsset,
+    },
+  ]);
 
-  useEffect(() => {
-    if (!isCourseQa) {
-      setAiThinking(false);
-      return undefined;
+  const commonAgents = useMemo(() => getRecentPlazaAgents(plazaState).slice(0, 4), [plazaState]);
+  const allAgents = useMemo(() => getPlazaAgents(plazaState), [plazaState]);
+  const agentOptions = agentScope === '常用' ? commonAgents : allAgents;
+
+  function sendQuestion(nextPrompt = inputValue) {
+    const trimmed = nextPrompt.trim();
+    if (!trimmed) {
+      messageApi.warning('先说一句想问什么');
+      return;
     }
 
-    const nextQuestion = incomingQuestion ?? `我刚学到《${courseTitle}》，想知道这个知识点在研学任务里怎么用？`;
-    setQuestion(nextQuestion);
-    setSubmittedQuestion(nextQuestion);
-    setAiThinking(true);
+    const reply = buildAssistantReply(activeAgent?.expertName ?? '问问', trimmed, attachedAsset);
+    setMessages((current) => [
+      ...current,
+      { id: `user_${Date.now()}`, role: 'user', content: trimmed },
+      { id: `assistant_${Date.now()}`, role: 'assistant', content: reply },
+    ]);
+    setInputValue('');
+    saveScreenshotAsset({
+      title: '问问对话截图',
+      previewLabel: activeAgent?.shortTitle ?? '问问',
+      summary: `问问已围绕“${trimmed}”生成一段可加入任务作品的回答。`,
+      sourceApp: 'ask',
+      linkedEntity: { type: 'ask', id: `ask_${Date.now()}`, title: trimmed },
+    });
+    clearCaptureShare();
+  }
 
-    const timer = window.setTimeout(() => {
-      setAiThinking(false);
-    }, 900);
+  function useMockVoice() {
+    const mock = attachedAsset ? `请用一句话说明${attachedAsset.primaryLabel ?? attachedAsset.title}和任务的关系` : '帮我把海豚结队活动整理成任务答案';
+    setInputValue(mock);
+    messageApi.success('已模拟语音转文字');
+  }
 
-    return () => window.clearTimeout(timer);
-  }, [courseTitle, incomingQuestion, isCourseQa]);
-
-  const courseQaHref = `/course-qa?${new URLSearchParams({
-    agentId,
-    courseId,
-    courseTitle,
-    courseSummary,
-  }).toString()}`;
-
-  const answer = useMemo(
-    () => ({
-      summary:
-        sharedAsset && sharedAsset.target === 'model'
-          ? `我已经收到这${sharedAsset.type === '照片' ? '张照片' : '段视频'}，当前识别的主要对象是“${sharedAsset.primaryLabel ?? '待确认对象'}”。你可以先从“它是什么、它在做什么、为什么会这样”三个角度来分析，再补一句你的现场判断。`
-          : isCourseQa
-            ? `我先把你的语音问题和《${courseTitle}》连起来看。${courseSummary ? `这节课的重点是：${courseSummary}。` : ''}建议你在研学任务里按“三步”使用：第一步说清课程里的核心概念，第二步找一个现场证据，第三步用自己的话解释它和任务的关系。你现在可以先补充一张现场照片或一个具体例子，我再帮你把答案整理成作品表达。`
-          : `${activeAgent?.expertName ?? '专家'}建议你先说清现场证据，再补你的判断。海豚结队更容易找到食物，也能一起保护幼崽，遇到危险时更安全。`,
-      tags:
-        sharedAsset && sharedAsset.target === 'model'
-          ? ['已接收素材', '已同步识物', '可继续追问']
-          : isCourseQa
-            ? ['课程问答', '语音提问', activeAgent?.title ?? '当前专家']
-            : [activeAgent?.category ?? '成长', activeAgent?.expertName ?? '专家', '可发图片继续问'],
-    }),
-    [activeAgent?.category, activeAgent?.expertName, activeAgent?.title, courseSummary, courseTitle, isCourseQa, sharedAsset, submittedQuestion],
-  );
+  function selectAgent(agentId: string) {
+    setActiveAgentId(agentId);
+    const agent = getPlazaAgentById(agentId, plazaState);
+    setMessages((current) => [
+      ...current,
+      {
+        id: `assistant_switch_${Date.now()}`,
+        role: 'assistant',
+        content: `已切换到${agent?.title ?? '新专家'}，当前素材和对话上下文会继续保留。`,
+      },
+    ]);
+    setAgentPanelOpen(false);
+  }
 
   return (
-    <div className="device-page-stack">
+    <div className="device-assistant-chat-page ask-chat-mode">
       {contextHolder}
-
-      <div className="device-hero-card device-stage-card" style={{ padding: 12 }}>
-        <Space direction="vertical" size={8} style={{ width: '100%' }}>
-          <Space>
-            <Tag color="orange">{isCourseQa ? '课程问答' : '专家伴学'}</Tag>
-            <Tag color="blue">{isCourseQa ? '语音提问' : activeAgent?.category ?? '成长'}</Tag>
-            {isCourseQa ? <Tag color="green">{activeAgent?.shortTitle ?? '当前专家'}</Tag> : null}
-          </Space>
-          <p className="device-page-title">{isCourseQa ? '专家问答' : '专家伴学'}</p>
-          <p className="device-page-subtle">
-            {isCourseQa
-              ? `围绕《${courseTitle}》回答你的语音问题。`
-              : activeAgent
-                ? `${activeAgent.expertName} · ${activeAgent.oneLineIntro}`
-                : '文字、语音、图片都可以继续问。'}
-          </p>
-        </Space>
-      </div>
-
-      {isCourseQa ? (
-        <div className="device-compact-card">
-          <p className="device-section-label">课程上下文</p>
-          <div className="device-mini-item">
-            <div className="device-mini-item-title">
-              <span>{courseTitle}</span>
-              <Tag color="blue">{activeAgent?.title ?? '课程专家'}</Tag>
-            </div>
-            <p className="device-mini-item-desc">{courseSummary || 'AI 会结合当前课程内容回答。'}</p>
-          </div>
+      <div className="device-assistant-chat-header">
+        <div className="device-assistant-header-spacer" />
+        <div className="device-ask-mobile-title">
+          <strong>问问</strong>
+          <button type="button" className="device-ask-agent-switch" onClick={() => setAgentPanelOpen(true)}>
+            <span>{activeAgent?.shortTitle ?? '智能体'}</span>
+            <DownOutlined />
+          </button>
         </div>
-      ) : null}
-
-      <div className="device-compact-card">
-        <p className="device-section-label">当前专家</p>
-        {activeAgent ? (
-          <div className="device-mini-item">
-            <div className="device-mini-item-title">
-              <span>{activeAgent.title}</span>
-              <Tag color="blue">{activeAgent.operatorName ?? '专家团队'}</Tag>
-            </div>
-            <p className="device-mini-item-desc">{activeAgent.oneLineIntro}</p>
-          </div>
-        ) : null}
-      </div>
-
-      <div className="device-compact-card">
-        <p className="device-section-label">{isCourseQa ? '继续追问' : '我的问题'}</p>
-        <Input.TextArea rows={3} value={question} onChange={(event) => setQuestion(event.target.value)} />
-        <div className="device-action-row" style={{ marginTop: 10 }}>
-          <Button type="primary" icon={<SendOutlined />} onClick={() => setSubmittedQuestion(question)} block>
-            {isCourseQa ? '继续追问' : '提交'}
-          </Button>
-          {isCourseQa ? (
-            <Link href={courseQaHref}>
-              <Button icon={<AudioOutlined />} block>重新语音提问</Button>
-            </Link>
-          ) : (
-            <Button icon={<AudioOutlined />} block>
-              语音提问
-            </Button>
-          )}
-        </div>
-        <div className="device-action-row" style={{ marginTop: 10 }}>
-          <Button
-            block
-            onClick={() => {
-              setSubmittedQuestion('我上传了一张现场照片，帮我看看最值得追问什么？');
-              messageApi.success('已附带图片/截图提问');
-            }}
-          >
-            发送图片/截图
-          </Button>
-          <Link href="/plaza">
-            <Button block>切换专家</Button>
-          </Link>
-        </div>
-      </div>
-
-      <div className="device-compact-card">
-        <p className="device-section-label">{isCourseQa ? 'AI 回答' : '回答结果'}</p>
-        {sharedAsset && sharedAsset.target === 'model' ? (
-          <div className={`device-capture-chat-card accent-${sharedAsset.accent ?? 'blue'}`}>
-            <div className="device-capture-chat-thumb">
-              <span>{sharedAsset.previewLabel ?? sharedAsset.title}</span>
-              <em>{sharedAsset.type}</em>
-            </div>
-            <div>
-              <Text strong style={{ fontSize: 12 }}>我刚拍的{sharedAsset.type === '照片' ? '照片' : '视频'}</Text>
-              <Paragraph style={{ margin: '6px 0 0', fontSize: 11 }}>{sharedAsset.summary}</Paragraph>
-              {sharedAsset.recognizedNames?.length ? (
-                <div className="watch-status-pills" style={{ marginTop: 8 }}>
-                  {sharedAsset.recognizedNames.map((item) => (
-                    <span key={item} className="watch-status-pill">{item}</span>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          </div>
-        ) : null}
-        <Text strong style={{ fontSize: 12 }}>{submittedQuestion}</Text>
-        {aiThinking ? (
-          <div className="device-review-summary-item" style={{ marginTop: 8 }}>
-            <div className="device-mini-item-title">
-              <span>AI 正在整理语音问题</span>
-              <Tag color="blue">处理中</Tag>
-            </div>
-            <Paragraph style={{ margin: '6px 0 0', fontSize: 12 }}>正在结合课程内容、专家知识和你的语音转写生成回答。</Paragraph>
-          </div>
-        ) : (
-          <>
-            <Paragraph style={{ margin: '6px 0 0', fontSize: 12 }}>{answer.summary}</Paragraph>
-            <Space wrap style={{ marginTop: 8 }}>
-              {answer.tags.map((tag) => (
-                <Tag key={tag} color="blue">{tag}</Tag>
-              ))}
-            </Space>
-          </>
-        )}
-      </div>
-
-      <div className="device-action-row">
-        <Button
-          block
-          onClick={() => {
-            saveDemoDraft({
-              type: 'text',
-              title: `${isCourseQa ? '专家问答' : '专家伴学'}结果：${submittedQuestion}`,
-              content: answer.summary,
-              source: 'ask',
-              updatedAt: new Date().toISOString(),
-            });
-            messageApi.success('已加入任务草稿');
-          }}
-        >
-          加入任务
-        </Button>
-        <Link href={isCourseQa && courseId ? `/plaza/agents/${agentId}/courses/${courseId}` : '/tasks'}>
-          <Button type="primary" block>{isCourseQa ? '返回课程' : '任务'}</Button>
+        <Link href="/plaza" className="device-assistant-header-icon" aria-label="专家广场">
+          <AppstoreOutlined />
         </Link>
       </div>
+
+      <div className="device-assistant-chat-scroll">
+        <div className="device-assistant-chat-thread">
+          {attachedAsset ? (
+            <div className="device-ask-attachment-card">
+              <div className={`device-album-thumb accent-${attachedAsset.accent ?? 'blue'}`}>
+                <span>{attachedAsset.previewLabel ?? attachedAsset.title}</span>
+              </div>
+              <div>
+                <Text strong style={{ fontSize: 12 }}>已挂载素材：{attachedAsset.title}</Text>
+                <Paragraph style={{ margin: '4px 0 0', fontSize: 11 }}>{attachedAsset.summary}</Paragraph>
+              </div>
+            </div>
+          ) : null}
+
+          {messages.map((item) => (
+            <div key={item.id} className={`device-assistant-message${item.role === 'user' ? ' self without-avatar' : ''}`}>
+              {item.role === 'assistant' ? <div className="device-assistant-avatar">问</div> : null}
+              <div className={`device-assistant-message-main${item.role === 'user' ? ' self' : ''}`}>
+                <p>{item.content}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="device-assistant-chat-footer ask-chat-footer">
+        <div className="device-ask-tool-strip">
+          <Button size="small" icon={<AudioOutlined />} onClick={useMockVoice}>
+            语音
+          </Button>
+          <Link href="/album">
+            <Button size="small" icon={<PictureOutlined />}>相册</Button>
+          </Link>
+          <Link href="/identify">
+            <Button size="small" icon={<CameraOutlined />}>AI识物</Button>
+          </Link>
+          <Link href="/ai-create">
+            <Button size="small">AI创作</Button>
+          </Link>
+        </div>
+        <div className="device-assistant-compose-bar ask-compose-bar">
+          <AudioOutlined />
+          <Input
+            value={inputValue}
+            onChange={(event) => setInputValue(event.target.value)}
+            placeholder="说出或输入你的问题"
+            variant="borderless"
+            onPressEnter={() => sendQuestion()}
+          />
+          <Button type="primary" shape="circle" icon={<SendOutlined />} onClick={() => sendQuestion()} />
+        </div>
+      </div>
+
+      <Modal
+        open={agentPanelOpen}
+        title="切换专家智能体"
+        footer={null}
+        onCancel={() => setAgentPanelOpen(false)}
+        width={320}
+        centered
+      >
+        <Segmented
+          block
+          value={agentScope}
+          onChange={(value) => setAgentScope(value as '常用' | '全部')}
+          options={['常用', '全部']}
+          style={{ marginBottom: 12 }}
+        />
+        <div className="device-mini-list">
+          {agentOptions.map((agent) => (
+            <button key={agent.id} type="button" className="device-ask-agent-option" onClick={() => selectAgent(agent.id)}>
+              <span>{agent.logo}</span>
+              <strong>{agent.title}</strong>
+              <em>{agent.oneLineIntro}</em>
+            </button>
+          ))}
+        </div>
+      </Modal>
     </div>
   );
 }

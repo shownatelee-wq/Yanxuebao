@@ -177,12 +177,12 @@ export default function DevicePlazaPage() {
               <Link href="/ask?agentId=plaza_agent_03" className="device-plaza-tile device-plaza-agent-tile">
                 <div className="device-agent-logo accent-blue">伴</div>
                 <div>
-                  <Text strong style={{ fontSize: 12 }}>专家伴学</Text>
+                  <Text strong style={{ fontSize: 12 }}>问问</Text>
                   <Paragraph type="secondary" style={{ margin: '4px 0 0', fontSize: 11 }}>
                     文字 / 语音 / 图片
                   </Paragraph>
                   <Paragraph type="secondary" style={{ margin: '4px 0 0', fontSize: 11 }}>
-                    从拍拍、识物、课程、闪记直接进入对应专家会话。
+                    从拍拍、AI识物、课程、闪记直接进入对应专家会话。
                   </Paragraph>
                 </div>
               </Link>

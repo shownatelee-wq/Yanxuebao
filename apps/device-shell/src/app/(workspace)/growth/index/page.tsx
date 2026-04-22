@@ -2,7 +2,7 @@
 
 import { Tag } from 'antd';
 import Link from 'next/link';
-import { DeviceCapabilityLevelGrid, DeviceCapabilityPlaneCards, DeviceGrowthFrameworkChart, DeviceGrowthSourceBreakdown, DeviceRadarCard, DeviceGrowthStatCard } from '../../../../lib/device-growth-ui';
+import { DeviceCapabilityPlaneCards, DeviceGrowthFrameworkChart, DeviceGrowthSourceBreakdown, DeviceRadarCard, DeviceGrowthStatCard } from '../../../../lib/device-growth-ui';
 import { useGrowthOverview, useGrowthState } from '../../../../lib/device-growth-data';
 import { WatchActionButtons } from '../../../../lib/watch-ui';
 
@@ -17,15 +17,14 @@ export default function DeviceGrowthIndexPage() {
     <div className="device-page-stack">
       <div className="watch-app-view">
         <div className="device-hero-card device-stage-card watch-system-hero" style={{ padding: 12 }}>
-          <p className="device-page-title">能力指数</p>
-          <p className="device-page-subtle">能力指数由学员自测、家长评测和研学评价共同生成，并持续动态更新。</p>
+          <p className="device-page-title">能力雷达</p>
+          <p className="device-page-subtle">能力雷达由学员自测、家长评测和研学评价共同生成，并持续动态更新。</p>
           <div className="device-growth-summary-grid" style={{ marginTop: 8 }}>
             <DeviceGrowthStatCard label="当前总指数" value={overview.currentIndex.toFixed(1)} helper="16 项能力指标平均值" />
             <DeviceGrowthStatCard label="当前能力水平" value={overview.currentLevel} tone="green" helper="根据 9/8/6 分阈值分级" />
           </div>
         </div>
 
-        <DeviceCapabilityLevelGrid capabilities={state.capabilities} />
         <DeviceGrowthFrameworkChart capabilities={state.capabilities} />
         <DeviceCapabilityPlaneCards planes={overview.planes} />
 

@@ -2,18 +2,14 @@
 
 import { Button, Segmented, Space, Tag, Typography } from 'antd';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
-import { getFlashNoteMeta, getFlashNoteSummary, getFlashNotes, getFlashNoteTypeLabel, type FlashNoteItem } from '../../../lib/flash-notes';
+import { useMemo, useState } from 'react';
+import { getFlashNoteMeta, getFlashNoteSummary, getFlashNoteTypeLabel, useFlashNotes } from '../../../lib/flash-notes';
 
 const { Paragraph } = Typography;
 
 export default function DeviceFlashNotePage() {
-  const [notes, setNotes] = useState<FlashNoteItem[]>([]);
+  const notes = useFlashNotes();
   const [mode, setMode] = useState<'voice' | 'video' | 'works'>('voice');
-
-  useEffect(() => {
-    setNotes(getFlashNotes());
-  }, []);
 
   const filteredNotes = useMemo(() => {
     if (mode === 'works') {
@@ -32,7 +28,7 @@ export default function DeviceFlashNotePage() {
             <Tag color="gold">统一记录</Tag>
           </Space>
           <p className="device-page-title">闪记</p>
-          <p className="device-page-subtle">语音闪记和视频闪记使用同一套创建、回看和引用逻辑。</p>
+          <p className="device-page-subtle">进入创建页后自动保存，语音、视频和作品引用保持同一套记录。</p>
         </Space>
       </div>
 
@@ -78,6 +74,9 @@ export default function DeviceFlashNotePage() {
                 </div>
                 <Paragraph type="secondary" style={{ margin: '4px 0 0', fontSize: 11 }}>
                   {getFlashNoteSummary(item)}
+                </Paragraph>
+                <Paragraph type="secondary" style={{ margin: '4px 0 0', fontSize: 10 }}>
+                  {new Date(item.createdAt).toLocaleString('zh-CN', { hour12: false })}
                 </Paragraph>
                 <div className="device-action-chip-row" style={{ marginTop: 8 }}>
                   {getFlashNoteMeta(item).map((meta) => (

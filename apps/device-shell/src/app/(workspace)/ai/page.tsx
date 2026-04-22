@@ -73,7 +73,7 @@ export default function DeviceAiPage() {
           <Link href="/ask?agentId=plaza_agent_03" className="watch-app-tile">
             <div>
               <div className="watch-app-icon" style={{ background: '#ff9f43' }}>专</div>
-              <Text strong style={{ fontSize: 11 }}>专家伴学</Text>
+              <Text strong style={{ fontSize: 11 }}>问问</Text>
             </div>
           </Link>
           <Link href="/flash-note" className="watch-app-tile">
@@ -149,7 +149,7 @@ export default function DeviceAiPage() {
       <div className="device-action-row">
         <Link href="/ask?agentId=plaza_agent_03">
           <Button type="primary" block>
-            专家伴学
+            问问
           </Button>
         </Link>
         <Link href="/home">

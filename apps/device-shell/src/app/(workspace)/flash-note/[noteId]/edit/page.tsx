@@ -48,7 +48,9 @@ export default function DeviceFlashNoteEditPage() {
             <Tag color={note.type === 'voice_note' ? 'green' : 'purple'}>{getFlashNoteTypeLabel(note)}</Tag>
           </Space>
           <p className="device-page-title">编辑闪记</p>
-          <p className="device-page-subtle">可修改标题和转写摘要，保存后回到详情页。</p>
+          <p className="device-page-subtle">
+            创建时间：{new Date(note.createdAt).toLocaleString('zh-CN', { hour12: false })}，内容会自动同步到详情页。
+          </p>
         </Space>
       </div>
 

@@ -8,7 +8,7 @@ export default function DeviceWalletCodePage() {
     <div className="device-page-stack">
       <div className="watch-app-view">
         <div className="device-hero-card device-stage-card watch-system-hero" style={{ padding: 12 }}>
-          <p className="device-page-title">付款码</p>
+          <p className="device-page-title">扫码支付</p>
           <div className="watch-status-pills">
             <span className="watch-status-pill">已授权</span>
             <span className="watch-status-pill">单次限额 50 元</span>
@@ -19,12 +19,12 @@ export default function DeviceWalletCodePage() {
             <div className="device-qr-box" />
             <Space wrap>
               <Tag color="green">支付宝亲子卡</Tag>
-              <Tag color="blue">到店扫码</Tag>
+              <Tag color="blue">出示或扫描商户码</Tag>
             </Space>
           </div>
         </div>
         <div className="watch-bottom-dock">
-          <WatchActionButtons primary={{ label: '支付', path: '/wallet' }} secondary={{ label: '交易记录', path: '/wallet/records' }} />
+          <WatchActionButtons primary={{ label: '扫一扫', path: '/wallet/code' }} secondary={{ label: '交易记录', path: '/wallet/records' }} />
         </div>
       </div>
     </div>

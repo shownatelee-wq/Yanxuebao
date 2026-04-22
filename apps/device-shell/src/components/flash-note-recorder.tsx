@@ -3,6 +3,7 @@
 import {
   CameraOutlined,
   CheckCircleOutlined,
+  DeleteOutlined,
   PauseCircleOutlined,
   PlayCircleOutlined,
   SoundOutlined,
@@ -10,13 +11,22 @@ import {
 } from '@ant-design/icons';
 import { Button, Input, Space, Tag, message } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
-import { FlashNoteItem, FlashNoteSourceContext, FlashNoteType, saveFlashNote } from '../lib/flash-notes';
+import {
+  FlashNoteItem,
+  FlashNoteSourceContext,
+  FlashNoteType,
+  createDraftFlashNote,
+  deleteFlashNote,
+  saveFlashNote,
+  updateFlashNote,
+} from '../lib/flash-notes';
 
 type FlashNoteRecorderProps = {
   type: FlashNoteType;
   contextTitle?: string;
   sourceContext?: FlashNoteSourceContext;
   saveButtonLabel?: string;
+  mode?: 'manual' | 'autosave';
   onSaved?: (note: FlashNoteItem) => void;
 };
 
@@ -57,6 +67,7 @@ export function FlashNoteRecorder({
   contextTitle,
   sourceContext,
   saveButtonLabel,
+  mode = 'manual',
   onSaved,
 }: FlashNoteRecorderProps) {
   const [messageApi, contextHolder] = message.useMessage();
@@ -64,6 +75,7 @@ export function FlashNoteRecorder({
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [transcript, setTranscript] = useState(buildDefaultTranscript(contextTitle));
   const [photos, setPhotos] = useState<Array<{ id: string; title: string; url?: string }>>([]);
+  const [draftNoteId, setDraftNoteId] = useState<string | null>(null);
 
   const limitSeconds = type === 'voice_note' ? VOICE_LIMIT_SECONDS : VIDEO_LIMIT_SECONDS;
   const typeLabel = type === 'voice_note' ? '语音闪记' : '视频闪记';
@@ -79,6 +91,7 @@ export function FlashNoteRecorder({
     setElapsedSeconds(0);
     setTranscript(buildDefaultTranscript(contextTitle));
     setPhotos([]);
+    setDraftNoteId(null);
   }, [contextTitle, type]);
 
   useEffect(() => {
@@ -98,6 +111,52 @@ export function FlashNoteRecorder({
       setPhase('completed');
     }
   }, [elapsedSeconds, limitSeconds, phase]);
+
+  useEffect(() => {
+    if (mode !== 'autosave' || draftNoteId) {
+      return;
+    }
+
+    const draft = createDraftFlashNote({
+      title: contextTitle ? `${contextTitle}${type === 'voice_note' ? '语音闪记' : '视频闪记'}` : typeLabel,
+      type,
+      duration: formatDuration(type === 'voice_note' ? 18 : 16),
+      transcript,
+      sourceContext,
+    });
+    setDraftNoteId(draft.id);
+  }, [contextTitle, draftNoteId, mode, sourceContext, transcript, type, typeLabel]);
+
+  useEffect(() => {
+    if (mode !== 'autosave' || !draftNoteId) {
+      return;
+    }
+
+    updateFlashNote(draftNoteId, {
+      title: contextTitle ? `${contextTitle}${type === 'voice_note' ? '语音闪记' : '视频闪记'}` : typeLabel,
+      transcript,
+      duration: formatDuration(safeDuration),
+      status: phase === 'completed' ? 'saved' : 'draft',
+      audio:
+        type === 'voice_note'
+          ? {
+              title: contextTitle ? `${contextTitle}现场录音` : '现场录音',
+              duration: formatDuration(safeDuration),
+              url: '/mock/flash-note-audio.mp3',
+            }
+          : undefined,
+      video:
+        type === 'video_note'
+          ? {
+              title: contextTitle ? `${contextTitle}现场视频` : '现场视频',
+              duration: formatDuration(safeDuration),
+              url: '/mock/explain-video.mp4',
+              coverImage: '/mock/task-photo.jpg',
+            }
+          : undefined,
+      photos,
+    });
+  }, [contextTitle, draftNoteId, mode, phase, photos, safeDuration, transcript, type, typeLabel]);
 
   function stopCapture() {
     setElapsedSeconds((current) => Math.max(current, type === 'voice_note' ? 18 : 16));
@@ -120,6 +179,38 @@ export function FlashNoteRecorder({
   function saveCurrentNote() {
     if (type === 'voice_note' && safeDuration <= 0) {
       messageApi.error('未录到有效音频，暂不能保存');
+      return;
+    }
+
+    if (mode === 'autosave' && draftNoteId) {
+      const saved = updateFlashNote(draftNoteId, {
+        title: contextTitle ? `${contextTitle}${type === 'voice_note' ? '语音闪记' : '视频闪记'}` : typeLabel,
+        transcript: transcript.trim() || undefined,
+        duration: formatDuration(safeDuration),
+        status: 'saved',
+        audio:
+          type === 'voice_note'
+            ? {
+                title: contextTitle ? `${contextTitle}现场录音` : '现场录音',
+                duration: formatDuration(safeDuration),
+                url: '/mock/flash-note-audio.mp3',
+              }
+            : undefined,
+        video:
+          type === 'video_note'
+            ? {
+                title: contextTitle ? `${contextTitle}现场视频` : '现场视频',
+                duration: formatDuration(safeDuration),
+                url: '/mock/explain-video.mp4',
+                coverImage: '/mock/task-photo.jpg',
+              }
+            : undefined,
+        photos,
+      });
+      if (saved) {
+        messageApi.success('闪记已自动保存');
+        onSaved?.(saved);
+      }
       return;
     }
 
@@ -149,6 +240,20 @@ export function FlashNoteRecorder({
 
     messageApi.success(type === 'voice_note' ? '语音闪记已保存' : '视频闪记已保存');
     onSaved?.(note);
+  }
+
+  function removeDraftNote() {
+    if (!draftNoteId) {
+      return;
+    }
+
+    deleteFlashNote(draftNoteId);
+    messageApi.success('闪记草稿已删除');
+    setDraftNoteId(null);
+    setPhase('recording');
+    setElapsedSeconds(0);
+    setTranscript(buildDefaultTranscript(contextTitle));
+    setPhotos([]);
   }
 
   return (
@@ -239,9 +344,20 @@ export function FlashNoteRecorder({
               </div>
             )}
 
-            <Button type="primary" block icon={<CheckCircleOutlined />} onClick={saveCurrentNote}>
-              {saveButtonLabel ?? '保存闪记'}
-            </Button>
+            {mode === 'autosave' ? (
+              <div className="device-action-row">
+                <Button block icon={<DeleteOutlined />} onClick={removeDraftNote}>
+                  {saveButtonLabel ?? '删除闪记'}
+                </Button>
+                <Button type="primary" block icon={<CheckCircleOutlined />} onClick={saveCurrentNote}>
+                  查看已保存内容
+                </Button>
+              </div>
+            ) : (
+              <Button type="primary" block icon={<CheckCircleOutlined />} onClick={saveCurrentNote}>
+                {saveButtonLabel ?? '保存闪记'}
+              </Button>
+            )}
           </Space>
         )}
       </div>

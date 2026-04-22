@@ -23,7 +23,7 @@ import {
 
 const DEVICE_GROWTH_STATE_KEY = 'yanxuebao_device_growth_state';
 const DEVICE_GROWTH_EVENT = 'yanxuebao:device-growth-change';
-const DEVICE_GROWTH_STATE_VERSION = 2;
+const DEVICE_GROWTH_STATE_VERSION = 3;
 
 type DeviceGrowthState = {
   version: number;

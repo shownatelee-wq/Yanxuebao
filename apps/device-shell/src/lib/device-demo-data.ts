@@ -111,6 +111,17 @@ export type DemoReviewRubric = {
 
 export type DemoTask = {
   id: string;
+  source?: 'seed' | 'assistant_ai';
+  taskSourceKind?:
+    | 'team_study'
+    | 'family_study'
+    | 'self_study'
+    | 'daily_checkin'
+    | 'expert_challenge'
+    | 'course_challenge';
+  taskSourceName?: string;
+  taskSourceLabel?: string;
+  publisherLabel?: string;
   title: string;
   description: string;
   intro: string;
@@ -863,7 +874,7 @@ export const demoTasks: DemoTask[] = [
         workCategory: '探究型',
         workMode: '独立完成',
         workKind: 'ai_link',
-        requirement: '提交 1 条问问/AI识物/AI创作过程链接或截图，并写下 AI 帮你发现的新问题。',
+        requirement: '完成 1 次 AI 探究或创作，可直接用语音、问问、AI识物、AI创作或闪记回填过程，再写下 AI 帮你发现的新问题。',
         mediaTypes: ['链接', '照片', '文字'],
         status: '进行中',
         submissionStatus: '待填写',
@@ -871,9 +882,9 @@ export const demoTasks: DemoTask[] = [
           {
             id: 'sheet_01_ai_link',
             kind: 'link_upload',
-            label: 'AI探究或创作链接',
-            helper: '可粘贴问问、AI识物、AI绘图、AI视频等过程链接',
-            tools: ['ask'],
+            label: 'AI探究过程记录',
+            helper: '不用粘贴链接，点击下方按钮直接回填问问、AI识物、AI绘图、AI视频、闪记或语音记录结果',
+            tools: ['voice_text', 'ask', 'identify', 'ai_draw', 'ai_video', 'flash_note'],
           },
           {
             id: 'sheet_01_ai_question',
@@ -1989,6 +2000,188 @@ export const demoTasks: DemoTask[] = [
       },
     ],
   },
+  {
+    id: 'task_demo_08',
+    title: '生态设施大搜索任务',
+    description: '围绕园区里的生态设施完成快速搜索和答案提交。',
+    intro: '观察园区里的青蛙池、雨水花园、昆虫旅馆等生态设施，快速完成搜索与识别，把你的答案直接提交到任务作品里。',
+    taskType: '日常研学任务',
+    taskDescription: '根据现场提示完成生态设施识别，提交任务名称、题目位置和你的观察答案。',
+    status: 'todo',
+    dueAt: now,
+    category: 'daily',
+    target: '个人',
+    requirement: '完成至少 1 题生态设施搜索问答，写出你识别到的设施名称或关键线索。',
+    infoSummary: '园区生态路线 · 快速搜索任务',
+    worksSubmitted: 0,
+    worksRequired: 1,
+    score: 0,
+    sequence: 8,
+    timeLimit: '今天 18:30 前',
+    capabilityTags: ['观察能力', '生态认知', '表达能力'],
+    capabilityTagSource: 'manual',
+    taskSheets: [
+      {
+        id: 'sheet_demo_17',
+        title: '第一题：识别青蛙生态设施',
+        topicType: '问答',
+        workCategory: '研究型',
+        workMode: '独立完成',
+        workKind: 'rich_text',
+        gameplayKind: 'qa_research',
+        requirement: '根据老师给出的线索，找出与青蛙相关的生态设施，并写下你的答案。',
+        mediaTypes: ['文字'],
+        status: '待开始',
+        submissionStatus: '待填写',
+        workForm: [
+          {
+            id: 'sheet_17_answer',
+            kind: 'fill_blank',
+            label: '你的答案',
+            placeholder: '例如：青蛙',
+            tools: ['ask', 'voice_text', 'flash_note'],
+          },
+        ],
+      },
+    ],
+    resourcePacks: [
+      {
+        id: 'resource_demo_ai_08',
+        title: '生态设施搜索提示',
+        type: 'ai',
+        summary: '输入线索后生成观察方向，帮助你更快找到对应生态设施。',
+        previewMode: 'ai',
+        allowEditPrompt: true,
+        defaultPrompt:
+          '请为“生态设施大搜索任务”生成一份学生可直接使用的搜索提示，内容包含观察位置、生态设施特征、常见线索和提交答案建议。语言简洁、适合现场快速查看。',
+      },
+    ],
+  },
+  {
+    id: 'task_demo_09',
+    taskSourceKind: 'team_study',
+    taskSourceName: '海洋馆研学团',
+    taskSourceLabel: '海洋馆研学团',
+    publisherLabel: '导师发布',
+    title: '小组海洋剧场复盘',
+    description: '小组协作复盘海洋剧场观察过程，整理共同发现和分工表现。',
+    intro: '和小组成员一起回顾海洋剧场观察过程，把每个人的证据、判断和分工汇总成一份小组复盘。',
+    taskType: '团队研学活动',
+    taskDescription: '围绕海洋剧场观察完成小组复盘，提交一份共同发现和分工总结。',
+    status: 'todo',
+    dueAt: now,
+    category: 'study',
+    target: '小组',
+    requirement: '小组共同整理 3 条观察发现，并说明每位成员负责的内容。',
+    infoSummary: '海洋剧场 · 小组复盘任务',
+    worksSubmitted: 0,
+    worksRequired: 1,
+    score: 0,
+    sequence: 9,
+    timeLimit: '今天 17:20 前',
+    capabilityTags: ['合作能力', '表达能力', '证据意识'],
+    capabilityTagSource: 'manual',
+    taskSheets: [
+      {
+        id: 'sheet_demo_18',
+        title: '小组复盘记录',
+        topicType: '调查',
+        workCategory: '记录型',
+        workMode: '小组协作',
+        workKind: 'rich_text',
+        requirement: '写出小组共同认可的 3 条观察发现，并补充成员分工。',
+        mediaTypes: ['文字', '照片'],
+        status: '待开始',
+        submissionStatus: '待填写',
+        workForm: [
+          {
+            id: 'sheet_18_findings',
+            kind: 'fill_blank',
+            label: '小组共同发现',
+            placeholder: '例如：海狮表演前观众声音会明显变大',
+            tools: ['ask', 'voice_text', 'flash_note'],
+          },
+          {
+            id: 'sheet_18_roles',
+            kind: 'fill_blank',
+            label: '小组分工',
+            placeholder: '记录员、摄影、汇报员分别做了什么',
+            tools: ['voice_text', 'flash_note'],
+          },
+        ],
+      },
+    ],
+    resourcePacks: [
+      {
+        id: 'resource_demo_ai_09',
+        title: '小组复盘提示',
+        type: 'ai',
+        summary: '帮助小组把观察证据、成员分工和共同结论整理成复盘。',
+        previewMode: 'ai',
+        allowEditPrompt: true,
+        defaultPrompt: '请帮小组整理海洋剧场观察复盘，包含共同发现、证据和成员分工。',
+      },
+    ],
+  },
+  {
+    id: 'task_demo_10',
+    taskSourceKind: 'daily_checkin',
+    taskSourceName: '爸爸',
+    taskSourceLabel: '爸爸创建',
+    publisherLabel: '家长创建',
+    title: '晚间阅读打卡',
+    description: '家长创建的小组日常打卡任务，适合同伴互相提醒完成。',
+    intro: '晚上和学习伙伴一起完成阅读打卡，记录今天读到的一个知识点。',
+    taskType: '日常打卡任务',
+    taskDescription: '完成晚间阅读并写下一条知识点，小组成员可互相查看完成情况。',
+    status: 'todo',
+    dueAt: now,
+    category: 'daily',
+    target: '小组',
+    requirement: '每位小组成员提交 1 条阅读知识点，组长确认全员完成。',
+    infoSummary: '家庭阅读 · 小组打卡',
+    worksSubmitted: 0,
+    worksRequired: 1,
+    score: 0,
+    sequence: 10,
+    timeLimit: '今晚 21:00 前',
+    capabilityTags: ['自主学习', '语言沟通', '坚持习惯'],
+    capabilityTagSource: 'manual',
+    taskSheets: [
+      {
+        id: 'sheet_demo_19',
+        title: '阅读知识点打卡',
+        topicType: '感想',
+        workCategory: '打卡型',
+        workMode: '小组协作',
+        workKind: 'rich_text',
+        requirement: '写下今天读到的一个知识点，也可以用语音转文字提交。',
+        mediaTypes: ['文字', '音频'],
+        status: '待开始',
+        submissionStatus: '待填写',
+        workForm: [
+          {
+            id: 'sheet_19_point',
+            kind: 'fill_blank',
+            label: '今天读到的知识点',
+            placeholder: '例如：海豚通过声音和同伴保持联系',
+            tools: ['voice_text', 'flash_note', 'ask'],
+          },
+        ],
+      },
+    ],
+    resourcePacks: [
+      {
+        id: 'resource_demo_ai_10',
+        title: '阅读打卡提示',
+        type: 'ai',
+        summary: '用一句话帮你把阅读内容整理成可以提交的知识点。',
+        previewMode: 'ai',
+        allowEditPrompt: true,
+        defaultPrompt: '请把我的阅读内容整理成一句适合打卡提交的知识点。',
+      },
+    ],
+  },
 ];
 
 export const demoTaskWorks: DemoTaskWork[] = [
@@ -2763,9 +2956,9 @@ export const demoCapabilities: DemoCapability[] = [
   { id: 'capability_demo_11', elementKey: '领导能力', planeKey: 'future', planeTitle: '创新发展', score: 7.8, averageScore: 7.3, level: '待提升', source: 'team_task', recordedAt: now, sourceBreakdown: capabilitySourceBreakdown, indicatorDimensions: makeIndicatorDimensions([['领导能力', 7.7, 7.2], ['协作能力', 8.0, 7.4], ['资源整合', 7.8, 7.3]]) },
   { id: 'capability_demo_12', elementKey: '商业思维', planeKey: 'future', planeTitle: '创新发展', score: 8.2, averageScore: 7.6, level: '良好', source: 'parent_review', recordedAt: now, sourceBreakdown: capabilitySourceBreakdown, indicatorDimensions: makeIndicatorDimensions([['商业思维', 8.1, 7.6], ['财商思维', 8.3, 7.5], ['创业思维', 8.2, 7.7]]) },
   { id: 'capability_demo_13', elementKey: '公民道德', planeKey: 'social', planeTitle: '社会参与', score: 9.1, averageScore: 7.9, level: '优秀', source: 'task_creation', recordedAt: now, sourceBreakdown: capabilitySourceBreakdown, indicatorDimensions: makeIndicatorDimensions([['尊重生命', 9.2, 8.0], ['公平争议', 8.9, 7.7], ['孝亲仁爱', 9.3, 8.1], ['诚信守信', 9.0, 7.8]]) },
-  { id: 'capability_demo_14', elementKey: '社会责任', planeKey: 'social', planeTitle: '社会参与', score: 7.8, averageScore: 7.0, level: '待提升', source: 'self_test', recordedAt: now, sourceBreakdown: capabilitySourceBreakdown, indicatorDimensions: makeIndicatorDimensions([['劳动意识', 7.7, 7.0], ['集体意识', 8.0, 7.2], ['环境意识', 7.8, 6.9], ['法律意识', 7.6, 6.8]]) },
+  { id: 'capability_demo_14', elementKey: '社会责任', planeKey: 'social', planeTitle: '社会参与', score: 6.4, averageScore: 7.0, level: '待提升', source: 'self_test', recordedAt: now, sourceBreakdown: capabilitySourceBreakdown, indicatorDimensions: makeIndicatorDimensions([['劳动意识', 6.3, 7.0], ['集体意识', 6.8, 7.2], ['环境意识', 6.4, 6.9], ['法律意识', 6.1, 6.8]]) },
   { id: 'capability_demo_15', elementKey: '国家认同', planeKey: 'social', planeTitle: '社会参与', score: 8.4, averageScore: 7.5, level: '良好', source: 'team_task', recordedAt: now, sourceBreakdown: capabilitySourceBreakdown, indicatorDimensions: makeIndicatorDimensions([['民族精神', 8.5, 7.6], ['政治觉悟', 8.2, 7.3], ['家国情怀', 8.6, 7.6]]) },
-  { id: 'capability_demo_16', elementKey: '国际理解', planeKey: 'social', planeTitle: '社会参与', score: 7.6, averageScore: 7.0, level: '待提升', source: 'parent_review', recordedAt: now, sourceBreakdown: capabilitySourceBreakdown, indicatorDimensions: makeIndicatorDimensions([['国际视野', 7.5, 6.9], ['发展共存', 7.7, 7.0], ['尊重包容', 7.6, 7.1]]) },
+  { id: 'capability_demo_16', elementKey: '国际理解', planeKey: 'social', planeTitle: '社会参与', score: 5.7, averageScore: 7.0, level: '待改进', source: 'parent_review', recordedAt: now, sourceBreakdown: capabilitySourceBreakdown, indicatorDimensions: makeIndicatorDimensions([['国际视野', 5.6, 6.9], ['发展共存', 5.9, 7.0], ['尊重包容', 5.7, 7.1]]) },
 ];
 
 export const demoTeams: DemoTeam[] = [
@@ -3656,7 +3849,7 @@ function buildDemoPlazaAgent(seed: DemoPlazaAgentSeed): DemoPlazaAgent {
         paragraphs: [
           seed.newsSummary,
           `本期内容适合结合“${seed.scenes[0]}”“${seed.scenes[1]}”等场景继续追问。`,
-          '听完后可以直接进入专家伴学、课程或专题挑战继续学习。',
+          '听完后可以直接进入问问、课程或专题挑战继续学习。',
         ],
       },
     ],
@@ -4700,6 +4893,56 @@ export const demoCloudFiles: DemoCloudFile[] = [
     preview: '15 秒片段，可用于课程复盘。',
   },
   {
+    id: 'cloud_file_05',
+    categoryId: 'cloud_image',
+    title: '水母展区灯光',
+    size: '1.8 MB',
+    updatedAt: '今天 10:05',
+    type: '图片',
+    source: '夸克网盘',
+    preview: '水母展区照片，可用于识物和日记。',
+  },
+  {
+    id: 'cloud_file_06',
+    categoryId: 'cloud_image',
+    title: '触摸池海星',
+    size: '2.1 MB',
+    updatedAt: '今天 10:32',
+    type: '图片',
+    source: '百度网盘',
+    preview: '触摸池观察照片，记录互动体验。',
+  },
+  {
+    id: 'cloud_file_07',
+    categoryId: 'cloud_image',
+    title: '研学小组合影',
+    size: '3.2 MB',
+    updatedAt: '昨天 16:12',
+    type: '图片',
+    source: '夸克网盘',
+    preview: '团队合影，可作为研学日记封面。',
+  },
+  {
+    id: 'cloud_file_08',
+    categoryId: 'cloud_video',
+    title: '企鹅行走视频',
+    size: '12.4 MB',
+    updatedAt: '今天 11:20',
+    type: '视频',
+    source: '夸克网盘',
+    preview: '21 秒企鹅行走行为观察片段。',
+  },
+  {
+    id: 'cloud_file_09',
+    categoryId: 'cloud_video',
+    title: '鱼群游动短片',
+    size: '14.8 MB',
+    updatedAt: '今天 11:48',
+    type: '视频',
+    source: '百度网盘',
+    preview: '18 秒珊瑚礁鱼群游动片段。',
+  },
+  {
     id: 'cloud_file_03',
     categoryId: 'cloud_doc',
     title: '海洋馆导览手册',
@@ -4718,6 +4961,36 @@ export const demoCloudFiles: DemoCloudFile[] = [
     type: '音频',
     source: '夸克网盘',
     preview: '18 秒语音记录，可加入任务作品。',
+  },
+  {
+    id: 'cloud_file_10',
+    categoryId: 'cloud_audio',
+    title: '像风一样',
+    size: '3.6 MB',
+    updatedAt: '今天 14:05',
+    type: '音频',
+    source: '夸克网盘',
+    preview: '薛之谦',
+  },
+  {
+    id: 'cloud_file_11',
+    categoryId: 'cloud_audio',
+    title: '海边口述记录',
+    size: '820 KB',
+    updatedAt: '今天 14:16',
+    type: '音频',
+    source: '百度网盘',
+    preview: '研学语音记录',
+  },
+  {
+    id: 'cloud_file_12',
+    categoryId: 'cloud_audio',
+    title: '集合提醒录音',
+    size: '540 KB',
+    updatedAt: '今天 15:00',
+    type: '音频',
+    source: '夸克网盘',
+    preview: '老师提醒',
   },
 ];
 

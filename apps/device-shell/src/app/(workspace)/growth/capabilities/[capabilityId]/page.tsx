@@ -59,7 +59,7 @@ export default function DeviceCapabilityDetailPage() {
         <div className="watch-bottom-dock">
           <div className="device-action-row">
             <Link href="/growth/index">
-              <Button type="primary" block>能力指数</Button>
+              <Button type="primary" block>能力雷达</Button>
             </Link>
             <Link href="/growth/self-test">
               <Button block>能力自测</Button>

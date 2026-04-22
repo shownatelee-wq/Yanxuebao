@@ -3,14 +3,21 @@
 import { Button, Empty, Result, Space, Tag } from 'antd';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { getDeviceTaskList } from '../../../../../lib/device-task-data';
+import { useMemo } from 'react';
+import { getDeviceTaskDisplayMeta, getDeviceTaskList, useDeviceTaskSnapshot } from '../../../../../lib/device-task-data';
 import { useDeviceTeamSnapshot } from '../../../../../lib/device-team-data';
 
 export default function DeviceTeamTasksPage() {
   const params = useParams<{ teamId: string }>();
   const { teams } = useDeviceTeamSnapshot();
+  const taskSnapshot = useDeviceTaskSnapshot();
   const team = teams.find((item) => item.id === params.teamId);
-  const tasks = getDeviceTaskList().filter((task) => task.taskType.includes('研学'));
+  const isHistorical = team?.membershipStatus === '历史可查看' || team?.lifecycleStatus === '已结束';
+  const taskPath = (taskId: string) => (isHistorical ? `/tasks/${taskId}?teamId=${params.teamId}&readonly=1` : `/tasks/${taskId}`);
+  const tasks = useMemo(
+    () => getDeviceTaskList().filter((task) => task.taskType.includes('研学')),
+    [taskSnapshot.tasks, taskSnapshot.works],
+  );
 
   if (!team) {
     return <Result status="404" title="未找到团队任务" extra={<Link href="/team"><Button>更多团队</Button></Link>} />;
@@ -25,29 +32,43 @@ export default function DeviceTeamTasksPage() {
           <div className="watch-status-pills">
             <span className="watch-status-pill">{team.lifecycleStatus}</span>
             <span className="watch-status-pill">{tasks.length} 个任务</span>
+            {isHistorical ? <span className="watch-status-pill">只读查看</span> : null}
           </div>
         </Space>
       </div>
 
       <div className="device-compact-card">
+        {isHistorical ? (
+          <p className="device-mini-item-desc" style={{ marginTop: 0 }}>
+            历史团队任务仅支持查看作品和资料，不能继续提交或修改。
+          </p>
+        ) : null}
         {tasks.length ? (
           <div className="device-mini-list">
-            {tasks.map((task) => (
-              <Link key={task.id} href={`/tasks/${task.id}`} className="device-card-link">
-                <div className="device-mini-item">
-                  <div className="device-mini-item-title">
-                    <span>{task.title}</span>
-                    <Tag color="blue">{task.target}</Tag>
+            {tasks.map((task) => {
+              const displayMeta = getDeviceTaskDisplayMeta(task);
+
+              return (
+                <Link key={task.id} href={taskPath(task.id)} className="device-card-link">
+                  <div className="device-mini-item">
+                    <div className="device-mini-item-title">
+                      <span>{task.title}</span>
+                      <Space size={6}>
+                        <Tag color={displayMeta.sourceColor}>{displayMeta.taskKindLabel}</Tag>
+                        <Tag color="blue">{task.target}</Tag>
+                      </Space>
+                    </div>
+                    <p className="device-mini-item-desc">来源：{displayMeta.sourceLabel} · {task.taskDescription}</p>
+                    <div className="device-action-chip-row" style={{ marginTop: 8 }}>
+                      {task.capabilityTags.map((tag) => (
+                        <Tag key={tag} color="purple">{tag}</Tag>
+                      ))}
+                      {task.source === 'assistant_ai' ? <Tag color="geekblue">AI助手生成</Tag> : null}
+                    </div>
                   </div>
-                  <p className="device-mini-item-desc">{task.taskDescription}</p>
-                  <div className="device-action-chip-row" style={{ marginTop: 8 }}>
-                    {task.capabilityTags.map((tag) => (
-                      <Tag key={tag} color="purple">{tag}</Tag>
-                    ))}
-                  </div>
-                </div>
-              </Link>
-            ))}
+                </Link>
+              );
+            })}
           </div>
         ) : (
           <Empty description="当前团队还没有任务" image={Empty.PRESENTED_IMAGE_SIMPLE} />

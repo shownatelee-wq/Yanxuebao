@@ -17,14 +17,15 @@ export default function DeviceFlashNoteNewPage() {
             <Tag color="blue">自动开始录音</Tag>
           </Space>
           <p className="device-page-title">语音闪记</p>
-          <p className="device-page-subtle">进入页面后自动开始录音，结束后可补拍 1-9 张照片并保存。</p>
+          <p className="device-page-subtle">进入页面后自动生成草稿并持续保存，结束后可补拍 1-9 张照片。</p>
         </Space>
       </div>
 
       <FlashNoteRecorder
         type="voice_note"
         sourceContext={{ source: 'flash-note-app' }}
-        saveButtonLabel="保存语音闪记"
+        mode="autosave"
+        saveButtonLabel="删除闪记"
         onSaved={(note) => router.push(`/flash-note/${note.id}`)}
       />
 

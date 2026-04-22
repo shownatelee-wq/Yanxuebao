@@ -3,12 +3,14 @@
 import { PlusOutlined } from '@ant-design/icons';
 import { Button, Space, Tag, Typography } from 'antd';
 import Link from 'next/link';
-import { demoGroupChats } from '../../../lib/device-demo-data';
+import { useDeviceSocialSnapshot } from '../../../lib/device-social-state';
 import { WatchActionButtons } from '../../../lib/watch-ui';
 
 const { Paragraph } = Typography;
 
 export default function DeviceGroupChatPage() {
+  const { groupChats } = useDeviceSocialSnapshot();
+
   return (
     <div className="device-page-stack">
       <div className="watch-app-view">
@@ -23,16 +25,16 @@ export default function DeviceGroupChatPage() {
               </Link>
             </Space>
             <div className="watch-status-pills">
-              <span className="watch-status-pill">{demoGroupChats.length} 个群</span>
+              <span className="watch-status-pill">{groupChats.length} 个群</span>
               <span className="watch-status-pill">
-                {demoGroupChats.reduce((sum, chat) => sum + (chat.unread ?? 0), 0)} 条未读
+                {groupChats.reduce((sum, chat) => sum + (chat.unread ?? 0), 0)} 条未读
               </span>
             </div>
           </Space>
         </div>
         <div className="watch-list-panel">
           <div className="device-mini-list">
-            {demoGroupChats.map((chat) => (
+            {groupChats.map((chat) => (
               <Link key={chat.id} href={`/group-chat/${chat.id}`} className="device-card-link">
                 <div className="device-mini-item watch-list-card">
                   <div className="device-mini-item-title">

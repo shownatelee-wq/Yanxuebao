@@ -8,6 +8,7 @@ import {
 import { Button, Space, Typography } from 'antd';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
+import { DeviceGlobalAssistantFab } from '../../components/device-global-assistant-fab';
 import { getDeviceDataMode, getDeviceInitialized } from '../../lib/api';
 import { useDeviceSession } from '../../lib/use-device-session';
 
@@ -18,10 +19,10 @@ const pageTitles: Record<string, string> = {
   '/tasks': '任务',
   '/tasks/new': '填写作品',
   '/capture': '拍拍',
-  '/ask': '专家伴学',
+  '/ask': '问问',
   '/flash-note': '闪记',
   '/flash-note/new': '语音闪记',
-  '/identify': '识物',
+  '/identify': 'AI识物',
   '/team': '更多团队',
   '/team/travel': '研学旅行团队',
   '/growth': '成长',
@@ -38,10 +39,12 @@ const pageTitles: Record<string, string> = {
   '/group-chat': '群聊',
   '/group-chat/new': '新建群聊',
   '/meeting': '会议',
+  '/meeting/new': '创建会议',
+  '/phone/call': '拨打电话',
   '/moments': '朋友圈',
   '/moments/new': '发朋友圈',
   '/wallet': '支付',
-  '/wallet/code': '付款码',
+  '/wallet/code': '扫码支付',
   '/wallet/balance': '余额',
   '/wallet/records': '交易记录',
   '/cloud': '网盘',
@@ -52,12 +55,15 @@ const pageTitles: Record<string, string> = {
   '/settings/face': '人脸识别',
   '/settings/payment': '支付卡管理',
   '/album': '相册',
-  '/ai-draw': 'AI 绘画',
-  '/ai-video': 'AI 视频',
+  '/diary': '研学日记',
+  '/diary/range': '日记日期',
+  '/ai-draw': 'AI生图',
+  '/ai-video': 'AI视频',
   '/wallet/card': '支付卡绑定',
   '/face-login': '人脸识别',
   '/social': '社交中心',
   '/ai-create': 'AI 创作',
+  '/ai-create/select': '选择素材',
   '/ai': 'AI',
   '/flash-note/video': '视频闪记',
   '/flash-note/works': '闪记作品',
@@ -69,10 +75,11 @@ const pageTitles: Record<string, string> = {
   '/team/roles': '岗位',
   '/team/badge': '名称与徽章',
   '/team/badge/upload': '上传徽章',
-  '/growth/index': '能力指数',
+  '/growth/index': '能力雷达',
   '/growth/self-test': '能力自测',
   '/growth/value': '成长值',
   '/growth/mall': '成长商城',
+  '/assistant/voice': '语音助手',
 };
 
 function resolvePageTitle(pathname: string) {
@@ -104,20 +111,32 @@ function resolvePageTitle(pathname: string) {
     return '群聊';
   }
   if (pathname.startsWith('/meeting/')) {
+    if (pathname.endsWith('/new')) {
+      return '创建会议';
+    }
     if (pathname.endsWith('/talk')) {
-      return '对讲';
+      return '会议中';
     }
     if (pathname.endsWith('/summary')) {
       return '会议纪要';
     }
+    if (pathname.endsWith('/share')) {
+      return '分享会议';
+    }
     return '会议详情';
   }
   if (pathname.startsWith('/moments/')) {
+    if (pathname.startsWith('/moments/new/select/')) {
+      return '选择内容';
+    }
+    if (pathname === '/moments/new') {
+      return '发朋友圈';
+    }
     return '动态详情';
   }
   if (pathname.startsWith('/wallet/')) {
     if (pathname.endsWith('/code')) {
-      return '付款码';
+      return '扫码支付';
     }
     if (pathname.endsWith('/balance')) {
       return '余额';
@@ -132,6 +151,12 @@ function resolvePageTitle(pathname: string) {
   }
   if (pathname.startsWith('/cloud/files/')) {
     return '文件预览';
+  }
+  if (pathname.startsWith('/album/')) {
+    return '相册详情';
+  }
+  if (pathname.startsWith('/identify/')) {
+    return '识物记录';
   }
   if (pathname.startsWith('/messages/')) {
     return '消息详情';
@@ -209,7 +234,10 @@ function resolvePageTitle(pathname: string) {
   }
   if (pathname.startsWith('/growth/')) {
     if (pathname.startsWith('/growth/index')) {
-      return '能力指数';
+      return '能力雷达';
+    }
+    if (pathname.startsWith('/growth/self-test/chat')) {
+      return '互动聊天自测';
     }
     if (pathname.startsWith('/growth/self-test/start')) {
       return '开始自测';
@@ -255,6 +283,30 @@ function resolvePageTitle(pathname: string) {
   if (pathname.startsWith('/me/diaries/')) {
     return '日记详情';
   }
+  if (pathname.startsWith('/diary/')) {
+    if (pathname.startsWith('/diary/chat/')) {
+      return '研学日记智能体';
+    }
+    if (pathname.startsWith('/diary/select/flash-notes')) {
+      return '选择闪记';
+    }
+    if (pathname.startsWith('/diary/select/task-works')) {
+      return '选择任务作品';
+    }
+    if (pathname.startsWith('/diary/select/images')) {
+      return '选择图片';
+    }
+    if (pathname.startsWith('/diary/select/videos')) {
+      return '选择视频';
+    }
+    if (pathname.startsWith('/diary/range')) {
+      return '日记日期';
+    }
+    return '日记详情';
+  }
+  if (pathname === '/diary') {
+    return '研学日记';
+  }
   if (pathname.startsWith('/me/favorites/')) {
     return '收藏详情';
   }
@@ -287,6 +339,15 @@ function resolvePageTitle(pathname: string) {
   }
   if (pathname.startsWith('/ai/records/')) {
     return 'AI 记录';
+  }
+  if (pathname.startsWith('/ai-draw/chat/')) {
+    return 'AI生图';
+  }
+  if (pathname.startsWith('/ai-video/chat/')) {
+    return 'AI视频';
+  }
+  if (pathname.startsWith('/ai-create/chat/')) {
+    return 'AI创作';
   }
   return '设备端';
 }
@@ -328,6 +389,21 @@ export default function DeviceWorkspaceLayout({ children }: { children: React.Re
   );
 
   const isHome = pathname === '/home';
+  const isVoiceAssistantPage = pathname === '/assistant/voice';
+  const isAiGenerateChatPage =
+    pathname.startsWith('/ai-draw/chat/')
+    || pathname.startsWith('/ai-video/chat/');
+  const isAiCreateFlowPage =
+    pathname.startsWith('/ai-create')
+    || pathname.startsWith('/ai-draw')
+    || pathname.startsWith('/ai-video');
+  const isDiaryAgentFlowPage =
+    pathname === '/diary'
+    || pathname.startsWith('/diary/range')
+    || pathname.startsWith('/diary/select/')
+    || pathname.startsWith('/diary/chat/');
+  const shouldShowGlobalFab = !isVoiceAssistantPage && !isAiCreateFlowPage && !isDiaryAgentFlowPage;
+  const shouldShowSystemPageHeader = !isHome && !isVoiceAssistantPage;
   const pageTitle = isCourseQaMode
     ? '专家问答'
     : resolvePageTitle(pathname);
@@ -366,7 +442,7 @@ export default function DeviceWorkspaceLayout({ children }: { children: React.Re
   }
 
   return (
-    <div className="device-workspace">
+    <div className={`device-workspace${isAiGenerateChatPage ? ' device-workspace-ai-generate' : ''}`}>
       <div className="device-workspace-header">
         <div className="device-topbar">
           <Text strong style={{ fontSize: 12 }}>
@@ -384,7 +460,7 @@ export default function DeviceWorkspaceLayout({ children }: { children: React.Re
             </Text>
           </Space>
         </div>
-        {!isHome ? (
+        {shouldShowSystemPageHeader ? (
           <div className="device-topbar-main">
             <Button
               type="text"
@@ -418,11 +494,14 @@ export default function DeviceWorkspaceLayout({ children }: { children: React.Re
           </div>
         ) : null}
       </div>
-      <div className="device-screen-content">
+      <div
+        className={`device-screen-content${isVoiceAssistantPage ? ' voice-assistant-mode' : ''}${isAiGenerateChatPage ? ' ai-generate-chat-mode' : ''}`}
+      >
         <div key={pathname} className={`device-page-enter${isHome ? ' home-enter' : ''}`}>
           {children}
         </div>
       </div>
+      {shouldShowGlobalFab ? <DeviceGlobalAssistantFab /> : null}
     </div>
   );
 }

@@ -1,9 +1,10 @@
 'use client';
 
 import { SoundOutlined, VideoCameraOutlined, FileTextOutlined, PictureOutlined } from '@ant-design/icons';
-import { Typography } from 'antd';
+import { Button, Typography, message } from 'antd';
 import Link from 'next/link';
-import { demoCloudCategories, demoCloudFiles } from '../../../lib/device-demo-data';
+import { demoCloudCategories } from '../../../lib/device-demo-data';
+import { uploadLocalCloudFile, useDeviceWorkspaceSnapshot } from '../../../lib/device-workspace-state';
 import { WatchActionButtons } from '../../../lib/watch-ui';
 
 const { Paragraph, Text } = Typography;
@@ -16,14 +17,18 @@ const categoryIcons = {
 };
 
 export default function DeviceCloudPage() {
+  const { cloudFiles } = useDeviceWorkspaceSnapshot();
+  const [messageApi, contextHolder] = message.useMessage();
+
   return (
     <div className="device-page-stack">
+      {contextHolder}
       <div className="watch-app-view">
         <div className="device-hero-card device-stage-card watch-system-hero" style={{ padding: 12 }}>
           <p className="device-page-title">网盘</p>
           <div className="watch-status-pills">
             <span className="watch-status-pill">{demoCloudCategories.length} 个分类</span>
-            <span className="watch-status-pill">{demoCloudFiles.length} 个文件</span>
+            <span className="watch-status-pill">{cloudFiles.length} 个文件</span>
           </div>
         </div>
         <div className="watch-grid-panel">
@@ -39,7 +44,7 @@ export default function DeviceCloudPage() {
         </div>
         <div className="watch-list-panel">
           <div className="device-mini-list">
-            {demoCloudFiles.slice(0, 3).map((file) => (
+            {cloudFiles.slice(0, 4).map((file) => (
               <Link key={file.id} href={`/cloud/files/${file.id}`} className="device-card-link">
                 <div className="device-mini-item watch-list-card">
                   <div className="device-mini-item-title">
@@ -55,6 +60,22 @@ export default function DeviceCloudPage() {
           </div>
         </div>
         <div className="watch-bottom-dock">
+          <Button
+            type="primary"
+            block
+            style={{ marginBottom: 10 }}
+            onClick={() => {
+              uploadLocalCloudFile({
+                title: '本地上传研学视频',
+                type: '视频',
+                categoryId: 'cloud_video',
+                preview: '从设备本地上传的研学视频，可在网盘播放和下载。',
+              });
+              messageApi.success('本地文件已上传到网盘');
+            }}
+          >
+            上传本地文件
+          </Button>
           <WatchActionButtons primary={{ label: '相册', path: '/cloud/category/cloud_image' }} secondary={{ label: '广场', path: '/plaza' }} />
         </div>
       </div>
