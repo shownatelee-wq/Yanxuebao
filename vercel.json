@@ -1,6 +1,0 @@
-{
-  "framework": "nextjs",
-  "installCommand": "pnpm install --ignore-scripts",
-  "buildCommand": "pnpm --filter @yanxuebao/config build && pnpm --filter @yanxuebao/types build && pnpm --filter @yanxuebao/ui build && pnpm --filter @yanxuebao/device-shell build",
-  "outputDirectory": "apps/device-shell/.next"
-}
