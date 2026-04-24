@@ -17,7 +17,11 @@
 - `JWT_REFRESH_SECRET`
 - `JWT_ACCESS_TTL`
 - `JWT_REFRESH_TTL`
-- `NEXT_PUBLIC_API_BASE_URL`
+
+说明：
+
+- 当前导师端、家长端、专家端、运营后台都按纯前端本地演示数据运行，不依赖 `NEXT_PUBLIC_API_BASE_URL`
+- `NEXT_PUBLIC_API_BASE_URL` 仅在设备端需要联调真实 API 时才需要配置
 
 ## 3. 数据库策略
 
@@ -30,4 +34,3 @@
 - 一个共享开发库：`yanxuebao_dev`
 - 一个测试库：`yanxuebao_test`
 - 每次结构调整通过 Prisma migration 记录
-

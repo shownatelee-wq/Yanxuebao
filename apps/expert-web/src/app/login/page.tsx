@@ -1,53 +1,45 @@
 'use client';
 
 import { LockOutlined, UserOutlined } from '@ant-design/icons';
-import { Button, Card, Form, Input, Space, Typography, message } from 'antd';
+import { Button, Form, Input, message } from 'antd';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { apiFetch, storeSession, type WebSession } from '../../lib/api';
-
-const { Paragraph, Title } = Typography;
+import { EXPERT_LOGIN_DEFAULTS, authenticateExpert, getStoredSession, storeSession } from '../../lib/api';
 
 export default function ExpertLoginPage() {
   const router = useRouter();
   const [messageApi, contextHolder] = message.useMessage();
 
+  useEffect(() => {
+    if (getStoredSession()) {
+      router.replace('/dashboard');
+    }
+  }, [router]);
+
   async function onFinish(values: { account: string; password: string }) {
     try {
-      const session = await apiFetch<WebSession>('/auth/web/login', {
-        method: 'POST',
-        body: JSON.stringify(values),
-      });
+      const session = authenticateExpert(values.account, values.password);
       storeSession(session);
-      messageApi.success('登录成功，正在进入专家端');
-      router.push('/courses');
+      messageApi.success('登录成功');
+      router.push('/dashboard');
     } catch (error) {
       messageApi.error(error instanceof Error ? error.message : '登录失败');
     }
   }
 
   return (
-    <main
-      style={{
-        minHeight: '100vh',
-        display: 'grid',
-        placeItems: 'center',
-        padding: 24,
-      }}
-    >
+    <main className="expert-app-bg">
       {contextHolder}
-      <Card style={{ width: 420 }}>
-        <Space direction="vertical" size={20} style={{ width: '100%' }}>
-          <Space direction="vertical" size={4}>
-            <Title level={3} style={{ margin: 0 }}>
-              专家端登录
-            </Title>
-            <Paragraph type="secondary" style={{ margin: 0 }}>
-              演示账号：`expert_demo` / `Yanxuebao@2026`
-            </Paragraph>
-          </Space>
+      <section className="expert-phone expert-login-shell">
+        <div className="expert-login-brand">
+          <span>研学宝专家工作台</span>
+          <h1>专家端 H5</h1>
+          <p>围绕课程、问答、知识、资讯、挑战和智能体维护的一体化工作区。</p>
+        </div>
+        <div className="expert-login-card">
           <Form
             layout="vertical"
-            initialValues={{ account: 'expert_demo', password: 'Yanxuebao@2026' }}
+            initialValues={EXPERT_LOGIN_DEFAULTS}
             onFinish={onFinish}
           >
             <Form.Item label="账号" name="account" rules={[{ required: true, message: '请输入账号' }]}>
@@ -60,12 +52,13 @@ export default function ExpertLoginPage() {
             >
               <Input.Password prefix={<LockOutlined />} placeholder="请输入密码" />
             </Form.Item>
-            <Button block type="primary" htmlType="submit">
+            <div className="expert-login-note">演示账号：expert_demo / Yanxuebao@2026</div>
+            <Button block size="large" type="primary" htmlType="submit">
               登录专家端
             </Button>
           </Form>
-        </Space>
-      </Card>
+        </div>
+      </section>
     </main>
   );
 }

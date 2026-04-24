@@ -4,7 +4,8 @@
 
 当前为开发前准备阶段，先约定演示账号命名规则：
 
-- 运营后台：`operator_demo`
+- 运营后台：`operator_console`
+- 兼职维护员：`city_nanshan`
 - 导师端：`tutor_demo`
 - 家长端：`parent_demo`
 - 专家端：`expert_demo`
@@ -21,6 +22,8 @@
 ### 运营后台
 
 - 首页 -> 机构管理 -> 任务库 -> 库存管理
+- 主账号：`operator_console / Yanxuebao@2026`
+- 城市维护入口：`city_nanshan / Yanxuebao@2026`
 
 ### 导师端
 
@@ -33,6 +36,7 @@
 ### 专家端
 
 - 首页 -> 课程管理 -> 知识库 -> 难题挑战 -> 资讯
+- 演示账号：`expert_demo / Yanxuebao@2026`
 
 ### 设备端
 
