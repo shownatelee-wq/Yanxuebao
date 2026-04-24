@@ -4,23 +4,11 @@ import '@ant-design/v5-patch-for-react-19';
 import { LockOutlined, MobileOutlined, UserOutlined } from '@ant-design/icons';
 import { Button, Form, Input, message } from 'antd';
 import { useRouter } from 'next/navigation';
-import { storeSession, type WebSession } from '../../lib/api';
+import { PARENT_LOGIN_DEFAULTS, authenticateParent, storeSession } from '../../lib/api';
 
 type LoginValues = {
   account: string;
   password: string;
-};
-
-const DEMO_SESSION: WebSession = {
-  accessToken: 'parent-local-token',
-  refreshToken: 'parent-local-refresh',
-  role: 'parent',
-  user: {
-    id: 'parent_demo',
-    account: 'parent_demo',
-    displayName: '演示家长',
-    role: 'parent',
-  },
 };
 
 export default function ParentLoginPage() {
@@ -28,13 +16,14 @@ export default function ParentLoginPage() {
   const [messageApi, contextHolder] = message.useMessage();
 
   function onFinish(values: LoginValues) {
-    if (values.account !== 'parent_demo' || values.password !== 'Yanxuebao@2026') {
+    try {
+      const session = authenticateParent(values.account, values.password);
+      storeSession(session);
+      messageApi.success('登录成功');
+      router.push('/home');
+    } catch {
       messageApi.error('账号或密码不正确');
-      return;
     }
-    storeSession(DEMO_SESSION);
-    messageApi.success('登录成功');
-    router.push('/home');
   }
 
   return (
@@ -54,7 +43,7 @@ export default function ParentLoginPage() {
           <div className="parent-login-panel">
             <Form<LoginValues>
               layout="vertical"
-              initialValues={{ account: 'parent_demo', password: 'Yanxuebao@2026' }}
+              initialValues={PARENT_LOGIN_DEFAULTS}
               onFinish={onFinish}
             >
               <Form.Item label="账号" name="account" rules={[{ required: true, message: '请输入账号' }]}>
