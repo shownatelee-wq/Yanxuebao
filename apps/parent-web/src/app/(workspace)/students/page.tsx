@@ -1,11 +1,5 @@
-import { Suspense } from 'react';
-import { ParentMobileApp } from '../../../components/parent-mobile-app';
-import { ParentRouteFallback } from '../../../components/parent-route-fallback';
+import { redirect } from 'next/navigation';
 
-export default function ParentStudentsPage() {
-  return (
-    <Suspense fallback={<ParentRouteFallback />}>
-      <ParentMobileApp initialTab="home" />
-    </Suspense>
-  );
+export default function ParentStudentsLegacyPage() {
+  redirect('/me/students');
 }

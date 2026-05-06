@@ -1,11 +1,5 @@
-import { Suspense } from 'react';
-import { ParentMobileApp } from '../../../components/parent-mobile-app';
-import { ParentRouteFallback } from '../../../components/parent-route-fallback';
+import { redirect } from 'next/navigation';
 
-export default function ParentAiRecordsPage() {
-  return (
-    <Suspense fallback={<ParentRouteFallback />}>
-      <ParentMobileApp initialTab="diary" />
-    </Suspense>
-  );
+export default function ParentAiRecordsLegacyPage() {
+  redirect('/portfolio?panel=qa');
 }

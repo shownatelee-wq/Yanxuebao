@@ -1,17 +1,17 @@
 'use client';
 
 import '@ant-design/v5-patch-for-react-19';
-import { ArrowLeftOutlined, CloseOutlined, PlusOutlined } from '@ant-design/icons';
+import { CloseOutlined, PlusOutlined } from '@ant-design/icons';
 import { Button, Empty, Form, Input, InputNumber, Select, Spin } from 'antd';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
-import { getStoredSession } from '../lib/api';
+import { useEffect, useMemo } from 'react';
 import {
   CAPABILITY_PLANES,
   useParentStore,
   type CustomTaskInput,
   type RequirementType,
 } from '../lib/parent-store';
+import { ParentPhoneFrame, ParentSubpageShell, useParentSessionReady } from './parent-mobile-shell';
 
 const TASK_TYPES = ['观察记录', '问答任务', '调查任务', '创作任务', '商业体验'];
 
@@ -28,7 +28,7 @@ export function ParentTaskEditorScreen() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const store = useParentStore();
-  const [sessionReady, setSessionReady] = useState(false);
+  const sessionReady = useParentSessionReady();
   const [form] = Form.useForm<CustomTaskInput>();
 
   const taskId = searchParams.get('taskId');
@@ -36,15 +36,6 @@ export function ParentTaskEditorScreen() {
     () => (taskId ? store.state.familyTasks.find((task) => task.id === taskId) ?? null : null),
     [store.state.familyTasks, taskId],
   );
-
-  useEffect(() => {
-    const session = getStoredSession();
-    if (!session) {
-      router.replace('/login');
-      return;
-    }
-    setSessionReady(true);
-  }, [router]);
 
   useEffect(() => {
     if (!store.hydrated) {
@@ -101,62 +92,48 @@ export function ParentTaskEditorScreen() {
 
   if (!sessionReady || !store.hydrated) {
     return (
-      <main className="parent-app-bg">
-        <div className="parent-phone">
-          <div className="parent-loading">
-            <Spin />
-            <span>正在进入任务编辑页</span>
-          </div>
+      <ParentPhoneFrame>
+        <div className="parent-loading">
+          <Spin />
+          <span>正在进入任务编辑页</span>
         </div>
-      </main>
+      </ParentPhoneFrame>
     );
   }
 
   if (taskId && !editingTask) {
     return (
-      <main className="parent-app-bg">
-        <div className="parent-phone">
-          <div className="parent-subpage-shell">
-            <header className="parent-subpage-header">
-              <Button aria-label="返回任务列表" icon={<ArrowLeftOutlined />} shape="circle" onClick={goBack} />
-              <div className="parent-subpage-title">
-                <span>家庭研学任务</span>
-                <strong>编辑任务</strong>
-              </div>
-              <span className="parent-subpage-spacer" aria-hidden />
-            </header>
-            <div className="parent-subpage-content">
-              <section className="parent-empty-guide">
-                <Empty description="没有找到要编辑的任务" />
-                <Button type="primary" onClick={goBack}>返回任务列表</Button>
-              </section>
-            </div>
-          </div>
-        </div>
-      </main>
+      <ParentPhoneFrame>
+        <ParentSubpageShell title="编辑任务" subtitle="家庭研学任务" onBack={goBack}>
+          <section className="parent-empty-guide">
+            <Empty description="没有找到要编辑的任务" />
+            <Button type="primary" onClick={goBack}>
+              返回任务列表
+            </Button>
+          </section>
+        </ParentSubpageShell>
+      </ParentPhoneFrame>
     );
   }
 
   return (
-    <main className="parent-app-bg">
-      <div className="parent-phone">
-        <div className="parent-subpage-shell">
-          <header className="parent-subpage-header">
-            <Button aria-label="返回任务列表" icon={<ArrowLeftOutlined />} shape="circle" onClick={goBack} />
-            <div className="parent-subpage-title">
-              <span>家庭研学任务</span>
-              <strong>{editingTask ? '编辑任务' : '自定义创建'}</strong>
-            </div>
-            <span className="parent-subpage-spacer" aria-hidden />
-          </header>
+    <ParentPhoneFrame>
+      <ParentSubpageShell
+        title={editingTask ? '编辑任务' : '自定义创建'}
+        subtitle="家庭研学任务"
+        onBack={goBack}
+        footer={
+          <Button block type="primary" onClick={() => form.submit()}>
+            保存任务
+          </Button>
+        }
+      >
+        <section className="parent-editor-intro">
+          <strong>{editingTask ? '修改任务内容' : '创建新的家庭任务'}</strong>
+          <span>完整填写后可以返回任务页继续下发给学员。</span>
+        </section>
 
-          <div className="parent-subpage-content">
-            <section className="parent-editor-intro">
-              <strong>{editingTask ? '修改任务内容' : '创建新的家庭任务'}</strong>
-              <span>完整填写后可以返回任务页继续下发给学员。</span>
-            </section>
-
-            <Form form={form} layout="vertical" onFinish={saveTask} className="parent-editor-form">
+        <Form form={form} layout="vertical" onFinish={saveTask} className="parent-editor-form">
               <Form.Item name="title" label="任务名称" rules={[{ required: true, message: '请输入任务名称' }]}>
                 <Input placeholder="例如 海洋动物观察记录" />
               </Form.Item>
@@ -219,16 +196,8 @@ export function ParentTaskEditorScreen() {
                   )}
                 </Form.List>
               </section>
-            </Form>
-          </div>
-
-          <div className="parent-editor-footer">
-            <Button block type="primary" onClick={() => form.submit()}>
-              保存任务
-            </Button>
-          </div>
-        </div>
-      </div>
-    </main>
+        </Form>
+      </ParentSubpageShell>
+    </ParentPhoneFrame>
   );
 }
