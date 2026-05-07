@@ -5,6 +5,7 @@ import {
   FileTextOutlined,
   HomeOutlined,
   LeftOutlined,
+  MessageOutlined,
   PicCenterOutlined,
   ScheduleOutlined,
   TeamOutlined,
@@ -22,8 +23,9 @@ const NAV_ITEMS = [
     href: '/dashboard',
     label: '工作台',
     icon: HomeOutlined,
-    matches: ['/dashboard', '/ranking', '/reports', '/broadcasts', '/photos', '/safety'],
+    matches: ['/dashboard', '/ranking', '/reports', '/photos', '/safety'],
   },
+  { href: '/messages', label: '消息', icon: MessageOutlined, matches: ['/messages', '/broadcasts'] },
   {
     href: '/teams',
     label: '团队',
@@ -44,7 +46,8 @@ const TITLES: Record<string, { title: string; subtitle: string }> = {
   '/works': { title: '任务作品', subtitle: '查看当前团队的学员与任务作品' },
   '/ranking': { title: '排行榜', subtitle: '学员与小组得分快速查看' },
   '/reports': { title: '研学报告', subtitle: '生成、推送与成长值发放' },
-  '/broadcasts': { title: '广播与消息', subtitle: '团队、小组、学员消息统一处理' },
+  '/messages': { title: '消息', subtitle: 'SoS、问询、通知与群组消息' },
+  '/broadcasts': { title: '消息', subtitle: '团队、小组、学员消息统一处理' },
   '/photos': { title: '团队照片', subtitle: '照片上传与研学回顾素材' },
   '/safety': { title: '安全中心', subtitle: '位置查看与 SoS 处理' },
   '/me': { title: '我的', subtitle: '导师信息与常用工具' },
@@ -188,12 +191,12 @@ export function QuickMenuLinks() {
   const currentTeam = getCurrentTeam(state);
   const teamHref = currentTeam ? `/teams/${currentTeam.id}` : '/teams';
   const items = [
-    { href: '/broadcasts', label: '广播', desc: '团队通知', icon: BellOutlined },
-    { href: '/ranking', label: '学员排行', desc: '个人排名', icon: TeamOutlined },
-    { href: '/ranking', label: '小组排行', desc: '小组排名', icon: TeamOutlined },
-    { href: '/reports', label: '研学报告', desc: '报告发放', icon: FileTextOutlined },
+    { href: '/messages', label: '消息', desc: 'SoS/群聊', icon: BellOutlined },
+    { href: '/works', label: '任务进度', desc: '个人/小组', icon: ScheduleOutlined },
+    { href: '/reports', label: '报告模版', desc: '生成/配置', icon: FileTextOutlined },
+    { href: '/ranking', label: '排行', desc: '学员/小组', icon: TeamOutlined },
     { href: teamHref, label: currentTeam ? '团队详情' : '团队管理', desc: currentTeam ? '团队总控' : '查看团队', icon: TeamOutlined },
-    { href: '/photos', label: '照片管理', desc: '素材整理', icon: PicCenterOutlined },
+    { href: '/photos', label: '照片', desc: '批量素材', icon: PicCenterOutlined },
   ];
 
   return (

@@ -2,10 +2,10 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
-export type TeamStatus = 'upcoming' | 'active' | 'ended';
+export type TeamStatus = 'creating' | 'recruiting' | 'pending_trip' | 'active' | 'ended';
 export type TeamSource = 'system' | 'self-built';
 export type TaskScope = 'student' | 'group';
-export type TaskStatus = 'draft' | 'published' | 'ended';
+export type TaskStatus = 'ai_created' | 'pending_publish' | 'published' | 'withdrawn' | 'ended';
 export type WorkStatus = 'draft' | 'submitted' | 'ai_scored' | 'confirmed';
 export type GroupRole =
   | 'leader'
@@ -15,11 +15,24 @@ export type GroupRole =
   | 'operator'
   | 'safety'
   | 'reporter'
-  | 'photographer';
+  | 'photographer'
+  | 'custom';
 export type ScoreKind = 'reward' | 'penalty';
 export type BroadcastScope = 'team' | 'group' | 'student';
-export type BroadcastContentType = 'text' | 'voice' | 'image';
+export type BroadcastContentType = 'text' | 'voice' | 'image' | 'lecture';
 export type SosStatus = 'new' | 'tracking' | 'resolved';
+export type EvaluationMode = 'tutor_only' | 'self_tutor' | 'self_peer_tutor';
+export type WorkRequirementType =
+  | 'text'
+  | 'choice'
+  | 'judge'
+  | 'image'
+  | 'checkin'
+  | 'audio'
+  | 'video'
+  | 'observation'
+  | 'ai_inquiry'
+  | 'ai_work_link';
 
 export type AssistantTeacher = {
   id: string;
@@ -40,11 +53,14 @@ export type Team = {
   organizationName: string;
   source: TeamSource;
   status: TeamStatus;
+  maxStudents: number;
   startDate: string;
   days: number;
   destination: string;
   bases: string[];
   studentSource: string;
+  reportTemplateId: string;
+  evaluationMode: EvaluationMode;
   joinCode: string;
   assistants: AssistantTeacher[];
   materials: TeamMaterial[];
@@ -61,6 +77,7 @@ export type Student = {
   teamId: string;
   name: string;
   age: number;
+  idNumber: string;
   joined: boolean;
   online: boolean;
   joinedOrder: number;
@@ -72,6 +89,7 @@ export type Student = {
 export type GroupMember = {
   studentId: string;
   role: GroupRole;
+  customRole?: string;
 };
 
 export type Group = {
@@ -86,13 +104,14 @@ export type Group = {
 export type TaskAttachment = {
   id: string;
   name: string;
-  kind: 'image' | 'pdf';
+  kind: 'image' | 'pdf' | 'file' | 'ai_link';
   url: string;
+  keyword?: string;
 };
 
 export type WorkRequirement = {
   id: string;
-  type: 'text' | 'choice' | 'judge' | 'image';
+  type: WorkRequirementType;
   requirement: string;
 };
 
@@ -100,12 +119,14 @@ export type TutorTask = {
   id: string;
   teamId: string;
   scope: TaskScope;
-  source: 'manual' | 'history' | 'library';
+  source: 'manual' | 'history' | 'library' | 'ai';
   base: string;
   taskType: string;
   title: string;
   points: number;
   description: string;
+  abilityTags: string[];
+  subjects: string[];
   attachments: TaskAttachment[];
   requirements: WorkRequirement[];
   status: TaskStatus;
@@ -121,6 +142,8 @@ export type TaskTemplate = {
   title: string;
   points: number;
   description: string;
+  abilityTags: string[];
+  subjects: string[];
   attachments: TaskAttachment[];
   requirements: WorkRequirement[];
 };
@@ -198,8 +221,58 @@ export type StudyReport = {
   grade: 'A' | 'B' | 'C' | 'D' | 'E';
   growthValue: number;
   summary: string;
+  templateId: string;
+  confirmedAt?: string;
   generatedAt: string;
   pushedAt?: string;
+};
+
+export type ReportTemplate = {
+  id: string;
+  name: string;
+  owner: 'organization' | 'tutor';
+  organizationName: string;
+  content: string;
+  enabledSections: string[];
+  updatedAt: string;
+};
+
+export type CommonStudent = {
+  id: string;
+  name: string;
+  age: number;
+  idNumber: string;
+  parentName: string;
+  parentPhone: string;
+};
+
+export type CommonClass = {
+  id: string;
+  name: string;
+  organizationName: string;
+  studentSource: string;
+  students: CommonStudent[];
+};
+
+export type TutorMessage = {
+  id: string;
+  teamId: string;
+  category: 'sos' | 'question' | 'system' | 'team_chat' | 'group_chat' | 'lecture';
+  title: string;
+  content: string;
+  targetId?: string;
+  createdAt: string;
+  read: boolean;
+};
+
+export type StudentTrackPoint = {
+  id: string;
+  teamId: string;
+  studentId: string;
+  address: string;
+  lat: number;
+  lng: number;
+  recordedAt: string;
 };
 
 export type BroadcastMessage = {
@@ -262,9 +335,15 @@ export type TutorMockState = {
   evaluationItems: EvaluationItem[];
   evaluationResults: EvaluationResult[];
   reports: StudyReport[];
+  reportTemplates: ReportTemplate[];
+  commonClasses: CommonClass[];
+  commonEvaluations: string[];
+  partnerOrganizations: string[];
+  tutorMessages: TutorMessage[];
   broadcasts: BroadcastMessage[];
   photos: PhotoAsset[];
   locations: LocationSnapshot[];
+  tracks: StudentTrackPoint[];
   sosAlerts: SosAlert[];
 };
 
@@ -277,17 +356,23 @@ type TeamDraft = {
   destination: string;
   bases: string[];
   studentSource: string;
+  organizationName: string;
+  maxStudents: number;
+  reportTemplateId: string;
+  evaluationMode: EvaluationMode;
 };
 
 type TaskDraft = {
   id?: string;
   scope: TaskScope;
-  source: 'manual' | 'history' | 'library';
+  source: 'manual' | 'history' | 'library' | 'ai';
   base: string;
   taskType: string;
   title: string;
   points: number;
   description: string;
+  abilityTags: string[];
+  subjects: string[];
   attachments: TaskAttachment[];
   requirements: WorkRequirement[];
   status: TaskStatus;
@@ -304,22 +389,27 @@ type TutorStoreValue = {
       teamId: string;
       name: string;
       age: number;
+      idNumber: string;
       parentName: string;
       parentPhone: string;
       joined: boolean;
     }) => void;
     importStudents: (payload: { teamId: string; rawText: string }) => { added: number };
+    addStudentsFromCommonClass: (teamId: string, classId: string, studentIds: string[]) => { added: number };
     addAssistant: (teamId: string, payload: { name: string; phone: string }) => void;
     removeAssistant: (teamId: string, assistantId: string) => void;
     addMaterial: (teamId: string, payload: { name: string; description: string; url: string }) => void;
     removeMaterial: (teamId: string, materialId: string) => void;
     createGroups: (teamId: string, count: number) => void;
     updateGroup: (groupId: string, payload: { name: string; emblem: string }) => void;
-    assignStudentToGroup: (teamId: string, studentId: string, groupId: string, role: GroupRole) => void;
+    deleteEmptyGroup: (groupId: string) => boolean;
+    assignStudentToGroup: (teamId: string, studentId: string, groupId: string, role: GroupRole, customRole?: string) => void;
     saveTask: (teamId: string, draft: TaskDraft) => void;
     reorderTask: (taskId: string, direction: 'up' | 'down' | 'top' | 'bottom') => void;
     copyTasksFromHistory: (teamId: string, sourceTeamId: string, taskIds: string[]) => void;
     copyTasksFromLibrary: (teamId: string, templateIds: string[]) => void;
+    createAiTasks: (teamId: string, payload: { scope: TaskScope; base: string; keyword: string; objective: string }) => string[];
+    updateTaskStatus: (taskId: string, status: TaskStatus) => void;
     scoreWork: (workItemId: string, payload: { rating: number; comment?: string }) => void;
     confirmAiScores: (workItemIds: string[]) => void;
     addRewardPenalty: (payload: {
@@ -332,7 +422,12 @@ type TutorStoreValue = {
     }) => void;
     updateEvaluation: (studentId: string, items: EvaluationEntry[], comment: string) => void;
     generateReports: (teamId: string, studentIds: string[]) => void;
+    pushReports: (reportIds: string[]) => void;
     pushReport: (reportId: string) => void;
+    saveReportTemplate: (template: Omit<ReportTemplate, 'id' | 'updatedAt'> & { id?: string }) => void;
+    duplicateReportTemplate: (templateId: string, name: string) => void;
+    saveCommonEvaluation: (content: string) => void;
+    addPartnerOrganization: (organizationName: string) => void;
     sendBroadcast: (payload: {
       teamId: string;
       scope: BroadcastScope;
@@ -348,11 +443,18 @@ type TutorStoreValue = {
       description: string;
       imageUrl?: string;
     }) => void;
+    addPhotosBatch: (payload: {
+      teamId: string;
+      scope: 'team' | 'group' | 'student';
+      targetId?: string;
+      titles: string[];
+      description: string;
+    }) => void;
     updateSosStatus: (alertId: string, status: SosStatus) => void;
   };
 };
 
-const STORE_KEY = 'yanxuebao_tutor_mock_v1';
+const STORE_KEY = 'yanxuebao_tutor_mock_v2';
 const TutorStoreContext = createContext<TutorStoreValue | null>(null);
 
 const PHOTO_POOL = [
@@ -449,11 +551,14 @@ function buildSeedState(): TutorMockState {
       organizationName: '南山实验学校研学中心',
       source: 'system',
       status: 'active',
+      maxStudents: 36,
       startDate: '2026-04-15',
       days: 2,
       destination: '深圳海洋馆 + 大鹏地质公园',
       bases: ['深圳海洋馆', '大鹏地质公园'],
       studentSource: '学校五年级 5 班',
+      reportTemplateId: 'tpl_report_ocean',
+      evaluationMode: 'self_peer_tutor',
       joinCode: 'YXB-TUTOR-0415',
       assistants: [
         { id: 'assistant_1', name: '周助教', phone: '13800000021' },
@@ -474,12 +579,15 @@ function buildSeedState(): TutorMockState {
       name: '红树林生态自建团',
       organizationName: '南山实验学校研学中心',
       source: 'self-built',
-      status: 'upcoming',
+      status: 'recruiting',
+      maxStudents: 28,
       startDate: '2026-04-21',
       days: 1,
       destination: '福田红树林',
       bases: ['红树林自然保护区'],
       studentSource: '家校联合招募',
+      reportTemplateId: 'tpl_report_green',
+      evaluationMode: 'self_tutor',
       joinCode: 'YXB-SELF-0421',
       assistants: [{ id: 'assistant_3', name: '陆助教', phone: '13800000023' }],
       materials: [],
@@ -491,11 +599,14 @@ function buildSeedState(): TutorMockState {
       organizationName: '南山实验学校研学中心',
       source: 'system',
       status: 'ended',
+      maxStudents: 30,
       startDate: '2026-03-20',
       days: 2,
       destination: '大鹏古火山遗址',
       bases: ['大鹏古火山遗址'],
       studentSource: '学校四年级 2 班',
+      reportTemplateId: 'tpl_report_ocean',
+      evaluationMode: 'tutor_only',
       joinCode: 'YXB-HIS-0320',
       assistants: [],
       materials: [],
@@ -509,6 +620,7 @@ function buildSeedState(): TutorMockState {
       teamId: 'team_active',
       name: '陈一诺',
       age: 11,
+      idNumber: '440305201504010011',
       joined: true,
       online: true,
       joinedOrder: 1,
@@ -521,6 +633,7 @@ function buildSeedState(): TutorMockState {
       teamId: 'team_active',
       name: '林子安',
       age: 11,
+      idNumber: '440305201505120022',
       joined: true,
       online: true,
       joinedOrder: 2,
@@ -533,6 +646,7 @@ function buildSeedState(): TutorMockState {
       teamId: 'team_active',
       name: '赵知夏',
       age: 10,
+      idNumber: '440305201509180033',
       joined: true,
       online: false,
       joinedOrder: 3,
@@ -545,6 +659,7 @@ function buildSeedState(): TutorMockState {
       teamId: 'team_active',
       name: '韩嘉树',
       age: 10,
+      idNumber: '440305201510060044',
       joined: true,
       online: true,
       joinedOrder: 4,
@@ -557,6 +672,7 @@ function buildSeedState(): TutorMockState {
       teamId: 'team_active',
       name: '苏听澜',
       age: 11,
+      idNumber: '440305201504220055',
       joined: false,
       online: false,
       joinedOrder: 5,
@@ -568,6 +684,7 @@ function buildSeedState(): TutorMockState {
       teamId: 'team_active',
       name: '顾星河',
       age: 10,
+      idNumber: '440305201512090066',
       joined: true,
       online: false,
       joinedOrder: 6,
@@ -580,6 +697,7 @@ function buildSeedState(): TutorMockState {
       teamId: 'team_history',
       name: '徐之遥',
       age: 10,
+      idNumber: '440305201512010077',
       joined: true,
       online: false,
       joinedOrder: 1,
@@ -591,6 +709,7 @@ function buildSeedState(): TutorMockState {
       teamId: 'team_history',
       name: '许沐言',
       age: 10,
+      idNumber: '440305201511110088',
       joined: true,
       online: false,
       joinedOrder: 2,
@@ -636,7 +755,9 @@ function buildSeedState(): TutorMockState {
       title: '海洋生物观察卡',
       points: 20,
       description: '观察两种海洋生物的特征并完成记录。',
-      attachments: [],
+      abilityTags: ['观察力', '表达力', '科学探究'],
+      subjects: ['科学', '语文'],
+      attachments: [{ id: 'att_s1_1', name: '海洋馆观察示例.pdf', kind: 'pdf', url: '#' }],
       requirements: [
         { id: 'req_1', type: 'text', requirement: '完成 100 字观察记录' },
         { id: 'req_2', type: 'image', requirement: '上传 1 张拍摄图片' },
@@ -655,7 +776,9 @@ function buildSeedState(): TutorMockState {
       title: '海洋馆十问',
       points: 15,
       description: '根据讲解完成海洋馆十问答题。',
-      attachments: [],
+      abilityTags: ['知识迁移', '信息提取', '判断力'],
+      subjects: ['科学'],
+      attachments: [{ id: 'att_s2_1', name: 'AI 链接：海洋馆十问资料', kind: 'ai_link', url: '#', keyword: '海洋馆 海龟 海豹 科普问答' }],
       requirements: [{ id: 'req_3', type: 'choice', requirement: '完成 10 道选择题' }],
       status: 'published',
       order: 2,
@@ -671,9 +794,11 @@ function buildSeedState(): TutorMockState {
       title: '今日研学反思',
       points: 15,
       description: '记录今天最有收获的一件事。',
+      abilityTags: ['反思力', '表达力'],
+      subjects: ['语文', '综合实践'],
       attachments: [],
-      requirements: [{ id: 'req_4', type: 'text', requirement: '完成 150 字反思' }],
-      status: 'draft',
+      requirements: [{ id: 'req_4', type: 'audio', requirement: '提交 1 段 60 秒以内语音反思' }],
+      status: 'pending_publish',
       order: 3,
       createdAt: nowPlus(-8),
     },
@@ -687,7 +812,9 @@ function buildSeedState(): TutorMockState {
       title: '海洋馆路线海报',
       points: 25,
       description: '小组整理参观路线并完成一张路线海报。',
-      attachments: [],
+      abilityTags: ['协作力', '空间表达', '创造力'],
+      subjects: ['美术', '地理'],
+      attachments: [{ id: 'att_g1_1', name: '路线图模板.png', kind: 'image', url: '#' }],
       requirements: [
         { id: 'req_5', type: 'image', requirement: '上传 1 张海报' },
         { id: 'req_6', type: 'text', requirement: '附 80 字说明' },
@@ -706,8 +833,10 @@ function buildSeedState(): TutorMockState {
       title: '火山岩样本汇报',
       points: 30,
       description: '小组汇总火山岩样本观察结论。',
-      attachments: [],
-      requirements: [{ id: 'req_7', type: 'image', requirement: '上传 3 张样本图与 1 段总结' }],
+      abilityTags: ['科学探究', '合作沟通', '归纳力'],
+      subjects: ['科学', '地理'],
+      attachments: [{ id: 'att_g2_1', name: '火山岩资料关键字', kind: 'ai_link', url: '#', keyword: '深圳 大鹏 火山岩 地质公园' }],
+      requirements: [{ id: 'req_7', type: 'observation', requirement: '上传 3 张样本图与 1 段观察表总结' }],
       status: 'published',
       order: 2,
       createdAt: nowPlus(-6),
@@ -722,6 +851,8 @@ function buildSeedState(): TutorMockState {
       title: '岩石纹理采样',
       points: 20,
       description: '记录岩石纹理并写出判断依据。',
+      abilityTags: ['观察力', '证据意识'],
+      subjects: ['科学', '地理'],
       attachments: [],
       requirements: [{ id: 'req_h1', type: 'text', requirement: '图文结合完成采样记录' }],
       status: 'ended',
@@ -738,6 +869,8 @@ function buildSeedState(): TutorMockState {
       title: '地质结构展示板',
       points: 25,
       description: '完成地质结构展示板并汇报。',
+      abilityTags: ['表达力', '协作力'],
+      subjects: ['地理', '美术'],
       attachments: [],
       requirements: [{ id: 'req_h2', type: 'image', requirement: '上传 1 张展示板照片' }],
       status: 'ended',
@@ -755,7 +888,9 @@ function buildSeedState(): TutorMockState {
       title: '海洋动物特征卡',
       points: 20,
       description: '观察 2 种海洋动物并记录外观、习性。',
-      attachments: [],
+      abilityTags: ['观察力', '表达力', '科学探究'],
+      subjects: ['科学', '语文'],
+      attachments: [{ id: 'tpl_att_1', name: '动物特征观察表.xlsx', kind: 'file', url: '#' }],
       requirements: [
         { id: 'tpl_req_1', type: 'text', requirement: '完成一段观察文字' },
         { id: 'tpl_req_2', type: 'image', requirement: '上传 1 张现场图片' },
@@ -769,6 +904,8 @@ function buildSeedState(): TutorMockState {
       title: '红树林生态问答',
       points: 15,
       description: '完成红树林生态知识问答。',
+      abilityTags: ['知识迁移', '判断力'],
+      subjects: ['科学'],
       attachments: [],
       requirements: [{ id: 'tpl_req_3', type: 'choice', requirement: '完成 8 道选择题' }],
     },
@@ -780,6 +917,8 @@ function buildSeedState(): TutorMockState {
       title: '深海主题海报',
       points: 25,
       description: '小组完成深海主题海报并说明创意。',
+      abilityTags: ['创造力', '协作力'],
+      subjects: ['美术', '科学'],
       attachments: [],
       requirements: [{ id: 'tpl_req_4', type: 'image', requirement: '上传 1 张海报与 1 段说明' }],
     },
@@ -791,6 +930,8 @@ function buildSeedState(): TutorMockState {
       title: '地质观察结论板',
       points: 30,
       description: '小组梳理地质观察结论并汇报。',
+      abilityTags: ['科学探究', '归纳力'],
+      subjects: ['地理', '科学'],
       attachments: [],
       requirements: [{ id: 'tpl_req_5', type: 'text', requirement: '输出 3 条结论与 1 张示意图' }],
     },
@@ -1118,6 +1259,7 @@ function buildSeedState(): TutorMockState {
       grade: 'B',
       growthValue: 900,
       summary: '完成任务积极，观察和表达能力较突出。',
+      templateId: 'tpl_report_ocean',
       generatedAt: nowPlus(-2),
     },
   ];
@@ -1204,8 +1346,156 @@ function buildSeedState(): TutorMockState {
     },
   ];
 
+  const reportTemplates: ReportTemplate[] = [
+    {
+      id: 'tpl_report_ocean',
+      name: '海洋探索综合成长报告',
+      owner: 'organization',
+      organizationName: '南山实验学校研学中心',
+      content:
+        '致[学员姓名]同学：你于[研学时间]完成[团队名称]全部课程与实践任务，综合评级为[A-E]。报告包含个性化评语、能力提升雷达图、导师签名与结业日期。',
+      enabledSections: ['身份信息', '研学证明', '个性化评语', '六维能力雷达图', '导师签名'],
+      updatedAt: nowPlus(-120),
+    },
+    {
+      id: 'tpl_report_green',
+      name: '生态实践观察报告',
+      owner: 'organization',
+      organizationName: '南山实验学校研学中心',
+      content: '面向生态实践团队，突出观察记录、合作表现、课程目标达成与能力提升。',
+      enabledSections: ['研学证明', '任务成果', '能力提升', '导师评价'],
+      updatedAt: nowPlus(-80),
+    },
+    {
+      id: 'tpl_report_tutor_custom',
+      name: '李老师常用个性化报告',
+      owner: 'tutor',
+      organizationName: '个人模版',
+      content: '基于老师综合评价与作品评价生成更温和的个性化评语，并突出学生的现场闪光点。',
+      enabledSections: ['个性化评语', '任务作品', '能力提升'],
+      updatedAt: nowPlus(-12),
+    },
+  ];
+
+  const commonClasses: CommonClass[] = [
+    {
+      id: 'class_grade5_5',
+      name: '五年级 5 班',
+      organizationName: '南山实验学校',
+      studentSource: '学校五年级 5 班',
+      students: [
+        { id: 'common_1', name: '沈清越', age: 11, idNumber: '440305201503130101', parentName: '沈妈妈', parentPhone: '13920000001' },
+        { id: 'common_2', name: '陆一辰', age: 11, idNumber: '440305201506260102', parentName: '陆爸爸', parentPhone: '13920000002' },
+        { id: 'common_3', name: '夏之禾', age: 10, idNumber: '440305201511070103', parentName: '夏妈妈', parentPhone: '13920000003' },
+      ],
+    },
+    {
+      id: 'class_grade4_2',
+      name: '四年级 2 班',
+      organizationName: '南山实验学校',
+      studentSource: '学校四年级 2 班',
+      students: [
+        { id: 'common_4', name: '周予安', age: 10, idNumber: '440305201512170104', parentName: '周妈妈', parentPhone: '13920000004' },
+        { id: 'common_5', name: '唐沐阳', age: 10, idNumber: '440305201510280105', parentName: '唐爸爸', parentPhone: '13920000005' },
+      ],
+    },
+  ];
+
+  const commonEvaluations = ['观察细致，能主动记录事实并形成判断。', '合作意识强，能承担岗位并帮助同伴推进任务。'];
+  const partnerOrganizations = ['南山实验学校', '深圳海洋馆研学中心', '大鹏地质公园科普基地'];
+
+  const tutorMessages: TutorMessage[] = [
+    {
+      id: 'msg_sos_1',
+      teamId: 'team_active',
+      category: 'sos',
+      title: 'SoS 告警：赵知夏',
+      content: '与小组短暂走散，请求定位协助。',
+      targetId: 'student_3',
+      createdAt: nowPlus(-1),
+      read: false,
+    },
+    {
+      id: 'msg_question_1',
+      teamId: 'team_active',
+      category: 'question',
+      title: '学员问询：海龟和海豹有什么区别？',
+      content: '来自陈一诺，等待导师在讲解中回复。',
+      targetId: 'student_1',
+      createdAt: nowPlus(-2),
+      read: false,
+    },
+    {
+      id: 'msg_system_1',
+      teamId: 'team_active',
+      category: 'system',
+      title: '系统通知：3 份 AI 初评分待确认',
+      content: '学员任务与小组任务均有新提交作品，请及时确认或调整导师分。',
+      createdAt: nowPlus(-3),
+      read: true,
+    },
+    {
+      id: 'msg_group_1',
+      teamId: 'team_active',
+      category: 'group_chat',
+      title: '深蓝观察组消息',
+      content: '我们已经完成路线海报初稿，准备提交。',
+      targetId: 'group_2',
+      createdAt: nowPlus(-4),
+      read: true,
+    },
+  ];
+
+  const tracks: StudentTrackPoint[] = [
+    {
+      id: 'track_1',
+      teamId: 'team_active',
+      studentId: 'student_1',
+      address: '深圳海洋馆入口',
+      lat: 22.4815,
+      lng: 113.9245,
+      recordedAt: nowPlus(-5),
+    },
+    {
+      id: 'track_2',
+      teamId: 'team_active',
+      studentId: 'student_1',
+      address: '珊瑚展区',
+      lat: 22.4818,
+      lng: 113.925,
+      recordedAt: nowPlus(-3),
+    },
+    {
+      id: 'track_3',
+      teamId: 'team_active',
+      studentId: 'student_1',
+      address: 'A 馆 2 层入口',
+      lat: 22.482,
+      lng: 113.925,
+      recordedAt: nowPlus(0),
+    },
+    {
+      id: 'track_4',
+      teamId: 'team_active',
+      studentId: 'student_3',
+      address: '海底隧道入口',
+      lat: 22.482,
+      lng: 113.9255,
+      recordedAt: nowPlus(-2),
+    },
+    {
+      id: 'track_5',
+      teamId: 'team_active',
+      studentId: 'student_3',
+      address: '海底隧道出口',
+      lat: 22.4823,
+      lng: 113.9259,
+      recordedAt: nowPlus(0),
+    },
+  ];
+
   return {
-    version: 1,
+    version: 2,
     currentTeamId: 'team_active',
     teams,
     students,
@@ -1218,9 +1508,15 @@ function buildSeedState(): TutorMockState {
     evaluationItems,
     evaluationResults,
     reports,
+    reportTemplates,
+    commonClasses,
+    commonEvaluations,
+    partnerOrganizations,
+    tutorMessages,
     broadcasts,
     photos,
     locations,
+    tracks,
     sosAlerts,
   };
 }
@@ -1275,6 +1571,18 @@ export function getReportForStudent(state: TutorMockState, studentId: string) {
 
 export function getLocationForStudent(state: TutorMockState, studentId: string) {
   return state.locations.find((location) => location.studentId === studentId) ?? null;
+}
+
+export function getTrackForStudent(state: TutorMockState, studentId: string) {
+  return state.tracks
+    .filter((point) => point.studentId === studentId)
+    .sort((left, right) => left.recordedAt.localeCompare(right.recordedAt));
+}
+
+export function getRewardPenaltyTotal(state: TutorMockState, targetType: TaskScope, targetId: string) {
+  return state.rewardPenaltyRecords
+    .filter((record) => record.targetType === targetType && record.targetId === targetId)
+    .reduce((sum, record) => sum + (record.kind === 'reward' ? record.points : -record.points), 0);
 }
 
 export function getSosForTeam(state: TutorMockState, teamId: string) {
@@ -1419,7 +1727,7 @@ export function TutorStoreProvider({ children }: { children: React.ReactNode }) 
       const raw = window.localStorage.getItem(STORE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as TutorMockState;
-        if (parsed.version === 1) {
+        if (parsed.version === 2) {
           setState(parsed);
         } else {
           setState(buildSeedState());
@@ -1462,6 +1770,9 @@ export function TutorStoreProvider({ children }: { children: React.ReactNode }) 
               const team = draft.teams.find((item) => item.id === teamId);
               if (!team) return;
               Object.assign(team, payload);
+              if (!draft.partnerOrganizations.includes(payload.organizationName)) {
+                draft.partnerOrganizations.unshift(payload.organizationName);
+              }
               return;
             }
 
@@ -1469,22 +1780,28 @@ export function TutorStoreProvider({ children }: { children: React.ReactNode }) 
             draft.teams.unshift({
               id: nextTeamId,
               name: payload.name,
-              organizationName: '南山实验学校研学中心',
+              organizationName: payload.organizationName,
               source: payload.source,
               status: payload.status,
+              maxStudents: payload.maxStudents,
               startDate: payload.startDate,
               days: payload.days,
               destination: payload.destination,
               bases: payload.bases,
               studentSource: payload.studentSource,
+              reportTemplateId: payload.reportTemplateId,
+              evaluationMode: payload.evaluationMode,
               joinCode: `YXB-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
               assistants: [],
               materials: [],
               growthBaseValue: 1000,
             });
+            if (!draft.partnerOrganizations.includes(payload.organizationName)) {
+              draft.partnerOrganizations.unshift(payload.organizationName);
+            }
             draft.currentTeamId = nextTeamId;
           }),
-        addStudent: ({ teamId, name, age, parentName, parentPhone, joined }) =>
+        addStudent: ({ teamId, name, age, idNumber, parentName, parentPhone, joined }) =>
           mutate((draft) => {
             const joinedOrder = draft.students.filter((student) => student.teamId === teamId).length + 1;
             const studentId = uid('student');
@@ -1493,6 +1810,7 @@ export function TutorStoreProvider({ children }: { children: React.ReactNode }) 
               teamId,
               name,
               age,
+              idNumber,
               joined,
               online: false,
               joinedOrder,
@@ -1524,7 +1842,7 @@ export function TutorStoreProvider({ children }: { children: React.ReactNode }) 
               .map((line) => line.trim())
               .filter(Boolean)
               .forEach((line, index) => {
-                const [name, ageText, parentName, parentPhone] = line.split(/[，,]/).map((item) => item.trim());
+                const [name, ageText, idNumber, parentName, parentPhone] = line.split(/[，,]/).map((item) => item.trim());
                 if (!name || !parentName || !parentPhone) {
                   return;
                 }
@@ -1534,6 +1852,7 @@ export function TutorStoreProvider({ children }: { children: React.ReactNode }) 
                   teamId,
                   name,
                   age: Number(ageText) || 10,
+                  idNumber: idNumber || `4403052015${String(currentTeamStudents.length + added).padStart(6, '0')}`,
                   joined: index % 3 !== 0,
                   online: index % 2 === 0,
                   joinedOrder: currentTeamStudents.length + added,
@@ -1555,6 +1874,52 @@ export function TutorStoreProvider({ children }: { children: React.ReactNode }) 
                     });
                   });
                 }
+              });
+          });
+          return { added };
+        },
+        addStudentsFromCommonClass: (teamId, classId, studentIds) => {
+          let added = 0;
+          mutate((draft) => {
+            const commonClass = draft.commonClasses.find((item) => item.id === classId);
+            if (!commonClass) return;
+            const team = draft.teams.find((item) => item.id === teamId);
+            if (team) {
+              team.organizationName = commonClass.organizationName;
+              team.studentSource = commonClass.studentSource;
+            }
+            const studentTasks = draft.tasks.filter((task) => task.teamId === teamId && task.scope === 'student');
+            const existingIdNumbers = new Set(
+              draft.students.filter((student) => student.teamId === teamId).map((student) => student.idNumber),
+            );
+            commonClass.students
+              .filter((student) => studentIds.includes(student.id) && !existingIdNumbers.has(student.idNumber))
+              .forEach((student) => {
+                const studentId = uid('student');
+                added += 1;
+                draft.students.push({
+                  id: studentId,
+                  teamId,
+                  name: student.name,
+                  age: student.age,
+                  idNumber: student.idNumber,
+                  joined: false,
+                  online: false,
+                  joinedOrder: draft.students.filter((item) => item.teamId === teamId).length + 1,
+                  deviceId: `YXB-DEV-${Math.floor(Math.random() * 9000 + 1000)}`,
+                  parent: { name: student.parentName, phone: student.parentPhone },
+                });
+                studentTasks.forEach((task) => {
+                  draft.workItems.push({
+                    id: uid('work'),
+                    taskId: task.id,
+                    teamId,
+                    ownerType: 'student',
+                    ownerId: studentId,
+                    status: 'draft',
+                    preview: '等待学员提交作品',
+                  });
+                });
               });
           });
           return { added };
@@ -1622,7 +1987,18 @@ export function TutorStoreProvider({ children }: { children: React.ReactNode }) 
             group.name = payload.name;
             group.emblem = payload.emblem;
           }),
-        assignStudentToGroup: (teamId, studentId, groupId, role) =>
+        deleteEmptyGroup: (groupId) => {
+          let deleted = false;
+          mutate((draft) => {
+            const group = draft.groups.find((item) => item.id === groupId);
+            if (!group || group.members.length > 0) return;
+            draft.groups = draft.groups.filter((item) => item.id !== groupId);
+            draft.workItems = draft.workItems.filter((work) => work.ownerId !== groupId);
+            deleted = true;
+          });
+          return deleted;
+        },
+        assignStudentToGroup: (teamId, studentId, groupId, role, customRole) =>
           mutate((draft) => {
             const student = draft.students.find((item) => item.id === studentId && item.teamId === teamId);
             const group = draft.groups.find((item) => item.id === groupId && item.teamId === teamId);
@@ -1635,7 +2011,7 @@ export function TutorStoreProvider({ children }: { children: React.ReactNode }) 
               });
 
             student.groupId = groupId;
-            group.members.push({ studentId, role });
+            group.members.push({ studentId, role, customRole: role === 'custom' ? customRole : undefined });
           }),
         saveTask: (teamId, payload) =>
           mutate((draft) => {
@@ -1657,6 +2033,8 @@ export function TutorStoreProvider({ children }: { children: React.ReactNode }) 
               title: payload.title,
               points: payload.points,
               description: payload.description,
+              abilityTags: payload.abilityTags,
+              subjects: payload.subjects,
               attachments: payload.attachments,
               requirements: payload.requirements,
               status: payload.status,
@@ -1698,7 +2076,7 @@ export function TutorStoreProvider({ children }: { children: React.ReactNode }) 
                 id: uid('task'),
                 teamId,
                 source: 'history',
-                status: 'draft',
+                status: 'pending_publish',
                 order: draft.tasks.filter((task) => task.teamId === teamId && task.scope === sourceTask.scope).length + 1,
                 createdAt: nowPlus(0),
               };
@@ -1721,15 +2099,86 @@ export function TutorStoreProvider({ children }: { children: React.ReactNode }) 
                   title: template.title,
                   points: template.points,
                   description: template.description,
+                  abilityTags: template.abilityTags,
+                  subjects: template.subjects,
                   attachments: template.attachments,
                   requirements: template.requirements,
-                  status: 'draft',
+                  status: 'pending_publish',
                   order: draft.tasks.filter((task) => task.teamId === teamId && task.scope === template.scope).length + 1,
                   createdAt: nowPlus(0),
                 };
                 draft.tasks.push(nextTask);
                 draft.workItems.push(...createWorksForTask(teamId, nextTask, draft));
               });
+          }),
+        createAiTasks: (teamId, payload) => {
+          const createdIds: string[] = [];
+          mutate((draft) => {
+            const baseNames = ['观察任务', '探究任务', '创作任务', '讲解任务', '反思任务'];
+            for (let index = 0; index < 5; index += 1) {
+              const title = `${payload.base || '研学基地'}${payload.keyword || baseNames[index]} ${index + 1}`;
+              const task: TutorTask = {
+                id: uid('task'),
+                teamId,
+                scope: payload.scope,
+                source: 'ai',
+                base: payload.base || '研学基地',
+                taskType: baseNames[index],
+                title,
+                points: payload.scope === 'student' ? 20 : 30,
+                description: `${payload.objective || '围绕现场观察与课程目标'}，由 AI 任务智能体生成任务草案，导师审核后可下发。`,
+                abilityTags: ['观察力', '表达力', index % 2 === 0 ? '科学探究' : '协作力'],
+                subjects: index % 2 === 0 ? ['科学', '语文'] : ['综合实践', '地理'],
+                attachments: [
+                  {
+                    id: uid('attachment'),
+                    name: `AI 资料关键字：${payload.keyword || payload.base || '研学任务'}`,
+                    kind: 'ai_link',
+                    url: '#',
+                    keyword: `${payload.base} ${payload.keyword} ${payload.objective}`.trim(),
+                  },
+                ],
+                requirements: [
+                  {
+                    id: uid('req'),
+                    type: index % 3 === 0 ? 'observation' : index % 3 === 1 ? 'audio' : 'ai_work_link',
+                    requirement:
+                      index % 3 === 0
+                        ? '完成观察记录表并上传关键照片'
+                        : index % 3 === 1
+                          ? '提交 1 段语音讲解'
+                          : '提交 AI 探究过程或作品链接',
+                  },
+                ],
+                status: 'ai_created',
+                order: draft.tasks.filter((taskItem) => taskItem.teamId === teamId && taskItem.scope === payload.scope).length + 1,
+                createdAt: nowPlus(0),
+              };
+              draft.tasks.push(task);
+              draft.taskTemplates.unshift({
+                id: uid('tpl'),
+                scope: task.scope,
+                base: task.base,
+                taskType: task.taskType,
+                title: task.title,
+                points: task.points,
+                description: task.description,
+                abilityTags: task.abilityTags,
+                subjects: task.subjects,
+                attachments: task.attachments,
+                requirements: task.requirements,
+              });
+              draft.workItems.push(...createWorksForTask(teamId, task, draft));
+              createdIds.push(task.id);
+            }
+          });
+          return createdIds;
+        },
+        updateTaskStatus: (taskId, status) =>
+          mutate((draft) => {
+            const task = draft.tasks.find((item) => item.id === taskId);
+            if (!task) return;
+            task.status = status;
           }),
         scoreWork: (workItemId, payload) =>
           mutate((draft) => {
@@ -1823,6 +2272,8 @@ export function TutorStoreProvider({ children }: { children: React.ReactNode }) 
                 existing.summary = summary;
                 existing.growthValue = Math.round(team.growthBaseValue * growthMultiplier(existing.grade));
                 existing.status = 'ready';
+                existing.templateId = team.reportTemplateId;
+                existing.confirmedAt = undefined;
                 existing.generatedAt = nowPlus(0);
                 return;
               }
@@ -1836,16 +2287,69 @@ export function TutorStoreProvider({ children }: { children: React.ReactNode }) 
                 grade: gradeFromScore(score),
                 growthValue,
                 summary,
+                templateId: team.reportTemplateId,
                 generatedAt: nowPlus(0),
               });
             });
+          }),
+        pushReports: (reportIds) =>
+          mutate((draft) => {
+            draft.reports
+              .filter((report) => reportIds.includes(report.id))
+              .forEach((report) => {
+                report.status = 'pushed';
+                report.confirmedAt = report.confirmedAt ?? nowPlus(0);
+                report.pushedAt = nowPlus(0);
+              });
           }),
         pushReport: (reportId) =>
           mutate((draft) => {
             const report = draft.reports.find((item) => item.id === reportId);
             if (!report) return;
             report.status = 'pushed';
+            report.confirmedAt = report.confirmedAt ?? nowPlus(0);
             report.pushedAt = nowPlus(0);
+          }),
+        saveReportTemplate: (template) =>
+          mutate((draft) => {
+            if (template.id) {
+              const existing = draft.reportTemplates.find((item) => item.id === template.id);
+              if (!existing) return;
+              Object.assign(existing, template, { updatedAt: nowPlus(0) });
+              return;
+            }
+            draft.reportTemplates.unshift({
+              ...template,
+              id: uid('report_tpl'),
+              updatedAt: nowPlus(0),
+            });
+          }),
+        duplicateReportTemplate: (templateId, name) =>
+          mutate((draft) => {
+            const source = draft.reportTemplates.find((item) => item.id === templateId);
+            if (!source) return;
+            draft.reportTemplates.unshift({
+              ...source,
+              id: uid('report_tpl'),
+              name,
+              owner: 'tutor',
+              organizationName: '个人模版',
+              updatedAt: nowPlus(0),
+            });
+          }),
+        saveCommonEvaluation: (content) =>
+          mutate((draft) => {
+            const value = content.trim();
+            if (value && !draft.commonEvaluations.includes(value)) {
+              draft.commonEvaluations.unshift(value);
+            }
+          }),
+        addPartnerOrganization: (organizationName) =>
+          mutate((draft) => {
+            const value = organizationName.trim();
+            if (value && !draft.partnerOrganizations.includes(value)) {
+              draft.partnerOrganizations.unshift(value);
+            }
           }),
         sendBroadcast: (payload) =>
           mutate((draft) => {
@@ -1853,6 +2357,16 @@ export function TutorStoreProvider({ children }: { children: React.ReactNode }) 
               id: uid('broadcast'),
               ...payload,
               createdAt: nowPlus(0),
+            });
+            draft.tutorMessages.unshift({
+              id: uid('msg'),
+              teamId: payload.teamId,
+              category: payload.contentType === 'lecture' ? 'lecture' : payload.scope === 'group' ? 'group_chat' : 'team_chat',
+              title: payload.contentType === 'lecture' ? '语音讲解记录' : payload.scope === 'team' ? '团队消息' : payload.scope === 'group' ? '小组消息' : '学员消息',
+              content: payload.content,
+              targetId: payload.targetId,
+              createdAt: nowPlus(0),
+              read: false,
             });
           }),
         addPhoto: (payload) =>
@@ -1867,6 +2381,24 @@ export function TutorStoreProvider({ children }: { children: React.ReactNode }) 
               imageUrl: payload.imageUrl || PHOTO_POOL[Math.floor(Math.random() * PHOTO_POOL.length)],
               createdAt: nowPlus(0),
             });
+          }),
+        addPhotosBatch: (payload) =>
+          mutate((draft) => {
+            payload.titles
+              .map((title) => title.trim())
+              .filter(Boolean)
+              .forEach((title, index) => {
+                draft.photos.unshift({
+                  id: uid('photo'),
+                  teamId: payload.teamId,
+                  scope: payload.scope,
+                  targetId: payload.targetId,
+                  title,
+                  description: payload.description || '现场批量上传照片',
+                  imageUrl: PHOTO_POOL[index % PHOTO_POOL.length],
+                  createdAt: nowPlus(0),
+                });
+              });
           }),
         updateSosStatus: (alertId, status) =>
           mutate((draft) => {
