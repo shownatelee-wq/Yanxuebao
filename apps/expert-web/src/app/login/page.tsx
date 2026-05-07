@@ -32,9 +32,9 @@ export default function ExpertLoginPage() {
       {contextHolder}
       <section className="expert-phone expert-login-shell">
         <div className="expert-login-brand">
-          <span>研学宝专家工作台</span>
-          <h1>专家端 H5</h1>
-          <p>围绕课程、问答、知识、资讯、挑战和智能体维护的一体化工作区。</p>
+          <span>研学宝专家合作中心</span>
+          <h1>专家端</h1>
+          <p>围绕智能体、课程经营、内容维护、挑战评价和结算管理的一体化工作区。</p>
         </div>
         <div className="expert-login-card">
           <Form
@@ -52,7 +52,7 @@ export default function ExpertLoginPage() {
             >
               <Input.Password prefix={<LockOutlined />} placeholder="请输入密码" />
             </Form.Item>
-            <div className="expert-login-note">演示账号：expert_demo / Yanxuebao@2026</div>
+            <div className="expert-login-note">合作账号：expert_partner / Yanxuebao@2026</div>
             <Button block size="large" type="primary" htmlType="submit">
               登录专家端
             </Button>

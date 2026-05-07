@@ -16,25 +16,13 @@ export type ExpertSession = {
 };
 
 export const EXPERT_LOGIN_DEFAULTS = {
-  account: 'expert_demo',
+  account: 'expert_partner',
   password: 'Yanxuebao@2026',
 };
 
 const ACCEPTED_ACCOUNTS = new Map<string, ExpertSession['user']>([
   [
     'expert_partner',
-    {
-      id: 'expert_user_001',
-      account: 'expert_partner',
-      displayName: '张知远',
-      role: 'expert',
-      title: '海洋科学专家',
-      organization: '研学宝专家合作中心',
-      field: '海洋生态与创新教育',
-    },
-  ],
-  [
-    'expert_demo',
     {
       id: 'expert_user_001',
       account: 'expert_partner',

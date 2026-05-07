@@ -2,69 +2,124 @@
 
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
-export type CourseStatus = 'draft' | 'pending_review' | 'published' | 'unpublished' | 'ended';
-export type CourseType = 'online' | 'offline';
+const STORE_KEY = 'yanxuebao_expert_h5_state_v4';
+const STORE_VERSION = 4;
+
+export type ExpertAccountStatus = 'not_started' | 'draft' | 'under_review' | 'rejected' | 'approved';
+export type AccountType = 'expert' | 'organization';
+export type AuditStatus = 'pending' | 'approved' | 'rejected';
+export type BankAccountStatus = 'not_set' | 'pending' | 'active' | 'rejected';
+export type InvoiceProfileStatus = 'not_set' | 'pending' | 'approved' | 'rejected';
+export type AgentLifecycleStatus = 'draft' | 'testing' | 'published' | 'unpublished';
+export type AgentCreationStep = 'basic' | 'role' | 'knowledge' | 'strategy' | 'testing' | 'publish';
+export type ReplyStyle = '鼓励型' | '专业严谨' | '启发提问' | '陪伴观察';
+export type ProductType = 'online_course' | 'offline_course' | 'pbl' | 'face_to_face';
+export type ProductStatus = 'draft' | 'pending_review' | 'published' | 'rejected' | 'unpublished' | 'ended';
+export type OrderStatus = 'reserved' | 'paid' | 'written_off' | 'refunded' | 'cancelled';
+export type WriteOffStatus = 'success' | 'duplicate' | 'exception';
 export type NewsStatus = 'collected' | 'editing' | 'published';
 export type ChallengeStatus = 'draft' | 'ready' | 'published' | 'ended';
-export type SubmissionStatus = 'pending' | 'reviewed';
-export type AgentStatus = 'published' | 'paused';
-export type AgentStyle = '严谨' | '活泼' | '鼓励型';
+export type SubmissionReviewStatus = 'pending' | 'reviewed' | 'returned';
+export type WithdrawalStatus = 'submitted' | 'reviewing' | 'paid' | 'rejected';
+export type EvaluationReportStatus = 'collecting' | 'generating' | 'completed' | 'synced';
+export type NewsFormat = '图文' | '短视频';
+export type KnowledgeEntryStatus = 'enabled' | 'disabled';
+export type KnowledgeImportStatus = 'uploaded' | 'parsing' | 'completed' | 'failed';
+export type ContentWorkflowStatus = 'draft' | 'pending' | 'active' | 'archived';
 
-export type DashboardMetric = {
-  id: string;
-  label: string;
-  value: number;
-  suffix?: string;
-  tone: 'brand' | 'gold' | 'green' | 'orange' | 'ink';
-};
-
-export type CourseChapter = {
-  id: string;
+export type ExpertApplication = {
+  accountType: AccountType;
+  status: ExpertAccountStatus;
+  expertName: string;
   title: string;
-  duration: string;
-  summary: string;
+  organization: string;
+  field: string;
+  credentialName: string;
+  credentialFileName: string;
+  authorizationFileName: string;
+  contactName: string;
+  contactPhone: string;
+  submittedAt?: string;
+  reviewedAt?: string;
+  reviewOpinion?: string;
 };
 
-export type CourseTrend = {
-  label: string;
-  value: number;
+export type ExpertApplicationInput = Omit<ExpertApplication, 'status' | 'submittedAt' | 'reviewedAt' | 'reviewOpinion'>;
+
+export type BankAccount = {
+  accountName: string;
+  cardNo: string;
+  bankName: string;
+  reservedPhone: string;
+  isDefault: boolean;
+  status: BankAccountStatus;
+  submittedAt?: string;
+  reviewedAt?: string;
+  reviewOpinion?: string;
 };
 
-export type ExpertCourse = {
-  id: string;
+export type BankAccountInput = Omit<BankAccount, 'status' | 'submittedAt' | 'reviewedAt' | 'reviewOpinion'>;
+
+export type InvoiceProfile = {
+  invoiceType: '个人' | '企业';
   title: string;
-  type: CourseType;
-  format: string;
-  summary: string;
-  ageRange: string;
-  price: number;
-  discountPrice?: number;
-  status: CourseStatus;
-  cover: string;
-  chapters: CourseChapter[];
-  views: number;
-  sales: number;
-  revenue: number;
-  trends: CourseTrend[];
-  location?: string;
-  sessionSchedule?: string[];
-  enrollmentLimit?: number;
-  publishedAt?: string;
-  updatedAt: string;
+  taxNo: string;
+  registeredAddress: string;
+  registeredPhone: string;
+  bankName: string;
+  bankAccount: string;
+  email: string;
+  status: InvoiceProfileStatus;
+  submittedAt?: string;
+  reviewedAt?: string;
+  reviewOpinion?: string;
 };
 
-export type QaRecord = {
+export type InvoiceProfileInput = Omit<InvoiceProfile, 'status' | 'submittedAt' | 'reviewedAt' | 'reviewOpinion'>;
+
+export type AuditRecord = {
   id: string;
-  askedAt: string;
-  studentName: string;
-  studentId: string;
-  agentName: string;
+  targetType: '入驻申请' | '银行卡' | '发票资料' | '课程';
+  targetId: string;
+  status: AuditStatus;
+  opinion: string;
+  createdAt: string;
+};
+
+export type KnowledgeBinding = {
+  knowledgeId: string;
+  priority: number;
+  enabled: boolean;
+};
+
+export type AgentTestRecord = {
+  id: string;
+  agentId: string;
   question: string;
-  replySummary: string;
-  matched: boolean;
-  status: 'unresolved' | 'resolved';
-  tags: string[];
-  linkedKnowledgeId?: string;
+  answer: string;
+  result: 'passed' | 'needs_tuning';
+  testedAt: string;
+};
+
+export type ExpertAgent = {
+  id: string;
+  name: string;
+  avatarText: string;
+  field: string;
+  status: AgentLifecycleStatus;
+  rolePositioning: string;
+  welcomeMessage: string;
+  promptTemplate: string;
+  replyStyle: ReplyStyle;
+  knowledgeBindings: KnowledgeBinding[];
+  createdAt: string;
+  updatedAt: string;
+  operations: {
+    conversations: number;
+    resolvedRate: number;
+    satisfaction: number;
+    dailyActiveUsers: number;
+  };
 };
 
 export type StoredFileMeta = {
@@ -75,1269 +130,2034 @@ export type StoredFileMeta = {
   uploadedAt: string;
 };
 
+export type NewsSourceRule = {
+  id: string;
+  name: string;
+  url: string;
+  enabled: boolean;
+};
+
+export type ContentCollectionRule = {
+  id: string;
+  name: string;
+  agentId: string | null;
+  keywords: string[];
+  sourceRules: NewsSourceRule[];
+  formats: NewsFormat[];
+  frequency: '每日' | '每周' | '手动';
+  enabled: boolean;
+  lastCollectedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type KnowledgeLibrary = {
+  id: string;
+  name: string;
+  agentId: string | null;
+  description: string;
+  enabled: boolean;
+  bindingPriority: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type KnowledgeImportJob = {
+  id: string;
+  libraryId: string;
+  agentId: string | null;
+  file: StoredFileMeta;
+  status: KnowledgeImportStatus;
+  entryCount: number;
+  previewText: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CourseChapter = {
+  title: string;
+  duration: string;
+  summary: string;
+};
+
+export type ExpertProduct = {
+  id: string;
+  title: string;
+  productType: ProductType;
+  status: ProductStatus;
+  summary: string;
+  targetAge: string;
+  price: number;
+  capacity: number;
+  location: string;
+  schedule: string;
+  bookingDeadline: string;
+  deliveryPlan: string;
+  chapters: CourseChapter[];
+  tags: string[];
+  views: number;
+  reservations: number;
+  payAmount: number;
+  refundAmount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ProductSession = {
+  id: string;
+  productId: string;
+  title: string;
+  startsAt: string;
+  location: string;
+  capacity: number;
+  reserved: number;
+};
+
+export type OrderRecord = {
+  id: string;
+  productId: string;
+  sessionId?: string;
+  studentName: string;
+  phoneTail: string;
+  reservationCode: string;
+  amount: number;
+  status: OrderStatus;
+  channel: '自然预约' | '专家推荐' | '分销推广';
+  createdAt: string;
+  paidAt?: string;
+  writtenOffAt?: string;
+};
+
+export type WriteOffRecord = {
+  id: string;
+  orderId?: string;
+  reservationCode: string;
+  productTitle: string;
+  status: WriteOffStatus;
+  message: string;
+  createdAt: string;
+};
+
+export type DistributionPlan = {
+  id: string;
+  productId: string;
+  enabled: boolean;
+  commissionRate: number;
+  promoterCount: number;
+  orderCount: number;
+  commissionAmount: number;
+};
+
+export type DistributionOrder = {
+  id: string;
+  productId: string;
+  orderId: string;
+  promoterName: string;
+  amount: number;
+  commission: number;
+  status: 'pending' | 'settled';
+  createdAt: string;
+};
+
+export type WithdrawalRequest = {
+  id: string;
+  amount: number;
+  accountName: string;
+  bankName: string;
+  status: WithdrawalStatus;
+  requestedAt: string;
+  processedAt?: string;
+};
+
+export type QaRecord = {
+  id: string;
+  agentId: string | null;
+  productId?: string | null;
+  studentName: string;
+  question: string;
+  answer?: string;
+  keywords?: string[];
+  sourceType: 'student_question' | 'manual_import';
+  status: 'unmatched' | 'resolved';
+  matchedKnowledgeId?: string;
+  askedAt: string;
+};
+
 export type KnowledgeRevision = {
   id: string;
-  question: string;
   answer: string;
-  updatedAt: string;
+  changedAt: string;
   note: string;
 };
 
 export type KnowledgeEntry = {
   id: string;
+  agentId: string | null;
+  libraryId: string | null;
+  title: string;
   question: string;
   answer: string;
-  tags: string[];
-  source: 'manual' | 'qa' | 'document';
-  updatedAt: string;
-  status: 'active' | 'archived';
+  keywords: string[];
+  source: 'manual' | 'upload' | 'qa_followup';
+  status: KnowledgeEntryStatus;
+  bindingPriority: number;
+  file?: StoredFileMeta;
   revisions: KnowledgeRevision[];
-  assets: StoredFileMeta[];
+  createdAt: string;
+  updatedAt: string;
+  archivedAt?: string;
 };
 
 export type NewsItem = {
   id: string;
+  agentId: string | null;
+  collectionRuleId?: string;
   title: string;
-  summary: string;
-  source: string;
-  category: string;
-  content: string;
-  keywords: string[];
-  featured: boolean;
   status: NewsStatus;
-  publishAt: string;
+  sourceType: 'collection' | 'manual';
+  format: NewsFormat;
+  source: string;
+  summary: string;
+  content: string;
+  scheduledAt?: string;
+  publishedAt?: string;
+  featured: boolean;
+  pushCount: number;
+  createdAt: string;
   updatedAt: string;
+};
+
+export type ChallengeRubric = {
+  dimensions: string[];
+  totalScore: number;
+  passScore: number;
+  rewardGrowth: number;
 };
 
 export type Challenge = {
   id: string;
+  agentId: string | null;
+  productId: string | null;
   title: string;
-  summary: string;
+  difficulty: '入门' | '进阶' | '高阶';
   description: string;
-  difficulty: '初级' | '中级' | '高级';
-  tags: string[];
-  references: string[];
+  workRequirement: string;
+  references: string;
   attachments: StoredFileMeta[];
+  tags: string[];
+  rubric: ChallengeRubric;
+  workflowStatus: ContentWorkflowStatus;
   status: ChallengeStatus;
-  participants: number;
-  publishedAt?: string;
+  submissionCount: number;
+  reviewedCount: number;
+  rewardGrowth: number;
+  createdAt: string;
   updatedAt: string;
+};
+
+export type SubmissionReviewResult = {
+  expertScore: number;
+  rewardGrowth: number;
+  comment: string;
+  reviewedAt: string;
 };
 
 export type ChallengeSubmission = {
   id: string;
   challengeId: string;
-  challengeTitle: string;
   studentName: string;
-  studentId: string;
-  submittedAt: string;
-  summary: string;
-  attachments: string[];
+  workTitle: string;
   aiScore: number;
-  finalScore?: number;
-  growthReward?: number;
+  expertScore?: number;
+  rewardGrowth?: number;
+  reviewResult?: SubmissionReviewResult;
+  status: SubmissionReviewStatus;
   comment?: string;
-  status: SubmissionStatus;
+  submittedAt: string;
+  reviewedAt?: string;
 };
 
-export type KnowledgeBinding = {
-  id: string;
-  knowledgeId: string;
-  knowledgeTitle: string;
-  priority: number;
-};
-
-export type AgentProfile = {
+export type EvaluationAttachment = {
   id: string;
   name: string;
-  avatar: string;
-  greeting: string;
-  promptTemplate: string;
-  style: AgentStyle;
-  status: AgentStatus;
-  totalUsers: number;
-  dailyActiveUsers: number;
-  weeklyActiveUsers: number;
-  totalQaCount: number;
-  averageDailyQa: number;
-  hotTopics: string[];
-  bindings: KnowledgeBinding[];
+  type: 'photo' | 'form';
+  uploadedAt: string;
+};
+
+export type StudentEvaluationBatch = {
+  id: string;
+  productId: string;
+  sessionId?: string;
+  title: string;
+  studentCount: number;
+  attachments: EvaluationAttachment[];
+  reportStatus: EvaluationReportStatus;
+  workflowStatus: ContentWorkflowStatus;
+  diarySynced: boolean;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type ChangeLogEntry = {
   id: string;
-  targetType: 'course' | 'qa' | 'knowledge' | 'news' | 'challenge' | 'submission' | 'agent';
-  targetId: string;
-  action: string;
-  detail: string;
+  module: string;
+  message: string;
   createdAt: string;
 };
 
 export type ExpertState = {
   version: number;
-  courses: ExpertCourse[];
+  accountStatus: ExpertAccountStatus;
+  application: ExpertApplication;
+  bankAccount: BankAccount;
+  invoiceProfile: InvoiceProfile;
+  auditRecords: AuditRecord[];
+  expert: {
+    name: string;
+    title: string;
+    organization: string;
+    field: string;
+    accountNo: string;
+  };
+  settlement: {
+    availableAmount: number;
+    frozenAmount: number;
+    withdrawnAmount: number;
+    accountName: string;
+    bankName: string;
+    invoiceTitle: string;
+  };
+  settings: {
+    notificationEnabled: boolean;
+    compactList: boolean;
+    dataWatermark: boolean;
+  };
+  agents: ExpertAgent[];
+  activeAgentId: string | null;
+  agentTestRecords: AgentTestRecord[];
+  products: ExpertProduct[];
+  sessions: ProductSession[];
+  orders: OrderRecord[];
+  writeOffRecords: WriteOffRecord[];
+  distributionPlans: DistributionPlan[];
+  distributionOrders: DistributionOrder[];
+  withdrawalRequests: WithdrawalRequest[];
+  contentCollectionRules: ContentCollectionRule[];
+  knowledgeLibraries: KnowledgeLibrary[];
+  knowledgeImportJobs: KnowledgeImportJob[];
   qaRecords: QaRecord[];
   knowledgeEntries: KnowledgeEntry[];
   newsItems: NewsItem[];
   challenges: Challenge[];
-  submissions: ChallengeSubmission[];
-  agent: AgentProfile;
+  challengeSubmissions: ChallengeSubmission[];
+  evaluationBatches: StudentEvaluationBatch[];
   logs: ChangeLogEntry[];
 };
 
-export type CourseInput = {
-  id?: string;
+export type AgentInput = {
+  name: string;
+  avatarText: string;
+  field: string;
+  rolePositioning: string;
+  welcomeMessage: string;
+  promptTemplate: string;
+  replyStyle: ReplyStyle;
+  knowledgeIds: string[];
+};
+
+export type ProductInput = {
   title: string;
-  type: CourseType;
-  format: string;
+  productType: ProductType;
   summary: string;
-  ageRange: string;
+  targetAge: string;
   price: number;
-  discountPrice?: number;
-  cover: string;
-  chapters: Array<{ title: string; duration: string; summary: string }>;
-  location?: string;
-  sessionSchedule?: string[];
-  enrollmentLimit?: number;
+  capacity: number;
+  location: string;
+  schedule: string;
+  bookingDeadline: string;
+  deliveryPlan: string;
+  chapters: CourseChapter[];
+  tags: string[];
 };
 
 export type KnowledgeInput = {
-  id?: string;
+  agentId: string | null;
+  libraryId?: string | null;
+  title: string;
   question: string;
   answer: string;
-  tags: string[];
-  source: KnowledgeEntry['source'];
-  assets: StoredFileMeta[];
+  keywords: string[];
+  source?: KnowledgeEntry['source'];
+  status?: KnowledgeEntryStatus;
+  bindingPriority?: number;
+  file?: StoredFileMeta;
 };
 
 export type NewsInput = {
-  id?: string;
+  agentId?: string | null;
+  collectionRuleId?: string;
   title: string;
-  summary: string;
+  status: NewsStatus;
+  sourceType?: NewsItem['sourceType'];
+  format?: NewsFormat;
   source: string;
-  category: string;
+  summary: string;
   content: string;
-  keywords: string[];
+  scheduledAt?: string;
   featured: boolean;
-  publishAt: string;
 };
 
 export type ChallengeInput = {
-  id?: string;
+  agentId: string | null;
+  productId: string | null;
   title: string;
-  summary: string;
-  description: string;
   difficulty: Challenge['difficulty'];
+  description: string;
+  workRequirement?: string;
+  references: string;
+  attachments?: StoredFileMeta[];
   tags: string[];
-  references: string[];
-  attachments: StoredFileMeta[];
+  rubric?: ChallengeRubric;
+};
+
+export type EvaluationBatchInput = {
+  productId: string;
+  sessionId?: string;
+  title: string;
+  studentCount: number;
+  photoCount: number;
+  formName: string;
+};
+
+export type QaImportInput = {
+  agentId: string | null;
+  productId?: string | null;
+  studentName: string;
+  question: string;
+  keywords: string[];
+};
+
+export type KnowledgeLibraryInput = {
+  name: string;
+  agentId: string | null;
+  description: string;
+  bindingPriority: number;
+};
+
+export type KnowledgeUploadInput = {
+  libraryId: string;
+  agentId: string | null;
+  fileName: string;
+  previewText: string;
+};
+
+export type CollectionRuleInput = {
+  name: string;
+  agentId: string | null;
+  keywords: string[];
+  sourceNames: string[];
+  formats: NewsFormat[];
+  frequency: ContentCollectionRule['frequency'];
+};
+
+export type SubmissionImportInput = {
+  challengeId: string;
+  studentName: string;
+  workTitle: string;
+  aiScore: number;
+};
+
+type WriteOffResult = {
+  status: WriteOffStatus;
+  message: string;
 };
 
 type ExpertStoreValue = {
-  hydrated: boolean;
   state: ExpertState;
-  metrics: DashboardMetric[];
-  resetDemoData: () => void;
-  saveCourse: (input: CourseInput) => void;
-  setCourseStatus: (courseId: string, status: CourseStatus) => void;
-  supplementQa: (recordId: string, answer: string, tags: string[]) => void;
-  saveKnowledgeEntry: (input: KnowledgeInput) => void;
+  hydrated: boolean;
+  resetData: () => void;
+  submitApplication: (input: ExpertApplicationInput) => void;
+  reviewApplication: (status: Extract<AuditStatus, 'approved' | 'rejected'>, opinion: string) => void;
+  saveBankAccount: (input: BankAccountInput) => void;
+  reviewBankAccount: (status: Extract<AuditStatus, 'approved' | 'rejected'>, opinion: string) => void;
+  saveInvoiceProfile: (input: InvoiceProfileInput) => void;
+  reviewInvoiceProfile: (status: Extract<AuditStatus, 'approved' | 'rejected'>, opinion: string) => void;
+  setActiveAgent: (agentId: string | null) => void;
+  createAgent: (input: AgentInput) => string;
+  updateAgent: (agentId: string, patch: Partial<Omit<ExpertAgent, 'id' | 'createdAt'>>) => void;
+  setAgentStatus: (agentId: string, status: AgentLifecycleStatus) => void;
+  updateAgentBindings: (agentId: string, knowledgeIds: string[]) => void;
+  addAgentTestRecord: (agentId: string, question: string) => AgentTestRecord;
+  saveProduct: (input: ProductInput, productId?: string) => string;
+  setProductStatus: (productId: string, status: ProductStatus) => void;
+  createOrder: (productId: string) => OrderRecord | null;
+  writeOffOrder: (reservationCode: string) => WriteOffResult;
+  updateDistributionPlan: (productId: string, patch: Partial<Pick<DistributionPlan, 'enabled' | 'commissionRate'>>) => void;
+  createWithdrawal: (amount: number) => void;
+  importQaRecord: (input: QaImportInput) => string;
+  supplementQa: (
+    recordId: string,
+    answer: string,
+    targetAgentId: string | null,
+    knowledgeId?: string,
+    libraryId?: string,
+    keywords?: string[],
+  ) => void;
+  saveKnowledgeLibrary: (input: KnowledgeLibraryInput, libraryId?: string) => string;
+  setKnowledgeLibraryEnabled: (libraryId: string, enabled: boolean) => void;
+  uploadKnowledgeFile: (input: KnowledgeUploadInput) => string;
+  completeKnowledgeImport: (jobId: string) => void;
+  saveKnowledgeEntry: (input: KnowledgeInput, entryId?: string) => string;
+  setKnowledgeEntryStatus: (entryId: string, status: KnowledgeEntryStatus) => void;
   archiveKnowledgeEntry: (entryId: string) => void;
   restoreKnowledgeRevision: (entryId: string, revisionId: string) => void;
-  saveNewsItem: (input: NewsInput) => void;
+  saveCollectionRule: (input: CollectionRuleInput, ruleId?: string) => string;
+  runCollectionRule: (ruleId: string) => string | null;
+  saveNewsItem: (input: NewsInput, newsId?: string) => string;
   setNewsStatus: (newsId: string, status: NewsStatus) => void;
-  saveChallenge: (input: ChallengeInput) => void;
+  saveChallenge: (input: ChallengeInput, challengeId?: string) => string;
   setChallengeStatus: (challengeId: string, status: ChallengeStatus) => void;
-  reviewSubmission: (submissionId: string, finalScore: number, growthReward: number, comment: string) => void;
-  updateAgentProfile: (input: Pick<AgentProfile, 'name' | 'avatar' | 'greeting' | 'promptTemplate' | 'style'>) => void;
-  setAgentStatus: (status: AgentStatus) => void;
-  updateAgentBindings: (knowledgeIds: string[]) => void;
+  importChallengeSubmission: (input: SubmissionImportInput) => string;
+  reviewSubmission: (submissionId: string, expertScore: number, rewardGrowth: number, comment: string) => void;
+  createEvaluationBatch: (input: EvaluationBatchInput) => void;
+  advanceEvaluationBatch: (batchId: string) => void;
+  updateSettings: (patch: Partial<ExpertState['settings']>) => void;
 };
-
-const STORE_KEY = 'yanxuebao_expert_h5_state_v1';
-const STORE_VERSION = 1;
 
 const ExpertStoreContext = createContext<ExpertStoreValue | null>(null);
 
-function nextId(prefix: string) {
-  return `${prefix}_${Math.random().toString(36).slice(2, 8)}${Date.now().toString(36).slice(-4)}`;
+function nowIso() {
+  return new Date().toISOString();
 }
 
-function formatMoney(value: number) {
-  return Math.round(value * 100) / 100;
+function uid(prefix: string) {
+  return `${prefix}_${Math.random().toString(36).slice(2, 8)}_${Date.now().toString(36)}`;
 }
 
-function uniqueTags(tags: string[]) {
-  return Array.from(new Set(tags.map((tag) => tag.trim()).filter(Boolean)));
-}
-
-function createLog(
-  targetType: ChangeLogEntry['targetType'],
-  targetId: string,
-  action: string,
-  detail: string,
-): ChangeLogEntry {
+function emptyApplication(): ExpertApplication {
   return {
-    id: nextId('log'),
-    targetType,
-    targetId,
-    action,
-    detail,
-    createdAt: new Date().toISOString(),
+    accountType: 'expert',
+    status: 'not_started',
+    expertName: '',
+    title: '',
+    organization: '',
+    field: '',
+    credentialName: '',
+    credentialFileName: '',
+    authorizationFileName: '',
+    contactName: '',
+    contactPhone: '',
   };
 }
 
-function createInitialState(): ExpertState {
+function emptyBankAccount(): BankAccount {
   return {
-    version: STORE_VERSION,
-    courses: [
-      {
-        id: 'course_ocean_01',
-        title: '海洋生态观察课',
-        type: 'online',
-        format: '视频课程',
-        summary: '围绕海豚行为、潮汐变化和海洋保护实践展开的连续学习课程。',
-        ageRange: '8-14岁',
-        price: 199,
-        discountPrice: 149,
-        status: 'published',
-        cover: '海洋馆观察主题课程',
-        chapters: [
-          { id: 'chapter_1', title: '认识海洋生态链', duration: '08:30', summary: '理解海洋生物之间的关系。' },
-          { id: 'chapter_2', title: '海豚观察方法', duration: '12:10', summary: '学会记录行为与证据。' },
-          { id: 'chapter_3', title: '保护行动设计', duration: '10:40', summary: '把观察结果转成实践方案。' },
-        ],
-        views: 4280,
-        sales: 356,
-        revenue: 53044,
-        trends: [
-          { label: '周一', value: 23 },
-          { label: '周二', value: 31 },
-          { label: '周三', value: 28 },
-          { label: '周四', value: 35 },
-          { label: '周五', value: 44 },
-          { label: '周六', value: 52 },
-          { label: '周日', value: 48 },
-        ],
-        publishedAt: '2026-04-02T09:00:00.000Z',
-        updatedAt: '2026-04-18T11:00:00.000Z',
-      },
-      {
-        id: 'course_city_01',
-        title: '城市考古研学营',
-        type: 'offline',
-        format: '线下活动',
-        summary: '结合城市博物馆和街区观察，带孩子完成一次城市历史研究任务。',
-        ageRange: '10-15岁',
-        price: 699,
-        status: 'pending_review',
-        cover: '城市考古线下研学',
-        chapters: [],
-        views: 860,
-        sales: 18,
-        revenue: 12582,
-        trends: [
-          { label: '周一', value: 8 },
-          { label: '周二', value: 11 },
-          { label: '周三', value: 13 },
-          { label: '周四', value: 10 },
-          { label: '周五', value: 14 },
-          { label: '周六', value: 19 },
-          { label: '周日', value: 16 },
-        ],
-        location: '深圳南山博物馆与海上世界片区',
-        sessionSchedule: ['2026-05-01 09:30', '2026-05-03 14:00'],
-        enrollmentLimit: 40,
-        updatedAt: '2026-04-19T16:20:00.000Z',
-      },
-      {
-        id: 'course_business_01',
-        title: '少年商业表达直播课',
-        type: 'online',
-        format: '直播课程',
-        summary: '训练孩子在真实商业议题中提出观点、组织证据并完成表达。',
-        ageRange: '11-16岁',
-        price: 129,
-        status: 'unpublished',
-        cover: '商业表达直播课',
-        chapters: [
-          { id: 'chapter_4', title: '观点搭建', duration: '45分钟直播', summary: '用事实、案例和结构讲清观点。' },
-          { id: 'chapter_5', title: '提案展示', duration: '45分钟直播', summary: '在有限时间内完成小组提案。' },
-        ],
-        views: 1130,
-        sales: 72,
-        revenue: 9288,
-        trends: [
-          { label: '周一', value: 7 },
-          { label: '周二', value: 12 },
-          { label: '周三', value: 10 },
-          { label: '周四', value: 15 },
-          { label: '周五', value: 18 },
-          { label: '周六', value: 16 },
-          { label: '周日', value: 13 },
-        ],
-        updatedAt: '2026-04-17T10:00:00.000Z',
-      },
-      {
-        id: 'course_create_01',
-        title: 'AI 创意绘图工作坊',
-        type: 'online',
-        format: '图文课程',
-        summary: '通过底图、提示词与手绘标注，让孩子建立图像表达与创作意识。',
-        ageRange: '7-12岁',
-        price: 89,
-        status: 'ended',
-        cover: 'AI 创意绘图工作坊',
-        chapters: [
-          { id: 'chapter_6', title: '观察与构图', duration: '06:20', summary: '从观察对象中提炼画面重点。' },
-          { id: 'chapter_7', title: '创意表达', duration: '07:50', summary: '用提示词和标注扩展创作。' },
-        ],
-        views: 2510,
-        sales: 214,
-        revenue: 19046,
-        trends: [
-          { label: '周一', value: 10 },
-          { label: '周二', value: 10 },
-          { label: '周三', value: 9 },
-          { label: '周四', value: 11 },
-          { label: '周五', value: 8 },
-          { label: '周六', value: 6 },
-          { label: '周日', value: 5 },
-        ],
-        publishedAt: '2026-02-08T09:00:00.000Z',
-        updatedAt: '2026-03-21T18:00:00.000Z',
-      },
-    ],
-    qaRecords: [
-      {
-        id: 'qa_001',
-        askedAt: '2026-04-19T09:18:00.000Z',
-        studentName: '林可可',
-        studentId: 'YXB-1023',
-        agentName: '海洋探索导师',
-        question: '海豚为什么会一起追逐鱼群？',
-        replySummary: '当前知识库中还缺少针对群体协作捕食的完整解释。',
-        matched: false,
-        status: 'unresolved',
-        tags: ['海豚', '协作行为'],
-      },
-      {
-        id: 'qa_002',
-        askedAt: '2026-04-19T11:45:00.000Z',
-        studentName: '周子航',
-        studentId: 'YXB-1177',
-        agentName: '海洋探索导师',
-        question: '珊瑚白化后还能恢复吗？',
-        replySummary: '在温度回落且压力降低的情况下，部分珊瑚可以逐步恢复共生藻。',
-        matched: true,
-        status: 'resolved',
-        tags: ['珊瑚', '生态保护'],
-        linkedKnowledgeId: 'knowledge_001',
-      },
-      {
-        id: 'qa_003',
-        askedAt: '2026-04-18T16:05:00.000Z',
-        studentName: '陈雨禾',
-        studentId: 'YXB-1088',
-        agentName: '海洋探索导师',
-        question: '海洋垃圾清理机器人最关键的设计点是什么？',
-        replySummary: '目前知识库匹配到的是设备分类，还缺少面向儿童可理解的设计说明。',
-        matched: false,
-        status: 'unresolved',
-        tags: ['机器人', '环保设计'],
-      },
-      {
-        id: 'qa_004',
-        askedAt: '2026-04-17T13:20:00.000Z',
-        studentName: '唐一宁',
-        studentId: 'YXB-1201',
-        agentName: '海洋探索导师',
-        question: '潮汐和月亮为什么会有关系？',
-        replySummary: '潮汐主要受月球和太阳引力影响，月球作用更明显。',
-        matched: true,
-        status: 'resolved',
-        tags: ['潮汐', '引力'],
-        linkedKnowledgeId: 'knowledge_002',
-      },
-    ],
-    knowledgeEntries: [
-      {
-        id: 'knowledge_001',
-        question: '珊瑚白化后还能恢复吗？',
-        answer:
-          '如果海水温度下降、污染减轻，珊瑚有机会重新获得共生藻并慢慢恢复，但恢复时间通常较长，也并不是所有珊瑚都能完全恢复。',
-        tags: ['珊瑚', '生态保护', '海水温度'],
-        source: 'qa',
-        updatedAt: '2026-04-19T12:10:00.000Z',
-        status: 'active',
-        revisions: [
-          {
-            id: 'rev_001',
-            question: '珊瑚白化后还能恢复吗？',
-            answer: '珊瑚白化意味着珊瑚失去共生藻，短期内会非常脆弱。',
-            updatedAt: '2026-04-15T09:00:00.000Z',
-            note: '补充恢复条件前版本',
-          },
-        ],
-        assets: [],
-      },
-      {
-        id: 'knowledge_002',
-        question: '潮汐和月亮为什么会有关系？',
-        answer:
-          '月球的引力会拉动地球上的海水，形成海面鼓起的区域。地球自转时，不同海岸会轮流经过这些区域，因此看到涨潮和退潮。',
-        tags: ['潮汐', '引力', '月球'],
-        source: 'manual',
-        updatedAt: '2026-04-17T13:30:00.000Z',
-        status: 'active',
-        revisions: [],
-        assets: [],
-      },
-      {
-        id: 'knowledge_003',
-        question: '海洋馆观察海豚时，应该重点记录什么？',
-        answer: '建议从行为、环境、互动对象和时间顺序四个角度做记录，先看到事实，再给出自己的判断。',
-        tags: ['观察方法', '海豚', '任务指导'],
-        source: 'manual',
-        updatedAt: '2026-04-16T15:00:00.000Z',
-        status: 'active',
-        revisions: [],
-        assets: [
-          {
-            id: 'asset_001',
-            name: '海豚观察记录模板.pdf',
-            sizeLabel: '2.4 MB',
-            type: 'application/pdf',
-            uploadedAt: '2026-04-16T14:40:00.000Z',
-          },
-        ],
-      },
-      {
-        id: 'knowledge_004',
-        question: '海洋垃圾清理设备有哪些常见类型？',
-        answer:
-          '常见类型包括表层打捞装置、漂浮拦截设施、岸线清洁设备和识别分类机器人。给孩子讲解时可以从“它解决什么问题、怎么发现垃圾、如何回收”三个问题入手。',
-        tags: ['环保设计', '机器人', '设备分类'],
-        source: 'document',
-        updatedAt: '2026-04-14T11:00:00.000Z',
-        status: 'active',
-        revisions: [],
-        assets: [
-          {
-            id: 'asset_002',
-            name: '海洋清洁设备资料.docx',
-            sizeLabel: '1.1 MB',
-            type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            uploadedAt: '2026-04-14T10:20:00.000Z',
-          },
-        ],
-      },
-    ],
-    newsItems: [
-      {
-        id: 'news_001',
-        title: '深圳海洋馆推出夜宿观察计划',
-        summary: '围绕夜间行为观察与声音记录，开放亲子和团体两种参与方式。',
-        source: '海洋教育观察',
-        category: '海洋教育',
-        content: '项目将夜间海豚、海狮和鱼群活动设计成连续观察任务，适合结合课程进行二次学习。',
-        keywords: ['海洋馆', '夜宿', '观察任务'],
-        featured: true,
-        status: 'published',
-        publishAt: '2026-04-20 08:30',
-        updatedAt: '2026-04-19T18:30:00.000Z',
-      },
-      {
-        id: 'news_002',
-        title: '海岸带修复案例适合做哪些儿童项目研究？',
-        summary: '正在整理为适合 10-14 岁学员的观察与表达任务。',
-        source: '海洋科普资讯源',
-        category: '项目研究',
-        content: '计划补充案例照片、修复前后对比和适龄讨论题，再安排定时发布。',
-        keywords: ['海岸带', '修复', '项目研究'],
-        featured: false,
-        status: 'editing',
-        publishAt: '2026-04-22 09:00',
-        updatedAt: '2026-04-19T10:00:00.000Z',
-      },
-      {
-        id: 'news_003',
-        title: '水下机器人竞赛最新观察',
-        summary: '来自行业媒体的初步采集内容，待专家筛选后下发。',
-        source: '前沿科技采集池',
-        category: '科技动态',
-        content: '本条内容待补充学员可理解的背景说明和适合追问的问题。',
-        keywords: ['机器人', '科技动态'],
-        featured: false,
-        status: 'collected',
-        publishAt: '2026-04-25 10:00',
-        updatedAt: '2026-04-18T09:00:00.000Z',
-      },
-    ],
-    challenges: [
-      {
-        id: 'challenge_001',
-        title: '如果你来设计海洋垃圾回收机器人',
-        summary: '结合真实海洋垃圾场景，设计机器人识别、收集和分类方案。',
-        description:
-          '请围绕“在哪里工作、如何发现垃圾、如何把垃圾安全带回”三个问题提出方案，并用图文说明你的设计理由。',
-        difficulty: '中级',
-        tags: ['机器人', '环保设计', '项目研究'],
-        references: ['深圳海洋馆现场观察', '海洋清洁设备案例'],
-        attachments: [],
-        status: 'published',
-        participants: 42,
-        publishedAt: '2026-04-10T09:00:00.000Z',
-        updatedAt: '2026-04-18T17:00:00.000Z',
-      },
-      {
-        id: 'challenge_002',
-        title: '一张图讲清楚珊瑚为什么重要',
-        summary: '把珊瑚礁对海洋生物和人类生活的作用做成一页讲解图。',
-        description: '支持图文、手绘和拼贴表达，重点考察信息组织与逻辑清晰度。',
-        difficulty: '初级',
-        tags: ['珊瑚', '表达', '观察转化'],
-        references: ['珊瑚保护科普材料'],
-        attachments: [],
-        status: 'ready',
-        participants: 0,
-        updatedAt: '2026-04-19T09:40:00.000Z',
-      },
-      {
-        id: 'challenge_003',
-        title: '潮汐如何影响港口生活',
-        summary: '从运输、渔业和城市安全角度研究潮汐的影响。',
-        description: '已完成一轮发布，当前保留为历史项目供回看。',
-        difficulty: '高级',
-        tags: ['潮汐', '城市观察', '系统思维'],
-        references: ['港口观察记录'],
-        attachments: [],
-        status: 'ended',
-        participants: 16,
-        publishedAt: '2026-03-15T09:00:00.000Z',
-        updatedAt: '2026-04-02T12:00:00.000Z',
-      },
-    ],
-    submissions: [
-      {
-        id: 'submission_001',
-        challengeId: 'challenge_001',
-        challengeTitle: '如果你来设计海洋垃圾回收机器人',
-        studentName: '林可可',
-        studentId: 'YXB-1023',
-        submittedAt: '2026-04-19T20:12:00.000Z',
-        summary: '提交了设备草图、识别流程和回收路径说明。',
-        attachments: ['机器人草图.png', '流程说明.docx'],
-        aiScore: 86,
-        status: 'pending',
-      },
-      {
-        id: 'submission_002',
-        challengeId: 'challenge_001',
-        challengeTitle: '如果你来设计海洋垃圾回收机器人',
-        studentName: '周子航',
-        studentId: 'YXB-1177',
-        submittedAt: '2026-04-18T21:03:00.000Z',
-        summary: '重点补充了识别漂浮垃圾和分类投递的步骤。',
-        attachments: ['观察记录.pdf'],
-        aiScore: 91,
-        finalScore: 94,
-        growthReward: 80,
-        comment: '方案完整，建议再补一段面对暴风浪时的安全策略。',
-        status: 'reviewed',
-      },
-      {
-        id: 'submission_003',
-        challengeId: 'challenge_001',
-        challengeTitle: '如果你来设计海洋垃圾回收机器人',
-        studentName: '陈雨禾',
-        studentId: 'YXB-1088',
-        submittedAt: '2026-04-19T18:32:00.000Z',
-        summary: '从岸线清洁场景切入，设计了模块化回收车。',
-        attachments: ['设计说明.md', '结构图.jpg'],
-        aiScore: 84,
-        status: 'pending',
-      },
-    ],
-    agent: {
-      id: 'agent_main_001',
-      name: '海洋探索导师',
-      avatar: '海',
-      greeting: '你好，我会结合课程、知识库和现场观察，陪你继续深挖海洋里的问题。',
-      promptTemplate: '请用儿童可理解的语言回答问题，先讲清事实，再引导学员继续观察和表达。',
-      style: '鼓励型',
-      status: 'published',
-      totalUsers: 3180,
-      dailyActiveUsers: 486,
-      weeklyActiveUsers: 1312,
-      totalQaCount: 16840,
-      averageDailyQa: 172,
-      hotTopics: ['海豚行为', '潮汐变化', '珊瑚保护', '海洋机器人'],
-      bindings: [
-        { id: 'binding_001', knowledgeId: 'knowledge_003', knowledgeTitle: '海洋馆观察海豚时，应该重点记录什么？', priority: 1 },
-        { id: 'binding_002', knowledgeId: 'knowledge_001', knowledgeTitle: '珊瑚白化后还能恢复吗？', priority: 2 },
-        { id: 'binding_003', knowledgeId: 'knowledge_004', knowledgeTitle: '海洋垃圾清理设备有哪些常见类型？', priority: 3 },
-      ],
-    },
+    accountName: '',
+    cardNo: '',
+    bankName: '',
+    reservedPhone: '',
+    isDefault: true,
+    status: 'not_set',
+  };
+}
+
+function emptyInvoiceProfile(): InvoiceProfile {
+  return {
+    invoiceType: '企业',
+    title: '',
+    taxNo: '',
+    registeredAddress: '',
+    registeredPhone: '',
+    bankName: '',
+    bankAccount: '',
+    email: '',
+    status: 'not_set',
+  };
+}
+
+function addLog(state: ExpertState, module: string, message: string): ExpertState {
+  return {
+    ...state,
     logs: [
       {
-        id: 'log_seed_001',
-        targetType: 'news',
-        targetId: 'news_001',
-        action: '发布资讯',
-        detail: '夜宿观察计划已进入学员资讯列表。',
-        createdAt: '2026-04-19T18:30:00.000Z',
+        id: uid('log'),
+        module,
+        message,
+        createdAt: nowIso(),
       },
-      {
-        id: 'log_seed_002',
-        targetType: 'qa',
-        targetId: 'qa_001',
-        action: '待补充问答',
-        detail: '海豚协作捕食问题等待补充标准答案。',
-        createdAt: '2026-04-19T09:18:00.000Z',
-      },
-      {
-        id: 'log_seed_003',
-        targetType: 'submission',
-        targetId: 'submission_001',
-        action: '收到作品',
-        detail: '林可可提交了海洋垃圾回收机器人设计稿。',
-        createdAt: '2026-04-19T20:12:00.000Z',
-      },
-    ],
+      ...state.logs,
+    ].slice(0, 30),
   };
 }
 
-function createDashboardMetrics(state: ExpertState): DashboardMetric[] {
-  return [
-    {
-      id: 'metric_courses',
-      label: '课程总数',
-      value: state.courses.length,
-      tone: 'brand',
+function addAudit(
+  state: ExpertState,
+  targetType: AuditRecord['targetType'],
+  targetId: string,
+  status: AuditStatus,
+  opinion: string,
+): ExpertState {
+  return {
+    ...state,
+    auditRecords: [
+      {
+        id: uid('audit'),
+        targetType,
+        targetId,
+        status,
+        opinion,
+        createdAt: nowIso(),
+      },
+      ...state.auditRecords,
+    ].slice(0, 40),
+  };
+}
+
+function cloneState(state: ExpertState): ExpertState {
+  return JSON.parse(JSON.stringify(state)) as ExpertState;
+}
+
+function initialState(): ExpertState {
+  return {
+    version: STORE_VERSION,
+    accountStatus: 'not_started',
+    application: emptyApplication(),
+    bankAccount: emptyBankAccount(),
+    invoiceProfile: emptyInvoiceProfile(),
+    auditRecords: [],
+    expert: {
+      name: '',
+      title: '',
+      organization: '',
+      field: '',
+      accountNo: '',
     },
-    {
-      id: 'metric_qa',
-      label: '未匹配问答',
-      value: state.qaRecords.filter((item) => item.status === 'unresolved').length,
-      tone: 'orange',
+    settlement: {
+      availableAmount: 0,
+      frozenAmount: 0,
+      withdrawnAmount: 0,
+      accountName: '',
+      bankName: '',
+      invoiceTitle: '',
     },
-    {
-      id: 'metric_news',
-      label: '已发布资讯',
-      value: state.newsItems.filter((item) => item.status === 'published').length,
-      tone: 'green',
+    settings: {
+      notificationEnabled: true,
+      compactList: false,
+      dataWatermark: true,
     },
-    {
-      id: 'metric_challenges',
-      label: '进行中挑战',
-      value: state.challenges.filter((item) => item.status === 'published').length,
-      tone: 'gold',
-    },
-    {
-      id: 'metric_reviews',
-      label: '待审核作品',
-      value: state.submissions.filter((item) => item.status === 'pending').length,
-      tone: 'ink',
-    },
-  ];
+    agents: [],
+    activeAgentId: null,
+    agentTestRecords: [],
+    products: [],
+    sessions: [],
+    orders: [],
+    writeOffRecords: [],
+    distributionPlans: [],
+    distributionOrders: [],
+    withdrawalRequests: [],
+    contentCollectionRules: [],
+    knowledgeLibraries: [],
+    knowledgeImportJobs: [],
+    qaRecords: [],
+    knowledgeEntries: [],
+    newsItems: [],
+    challenges: [],
+    challengeSubmissions: [],
+    evaluationBatches: [],
+    logs: [],
+  };
+}
+
+function normalizeState(value: unknown): ExpertState {
+  if (!value || typeof value !== 'object') {
+    return initialState();
+  }
+
+  const parsed = value as Partial<ExpertState>;
+  if (parsed.version !== STORE_VERSION) {
+    return initialState();
+  }
+
+  return {
+    ...initialState(),
+    ...parsed,
+    application: { ...emptyApplication(), ...parsed.application },
+    bankAccount: { ...emptyBankAccount(), ...parsed.bankAccount },
+    invoiceProfile: { ...emptyInvoiceProfile(), ...parsed.invoiceProfile },
+    version: STORE_VERSION,
+  };
 }
 
 export function ExpertStoreProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<ExpertState>(() => createInitialState());
+  const [state, setState] = useState<ExpertState>(() => initialState());
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    const raw = window.localStorage.getItem(STORE_KEY);
-    if (!raw) {
-      setHydrated(true);
-      return;
-    }
-
     try {
-      const parsed = JSON.parse(raw) as ExpertState;
-      if (parsed.version === STORE_VERSION) {
-        setState(parsed);
-      }
+      const raw = window.localStorage.getItem(STORE_KEY);
+      setState(raw ? normalizeState(JSON.parse(raw)) : initialState());
     } catch {
-      window.localStorage.removeItem(STORE_KEY);
+      setState(initialState());
     } finally {
       setHydrated(true);
     }
   }, []);
 
   useEffect(() => {
-    if (!hydrated || typeof window === 'undefined') {
-      return;
+    if (hydrated) {
+      window.localStorage.setItem(STORE_KEY, JSON.stringify(state));
     }
-
-    window.localStorage.setItem(STORE_KEY, JSON.stringify(state));
   }, [hydrated, state]);
 
-  function updateState(updater: (current: ExpertState) => ExpertState) {
-    setState((current) => updater(current));
-  }
+  const value = useMemo<ExpertStoreValue>(() => {
+    function resetData() {
+      setState(initialState());
+    }
 
-  function pushLog(current: ExpertState, entry: ChangeLogEntry) {
-    return {
-      ...current,
-      logs: [entry, ...current.logs].slice(0, 24),
-    };
-  }
-
-  function resetDemoData() {
-    const nextState = createInitialState();
-    setState(nextState);
-  }
-
-  function saveCourse(input: CourseInput) {
-    updateState((current) => {
-      const chapters = input.chapters
-        .filter((item) => item.title.trim())
-        .map((item, index) => ({
-          id: input.id ? `${input.id}_chapter_${index + 1}` : nextId('chapter'),
-          title: item.title.trim(),
-          duration: item.duration.trim() || '待定',
-          summary: item.summary.trim() || '待补充课程说明',
-        }));
-
-      if (input.id) {
-        const nextState = {
+    function submitApplication(input: ExpertApplicationInput) {
+      const timestamp = nowIso();
+      setState((current) => {
+        const next: ExpertState = {
           ...current,
-          courses: current.courses.map((course) =>
-            course.id === input.id
-              ? {
-                  ...course,
-                  ...input,
-                  chapters,
-                  updatedAt: new Date().toISOString(),
-                }
-              : course,
-          ),
+          accountStatus: 'under_review',
+          application: {
+            ...input,
+            status: 'under_review',
+            submittedAt: timestamp,
+            reviewedAt: undefined,
+            reviewOpinion: undefined,
+          },
+          expert: {
+            name: input.expertName,
+            title: input.title,
+            organization: input.organization || (input.accountType === 'expert' ? '个人专家' : ''),
+            field: input.field,
+            accountNo: current.expert.accountNo,
+          },
         };
-        return pushLog(nextState, createLog('course', input.id, '更新课程', `${input.title} 已更新内容与排期。`));
-      }
+        return addLog(addAudit(next, '入驻申请', 'application', 'pending', '入驻资料已提交'), '入驻', '入驻资料已提交运营审核');
+      });
+    }
 
-      const newCourse: ExpertCourse = {
-        id: nextId('course'),
-        title: input.title,
-        type: input.type,
-        format: input.format,
-        summary: input.summary,
-        ageRange: input.ageRange,
-        price: formatMoney(input.price),
-        discountPrice: input.discountPrice ? formatMoney(input.discountPrice) : undefined,
-        status: 'draft',
-        cover: input.cover,
-        chapters,
-        views: 0,
-        sales: 0,
-        revenue: 0,
-        trends: [
-          { label: '周一', value: 0 },
-          { label: '周二', value: 0 },
-          { label: '周三', value: 0 },
-          { label: '周四', value: 0 },
-          { label: '周五', value: 0 },
-          { label: '周六', value: 0 },
-          { label: '周日', value: 0 },
-        ],
-        location: input.location,
-        sessionSchedule: input.sessionSchedule?.filter(Boolean),
-        enrollmentLimit: input.enrollmentLimit,
-        updatedAt: new Date().toISOString(),
-      };
-      const nextState = {
-        ...current,
-        courses: [newCourse, ...current.courses],
-      };
-      return pushLog(nextState, createLog('course', newCourse.id, '创建课程', `${newCourse.title} 已进入课程列表。`));
-    });
-  }
+    function reviewApplication(status: Extract<AuditStatus, 'approved' | 'rejected'>, opinion: string) {
+      const timestamp = nowIso();
+      setState((current) => {
+        const approved = status === 'approved';
+        const next: ExpertState = {
+          ...current,
+          accountStatus: approved ? 'approved' : 'rejected',
+          application: {
+            ...current.application,
+            status: approved ? 'approved' : 'rejected',
+            reviewedAt: timestamp,
+            reviewOpinion: opinion,
+          },
+          expert: {
+            ...current.expert,
+            accountNo: approved && !current.expert.accountNo ? `YXZJ-${new Date().getFullYear()}-${String(current.auditRecords.length + 1).padStart(4, '0')}` : current.expert.accountNo,
+          },
+        };
+        return addLog(addAudit(next, '入驻申请', 'application', status, opinion), '入驻', approved ? '专家账户已开通' : '入驻资料已驳回');
+      });
+    }
 
-  function setCourseStatus(courseId: string, status: CourseStatus) {
-    updateState((current) => {
-      const target = current.courses.find((course) => course.id === courseId);
-      if (!target) {
-        return current;
-      }
+    function saveBankAccount(input: BankAccountInput) {
+      setState((current) => {
+        const next: ExpertState = {
+          ...current,
+          bankAccount: {
+            ...input,
+            status: 'pending',
+            submittedAt: nowIso(),
+            reviewedAt: undefined,
+            reviewOpinion: undefined,
+          },
+        };
+        return addLog(addAudit(next, '银行卡', 'bank_account', 'pending', '收款银行卡已提交校验'), '结算', '收款银行卡已提交校验');
+      });
+    }
 
-      const nextState = {
-        ...current,
-        courses: current.courses.map((course) =>
-          course.id === courseId
+    function reviewBankAccount(status: Extract<AuditStatus, 'approved' | 'rejected'>, opinion: string) {
+      const timestamp = nowIso();
+      setState((current) => {
+        const approved = status === 'approved';
+        const next: ExpertState = {
+          ...current,
+          bankAccount: {
+            ...current.bankAccount,
+            status: approved ? 'active' : 'rejected',
+            reviewedAt: timestamp,
+            reviewOpinion: opinion,
+          },
+          settlement: approved
             ? {
-                ...course,
-                status,
-                publishedAt: status === 'published' ? course.publishedAt ?? new Date().toISOString() : course.publishedAt,
-                updatedAt: new Date().toISOString(),
+                ...current.settlement,
+                accountName: current.bankAccount.accountName,
+                bankName: current.bankAccount.bankName,
               }
-            : course,
-        ),
-      };
-      const labels: Record<CourseStatus, string> = {
-        draft: '回到草稿',
-        pending_review: '提交审核',
-        published: '上架课程',
-        unpublished: '下架课程',
-        ended: '结束课程',
-      };
-      return pushLog(nextState, createLog('course', courseId, labels[status], `${target.title} 已更新为${labels[status]}状态。`));
-    });
-  }
+            : current.settlement,
+        };
+        return addLog(addAudit(next, '银行卡', 'bank_account', status, opinion), '结算', approved ? '收款银行卡已生效' : '收款银行卡校验未通过');
+      });
+    }
 
-  function supplementQa(recordId: string, answer: string, tags: string[]) {
-    updateState((current) => {
-      const record = current.qaRecords.find((item) => item.id === recordId);
-      if (!record) {
-        return current;
-      }
+    function saveInvoiceProfile(input: InvoiceProfileInput) {
+      setState((current) => {
+        const next: ExpertState = {
+          ...current,
+          invoiceProfile: {
+            ...input,
+            status: 'pending',
+            submittedAt: nowIso(),
+            reviewedAt: undefined,
+            reviewOpinion: undefined,
+          },
+        };
+        return addLog(addAudit(next, '发票资料', 'invoice_profile', 'pending', '发票资料已提交审核'), '发票', '发票资料已提交审核');
+      });
+    }
 
-      const now = new Date().toISOString();
-      let nextKnowledgeEntries = [...current.knowledgeEntries];
-      let linkedKnowledgeId = record.linkedKnowledgeId;
-
-      if (linkedKnowledgeId) {
-        nextKnowledgeEntries = nextKnowledgeEntries.map((entry) => {
-          if (entry.id !== linkedKnowledgeId) {
-            return entry;
-          }
-          return {
-            ...entry,
-            answer,
-            tags: uniqueTags([...entry.tags, ...tags]),
-            updatedAt: now,
-            revisions: [
-              {
-                id: nextId('revision'),
-                question: entry.question,
-                answer: entry.answer,
-                updatedAt: now,
-                note: '补充问答前版本',
-              },
-              ...entry.revisions,
-            ].slice(0, 6),
-          };
-        });
-      } else {
-        const matchedEntry = nextKnowledgeEntries.find((entry) => entry.question === record.question);
-        if (matchedEntry) {
-          linkedKnowledgeId = matchedEntry.id;
-          nextKnowledgeEntries = nextKnowledgeEntries.map((entry) => {
-            if (entry.id !== matchedEntry.id) {
-              return entry;
-            }
-            return {
-              ...entry,
-              answer,
-              tags: uniqueTags([...entry.tags, ...tags]),
-              updatedAt: now,
-              revisions: [
-                {
-                  id: nextId('revision'),
-                  question: entry.question,
-                  answer: entry.answer,
-                  updatedAt: now,
-                  note: '补充问答前版本',
-                },
-                ...entry.revisions,
-              ].slice(0, 6),
-            };
-          });
-        } else {
-          const newEntry: KnowledgeEntry = {
-            id: nextId('knowledge'),
-            question: record.question,
-            answer,
-            tags: uniqueTags(tags),
-            source: 'qa',
-            updatedAt: now,
-            status: 'active',
-            revisions: [],
-            assets: [],
-          };
-          linkedKnowledgeId = newEntry.id;
-          nextKnowledgeEntries = [newEntry, ...nextKnowledgeEntries];
-        }
-      }
-
-      const nextState = {
-        ...current,
-        knowledgeEntries: nextKnowledgeEntries,
-        qaRecords: current.qaRecords.map<QaRecord>((item) =>
-          item.id === recordId
+    function reviewInvoiceProfile(status: Extract<AuditStatus, 'approved' | 'rejected'>, opinion: string) {
+      const timestamp = nowIso();
+      setState((current) => {
+        const approved = status === 'approved';
+        const next: ExpertState = {
+          ...current,
+          invoiceProfile: {
+            ...current.invoiceProfile,
+            status: approved ? 'approved' : 'rejected',
+            reviewedAt: timestamp,
+            reviewOpinion: opinion,
+          },
+          settlement: approved
             ? {
-                ...item,
-                replySummary: answer,
-                matched: true,
-                status: 'resolved',
-                tags: uniqueTags([...item.tags, ...tags]),
-                linkedKnowledgeId,
+                ...current.settlement,
+                invoiceTitle: current.invoiceProfile.title,
               }
-            : item,
-        ),
-      };
+            : current.settlement,
+        };
+        return addLog(addAudit(next, '发票资料', 'invoice_profile', status, opinion), '发票', approved ? '发票资料已通过' : '发票资料已驳回');
+      });
+    }
 
-      return pushLog(
-        nextState,
-        createLog('qa', recordId, '补充答案', `${record.studentName} 的问题已补充标准答案并同步到知识库。`),
+    function setActiveAgent(agentId: string | null) {
+      setState((current) => ({ ...current, activeAgentId: agentId }));
+    }
+
+    function createAgent(input: AgentInput) {
+      const id = uid('agent');
+      const timestamp = nowIso();
+      setState((current) => {
+        const agent: ExpertAgent = {
+          id,
+          name: input.name,
+          avatarText: input.avatarText.slice(0, 2) || '智',
+          field: input.field,
+          status: 'draft',
+          rolePositioning: input.rolePositioning,
+          welcomeMessage: input.welcomeMessage,
+          promptTemplate: input.promptTemplate,
+          replyStyle: input.replyStyle,
+          knowledgeBindings: input.knowledgeIds.map((knowledgeId, index) => ({
+            knowledgeId,
+            priority: index + 1,
+            enabled: true,
+          })),
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          operations: {
+            conversations: 0,
+            resolvedRate: 0,
+            satisfaction: 0,
+            dailyActiveUsers: 0,
+          },
+        };
+        return addLog(
+          {
+            ...current,
+            agents: [agent, ...current.agents],
+            activeAgentId: id,
+          },
+          '智能体',
+          `${agent.name} 已创建为草稿`,
+        );
+      });
+      return id;
+    }
+
+    function updateAgent(agentId: string, patch: Partial<Omit<ExpertAgent, 'id' | 'createdAt'>>) {
+      setState((current) =>
+        addLog(
+          {
+            ...current,
+            agents: current.agents.map((agent) => (agent.id === agentId ? { ...agent, ...patch, updatedAt: nowIso() } : agent)),
+          },
+          '智能体',
+          '智能体配置已更新',
+        ),
       );
-    });
-  }
+    }
 
-  function saveKnowledgeEntry(input: KnowledgeInput) {
-    updateState((current) => {
-      const now = new Date().toISOString();
-      if (input.id) {
-        const target = current.knowledgeEntries.find((entry) => entry.id === input.id);
-        if (!target) {
+    function setAgentStatus(agentId: string, status: AgentLifecycleStatus) {
+      const statusLabel: Record<AgentLifecycleStatus, string> = {
+        draft: '草稿',
+        testing: '测试中',
+        published: '已上架',
+        unpublished: '已下架',
+      };
+      setState((current) =>
+        addLog(
+          {
+            ...current,
+            agents: current.agents.map((agent) => (agent.id === agentId ? { ...agent, status, updatedAt: nowIso() } : agent)),
+          },
+          '智能体',
+          `智能体状态已更新为${statusLabel[status]}`,
+        ),
+      );
+    }
+
+    function updateAgentBindings(agentId: string, knowledgeIds: string[]) {
+      setState((current) =>
+        addLog(
+          {
+            ...current,
+            agents: current.agents.map((agent) =>
+              agent.id === agentId
+                ? {
+                    ...agent,
+                    knowledgeBindings: knowledgeIds.map((knowledgeId, index) => ({
+                      knowledgeId,
+                      priority: index + 1,
+                      enabled: true,
+                    })),
+                    updatedAt: nowIso(),
+                  }
+                : agent,
+            ),
+          },
+          '智能体',
+          '知识库绑定顺序已保存',
+        ),
+      );
+    }
+
+    function addAgentTestRecord(agentId: string, question: string) {
+      const timestamp = nowIso();
+      const record: AgentTestRecord = {
+        id: uid('test'),
+        agentId,
+        question,
+        answer: `我会先把问题拆成可观察的现象，再结合课程和知识库给出适合孩子理解的回答：${question}`,
+        result: question.length > 8 ? 'passed' : 'needs_tuning',
+        testedAt: timestamp,
+      };
+      setState((current) =>
+        addLog(
+          {
+            ...current,
+            agentTestRecords: [record, ...current.agentTestRecords],
+            agents: current.agents.map((agent) =>
+              agent.id === agentId
+                ? {
+                    ...agent,
+                    status: agent.status === 'draft' ? 'testing' : agent.status,
+                    updatedAt: timestamp,
+                    operations: {
+                      ...agent.operations,
+                      conversations: agent.operations.conversations + 1,
+                      resolvedRate: Math.max(agent.operations.resolvedRate, 72),
+                      satisfaction: Math.max(agent.operations.satisfaction, 88),
+                      dailyActiveUsers: Math.max(agent.operations.dailyActiveUsers, 1),
+                    },
+                  }
+                : agent,
+            ),
+          },
+          '智能体',
+          '已生成一条测试记录',
+        ),
+      );
+      return record;
+    }
+
+    function saveProduct(input: ProductInput, productId?: string) {
+      const id = productId ?? uid('product');
+      const timestamp = nowIso();
+      setState((current) => {
+        const exists = current.products.some((product) => product.id === id);
+        const nextProducts = exists
+          ? current.products.map((product) =>
+              product.id === id
+                ? {
+                    ...product,
+                    ...input,
+                    updatedAt: timestamp,
+                  }
+                : product,
+            )
+          : [
+              {
+                id,
+                ...input,
+                status: 'draft' as ProductStatus,
+                views: 0,
+                reservations: 0,
+                payAmount: 0,
+                refundAmount: 0,
+                createdAt: timestamp,
+                updatedAt: timestamp,
+              },
+              ...current.products,
+            ];
+
+        const nextSessions = exists
+          ? current.sessions
+          : [
+              {
+                id: uid('session'),
+                productId: id,
+                title: `${input.title} 首期场次`,
+                startsAt: timestamp,
+                location: input.location,
+                capacity: input.capacity,
+                reserved: 0,
+              },
+              ...current.sessions,
+            ];
+
+        const nextPlans = current.distributionPlans.some((plan) => plan.productId === id)
+          ? current.distributionPlans
+          : [
+              {
+                id: uid('dist_plan'),
+                productId: id,
+                enabled: false,
+                commissionRate: 8,
+                promoterCount: 0,
+                orderCount: 0,
+                commissionAmount: 0,
+              },
+              ...current.distributionPlans,
+            ];
+
+        return addLog(
+          {
+            ...current,
+            products: nextProducts,
+            sessions: nextSessions,
+            distributionPlans: nextPlans,
+          },
+          '课程',
+          exists ? '课程产品已更新' : '课程产品已创建',
+        );
+      });
+      return id;
+    }
+
+    function setProductStatus(productId: string, status: ProductStatus) {
+      const label: Record<ProductStatus, string> = {
+        draft: '草稿',
+        pending_review: '运营审核中',
+        published: '已上架',
+        rejected: '审核驳回',
+        unpublished: '已下架',
+        ended: '已结束',
+      };
+      setState((current) => {
+        const next = addAudit(current, '课程', productId, status === 'published' ? 'approved' : status === 'rejected' ? 'rejected' : 'pending', `课程状态更新为${label[status]}`);
+        return addLog(
+          {
+            ...next,
+            products: next.products.map((product) =>
+              product.id === productId ? { ...product, status, updatedAt: nowIso() } : product,
+            ),
+          },
+          '课程',
+          `课程状态更新为${label[status]}`,
+        );
+      });
+    }
+
+    function createOrder(productId: string) {
+      const product = state.products.find((item) => item.id === productId);
+      if (!product) {
+        return null;
+      }
+      const order: OrderRecord = {
+        id: uid('order'),
+        productId,
+        sessionId: state.sessions.find((session) => session.productId === productId)?.id,
+        studentName: ['林知禾', '沈思远', '叶一晨', '陆安然'][Math.floor(Math.random() * 4)],
+        phoneTail: String(Math.floor(1000 + Math.random() * 9000)),
+        reservationCode: `YX${Math.floor(100000 + Math.random() * 900000)}`,
+        amount: product.price,
+        status: 'paid',
+        channel: product.productType === 'online_course' ? '分销推广' : '自然预约',
+        createdAt: nowIso(),
+        paidAt: nowIso(),
+      };
+      setState((current) => {
+        const plan = current.distributionPlans.find((item) => item.productId === productId);
+        const commission = plan?.enabled ? Math.round(product.price * plan.commissionRate) / 100 : 0;
+        const distributionOrder: DistributionOrder | null =
+          plan?.enabled && commission > 0
+            ? {
+                id: uid('dist_order'),
+                productId,
+                orderId: order.id,
+                promoterName: '研学推广伙伴',
+                amount: product.price,
+                commission,
+                status: 'pending',
+                createdAt: nowIso(),
+              }
+            : null;
+
+        return addLog(
+          {
+            ...current,
+            settlement: {
+              ...current.settlement,
+              availableAmount: current.settlement.availableAmount + Math.max(0, product.price - commission),
+            },
+            orders: [order, ...current.orders],
+            distributionOrders: distributionOrder ? [distributionOrder, ...current.distributionOrders] : current.distributionOrders,
+            distributionPlans: current.distributionPlans.map((item) =>
+              item.productId === productId && distributionOrder
+                ? {
+                    ...item,
+                    promoterCount: Math.max(item.promoterCount, 1),
+                    orderCount: item.orderCount + 1,
+                    commissionAmount: item.commissionAmount + commission,
+                  }
+                : item,
+            ),
+            products: current.products.map((item) =>
+              item.id === productId
+                ? {
+                    ...item,
+                    reservations: item.reservations + 1,
+                    payAmount: item.payAmount + product.price,
+                    views: item.views + 8,
+                    updatedAt: nowIso(),
+                  }
+                : item,
+            ),
+            sessions: current.sessions.map((session) =>
+              session.productId === productId ? { ...session, reserved: session.reserved + 1 } : session,
+            ),
+          },
+          '课程',
+          `已生成预约订单 ${order.reservationCode}`,
+        );
+      });
+      return order;
+    }
+
+    function writeOffOrder(reservationCode: string) {
+      const code = reservationCode.trim().toUpperCase();
+      const order = state.orders.find((item) => item.reservationCode.toUpperCase() === code);
+      const product = order ? state.products.find((item) => item.id === order.productId) : undefined;
+
+      let result: WriteOffResult;
+      if (!order) {
+        result = { status: 'exception', message: '未找到预约码，请核对后重试' };
+      } else if (order.status === 'written_off') {
+        result = { status: 'duplicate', message: '该预约码已核销，已记录重复核销' };
+      } else if (order.status === 'refunded' || order.status === 'cancelled') {
+        result = { status: 'exception', message: '订单状态异常，无法核销' };
+      } else {
+        result = { status: 'success', message: '核销成功，履约状态已更新' };
+      }
+
+      setState((current) =>
+        addLog(
+          {
+            ...current,
+            orders:
+              result.status === 'success'
+                ? current.orders.map((item) =>
+                    item.id === order?.id ? { ...item, status: 'written_off', writtenOffAt: nowIso() } : item,
+                  )
+                : current.orders,
+            writeOffRecords: [
+              {
+                id: uid('writeoff'),
+                orderId: order?.id,
+                reservationCode: code,
+                productTitle: product?.title ?? '未匹配产品',
+                status: result.status,
+                message: result.message,
+                createdAt: nowIso(),
+              },
+              ...current.writeOffRecords,
+            ],
+          },
+          '核销',
+          result.message,
+        ),
+      );
+
+      return result;
+    }
+
+    function updateDistributionPlan(
+      productId: string,
+      patch: Partial<Pick<DistributionPlan, 'enabled' | 'commissionRate'>>,
+    ) {
+      setState((current) => {
+        const hasPlan = current.distributionPlans.some((plan) => plan.productId === productId);
+        const plan: DistributionPlan = {
+          id: uid('dist_plan'),
+          productId,
+          enabled: false,
+          commissionRate: 8,
+          promoterCount: 0,
+          orderCount: 0,
+          commissionAmount: 0,
+          ...patch,
+        };
+        return addLog(
+          {
+            ...current,
+            distributionPlans: hasPlan
+              ? current.distributionPlans.map((item) => (item.productId === productId ? { ...item, ...patch } : item))
+              : [plan, ...current.distributionPlans],
+          },
+          '分销',
+          '分销配置已保存',
+        );
+      });
+    }
+
+    function createWithdrawal(amount: number) {
+      setState((current) => {
+        const request: WithdrawalRequest = {
+          id: uid('withdraw'),
+          amount,
+          accountName: current.settlement.accountName,
+          bankName: current.settlement.bankName,
+          status: 'submitted',
+          requestedAt: nowIso(),
+        };
+
+        return addLog(
+          {
+            ...current,
+            settlement: {
+              ...current.settlement,
+              availableAmount: Math.max(0, current.settlement.availableAmount - amount),
+              frozenAmount: current.settlement.frozenAmount + amount,
+            },
+            withdrawalRequests: [request, ...current.withdrawalRequests],
+          },
+          '结算',
+          '提现申请已提交',
+        );
+      });
+    }
+
+    function importQaRecord(input: QaImportInput) {
+      const id = uid('qa');
+      setState((current) =>
+        addLog(
+          {
+            ...current,
+            qaRecords: [
+              {
+                id,
+                agentId: input.agentId,
+                productId: input.productId ?? null,
+                studentName: input.studentName,
+                question: input.question,
+                keywords: input.keywords,
+                sourceType: 'manual_import',
+                status: 'unmatched',
+                askedAt: nowIso(),
+              },
+              ...current.qaRecords,
+            ],
+          },
+          '问答',
+          '学员提问已导入待补答列表',
+        ),
+      );
+      return id;
+    }
+
+    function saveKnowledgeLibrary(input: KnowledgeLibraryInput, libraryId?: string) {
+      const id = libraryId ?? uid('library');
+      const timestamp = nowIso();
+      setState((current) => {
+        const exists = current.knowledgeLibraries.some((library) => library.id === id);
+        return addLog(
+          {
+            ...current,
+            knowledgeLibraries: exists
+              ? current.knowledgeLibraries.map((library) =>
+                  library.id === id ? { ...library, ...input, updatedAt: timestamp } : library,
+                )
+              : [
+                  {
+                    id,
+                    ...input,
+                    enabled: true,
+                    createdAt: timestamp,
+                    updatedAt: timestamp,
+                  },
+                  ...current.knowledgeLibraries,
+                ],
+          },
+          '知识库',
+          exists ? '知识库分组已更新' : '知识库分组已创建',
+        );
+      });
+      return id;
+    }
+
+    function setKnowledgeLibraryEnabled(libraryId: string, enabled: boolean) {
+      setState((current) =>
+        addLog(
+          {
+            ...current,
+            knowledgeLibraries: current.knowledgeLibraries.map((library) =>
+              library.id === libraryId ? { ...library, enabled, updatedAt: nowIso() } : library,
+            ),
+          },
+          '知识库',
+          enabled ? '知识库分组已启用' : '知识库分组已停用',
+        ),
+      );
+    }
+
+    function uploadKnowledgeFile(input: KnowledgeUploadInput) {
+      const id = uid('knowledge_job');
+      const timestamp = nowIso();
+      setState((current) =>
+        addLog(
+          {
+            ...current,
+            knowledgeImportJobs: [
+              {
+                id,
+                libraryId: input.libraryId,
+                agentId: input.agentId,
+                file: {
+                  id: uid('file'),
+                  name: input.fileName,
+                  sizeLabel: '2.4 MB',
+                  type: input.fileName.endsWith('.pdf') ? 'application/pdf' : 'application/octet-stream',
+                  uploadedAt: timestamp,
+                },
+                status: 'uploaded',
+                entryCount: 0,
+                previewText: input.previewText,
+                createdAt: timestamp,
+                updatedAt: timestamp,
+              },
+              ...current.knowledgeImportJobs,
+            ],
+          },
+          '知识库',
+          '知识库文件已上传',
+        ),
+      );
+      return id;
+    }
+
+    function completeKnowledgeImport(jobId: string) {
+      setState((current) => {
+        const job = current.knowledgeImportJobs.find((item) => item.id === jobId);
+        if (!job) {
           return current;
         }
-
-        const nextState = {
-          ...current,
-          knowledgeEntries: current.knowledgeEntries.map<KnowledgeEntry>((entry) =>
-            entry.id === input.id
-              ? {
-                  ...entry,
-                  question: input.question,
-                  answer: input.answer,
-                  tags: uniqueTags(input.tags),
-                  assets: input.assets,
-                  source: input.source,
-                  updatedAt: now,
-                  revisions: [
-                    {
-                      id: nextId('revision'),
-                      question: entry.question,
-                      answer: entry.answer,
-                      updatedAt: now,
-                      note: '编辑知识条目前版本',
-                    },
-                    ...entry.revisions,
-                  ].slice(0, 6),
-                }
-              : entry,
-          ),
+        const timestamp = nowIso();
+        const entry: KnowledgeEntry = {
+          id: uid('knowledge'),
+          agentId: job.agentId,
+          libraryId: job.libraryId,
+          title: job.file.name.replace(/\.[^.]+$/, ''),
+          question: '这份资料主要回答哪些研学问题？',
+          answer: job.previewText || '已上传资料，后续可继续修订为标准问答。',
+          keywords: ['资料导入'],
+          source: 'upload',
+          status: 'enabled',
+          bindingPriority: 1,
+          file: job.file,
+          revisions: [],
+          createdAt: timestamp,
+          updatedAt: timestamp,
         };
-        return pushLog(nextState, createLog('knowledge', input.id, '更新知识条目', `${input.question} 已更新。`));
-      }
+        return addLog(
+          {
+            ...current,
+            knowledgeImportJobs: current.knowledgeImportJobs.map((item) =>
+              item.id === jobId ? { ...item, status: 'completed', entryCount: 1, updatedAt: timestamp } : item,
+            ),
+            knowledgeEntries: [entry, ...current.knowledgeEntries],
+          },
+          '知识库',
+          '知识库文件解析完成并生成条目',
+        );
+      });
+    }
 
-      const entry: KnowledgeEntry = {
-        id: nextId('knowledge'),
-        question: input.question,
-        answer: input.answer,
-        tags: uniqueTags(input.tags),
-        source: input.source,
-        updatedAt: now,
-        status: 'active',
-        revisions: [],
-        assets: input.assets,
-      };
-      const nextState = {
-        ...current,
-        knowledgeEntries: [entry, ...current.knowledgeEntries],
-      };
-      return pushLog(nextState, createLog('knowledge', entry.id, '新增知识条目', `${entry.question} 已写入知识库。`));
-    });
-  }
+    function supplementQa(
+      recordId: string,
+      answer: string,
+      targetAgentId: string | null,
+      knowledgeId?: string,
+      libraryId?: string,
+      keywords?: string[],
+    ) {
+      setState((current) => {
+        const qa = current.qaRecords.find((record) => record.id === recordId);
+        if (!qa) {
+          return current;
+        }
+        const timestamp = nowIso();
+        const nextKnowledgeId = knowledgeId || uid('knowledge');
+        const existing = current.knowledgeEntries.find((entry) => entry.id === nextKnowledgeId);
+        const targetLibrary = libraryId
+          ? current.knowledgeLibraries.find((library) => library.id === libraryId)
+          : current.knowledgeLibraries.find((library) => library.agentId === targetAgentId) ?? current.knowledgeLibraries[0];
+        const nextKeywords = keywords?.length
+          ? keywords
+          : qa.keywords?.length
+            ? qa.keywords
+            : ['问答补充', targetAgentId ? '智能体知识' : '公共知识'];
+        const nextKnowledge = existing
+          ? current.knowledgeEntries.map((entry) =>
+              entry.id === nextKnowledgeId
+                ? {
+                    ...entry,
+                    agentId: targetAgentId,
+                    libraryId: entry.libraryId ?? targetLibrary?.id ?? null,
+                    answer,
+                    keywords: nextKeywords,
+                    revisions: [
+                      {
+                        id: uid('rev'),
+                        answer: entry.answer,
+                        changedAt: timestamp,
+                        note: '由问答补充产生的上一版本',
+                      },
+                      ...entry.revisions,
+                    ],
+                    updatedAt: timestamp,
+                  }
+                : entry,
+            )
+          : [
+              {
+                id: nextKnowledgeId,
+                agentId: targetAgentId,
+                libraryId: targetLibrary?.id ?? null,
+                title: qa.question.slice(0, 18),
+                question: qa.question,
+                answer,
+                keywords: nextKeywords,
+                source: 'qa_followup' as const,
+                status: 'enabled' as const,
+                bindingPriority: 1,
+                revisions: [],
+                createdAt: timestamp,
+                updatedAt: timestamp,
+              },
+              ...current.knowledgeEntries,
+            ];
 
-  function archiveKnowledgeEntry(entryId: string) {
-    updateState((current) => {
-      const target = current.knowledgeEntries.find((entry) => entry.id === entryId);
-      if (!target) {
-        return current;
-      }
+        return addLog(
+          {
+            ...current,
+            qaRecords: current.qaRecords.map((record) =>
+              record.id === recordId
+                ? {
+                    ...record,
+                    agentId: targetAgentId,
+                    answer,
+                    keywords: nextKeywords,
+                    status: 'resolved',
+                    matchedKnowledgeId: nextKnowledgeId,
+                  }
+                : record,
+            ),
+            knowledgeEntries: nextKnowledge,
+          },
+          '问答',
+          '问答已补答并回写知识库',
+        );
+      });
+    }
 
-      const nextState = {
-        ...current,
-        knowledgeEntries: current.knowledgeEntries.map<KnowledgeEntry>((entry) =>
-          entry.id === entryId ? { ...entry, status: 'archived', updatedAt: new Date().toISOString() } : entry,
+    function saveKnowledgeEntry(input: KnowledgeInput, entryId?: string) {
+      const id = entryId ?? uid('knowledge');
+      const timestamp = nowIso();
+      setState((current) => {
+        const existing = current.knowledgeEntries.find((entry) => entry.id === id);
+        const targetLibrary = input.libraryId
+          ? current.knowledgeLibraries.find((library) => library.id === input.libraryId)
+          : current.knowledgeLibraries.find((library) => library.agentId === input.agentId) ?? current.knowledgeLibraries[0];
+        const entries = existing
+          ? current.knowledgeEntries.map((entry) =>
+              entry.id === id
+                ? {
+                    ...entry,
+                    ...input,
+                    libraryId: input.libraryId ?? entry.libraryId,
+                    status: input.status ?? entry.status,
+                    bindingPriority: input.bindingPriority ?? entry.bindingPriority,
+                    revisions:
+                      entry.answer === input.answer
+                        ? entry.revisions
+                        : [
+                            {
+                              id: uid('rev'),
+                              answer: entry.answer,
+                              changedAt: timestamp,
+                              note: '手动修订前版本',
+                            },
+                            ...entry.revisions,
+                          ],
+                    updatedAt: timestamp,
+                    archivedAt: undefined,
+                  }
+                : entry,
+            )
+          : [
+              {
+                id,
+                ...input,
+                libraryId: input.libraryId ?? targetLibrary?.id ?? null,
+                source: input.source ?? 'manual',
+                status: input.status ?? 'enabled',
+                bindingPriority: input.bindingPriority ?? 1,
+                revisions: [],
+                createdAt: timestamp,
+                updatedAt: timestamp,
+              },
+              ...current.knowledgeEntries,
+            ];
+
+        return addLog({ ...current, knowledgeEntries: entries }, '知识库', existing ? '知识条目已修订' : '知识条目已新增');
+      });
+      return id;
+    }
+
+    function setKnowledgeEntryStatus(entryId: string, status: KnowledgeEntryStatus) {
+      setState((current) =>
+        addLog(
+          {
+            ...current,
+            knowledgeEntries: current.knowledgeEntries.map((entry) =>
+              entry.id === entryId ? { ...entry, status, updatedAt: nowIso() } : entry,
+            ),
+          },
+          '知识库',
+          status === 'enabled' ? '知识条目已启用' : '知识条目已停用',
         ),
-      };
-      return pushLog(nextState, createLog('knowledge', entryId, '停用条目', `${target.question} 已移出当前知识库。`));
-    });
-  }
-
-  function restoreKnowledgeRevision(entryId: string, revisionId: string) {
-    updateState((current) => {
-      const target = current.knowledgeEntries.find((entry) => entry.id === entryId);
-      if (!target) {
-        return current;
-      }
-      const revision = target.revisions.find((item) => item.id === revisionId);
-      if (!revision) {
-        return current;
-      }
-
-      const now = new Date().toISOString();
-      const nextState = {
-        ...current,
-        knowledgeEntries: current.knowledgeEntries.map((entry) =>
-          entry.id === entryId
-            ? {
-                ...entry,
-                question: revision.question,
-                answer: revision.answer,
-                updatedAt: now,
-                revisions: [
-                  {
-                    id: nextId('revision'),
-                    question: entry.question,
-                    answer: entry.answer,
-                    updatedAt: now,
-                    note: '版本回退前内容',
-                  },
-                  ...entry.revisions.filter((item) => item.id !== revisionId),
-                ].slice(0, 6),
-              }
-            : entry,
-        ),
-      };
-
-      return pushLog(nextState, createLog('knowledge', entryId, '回退版本', `${revision.question} 已回退到较早版本。`));
-    });
-  }
-
-  function saveNewsItem(input: NewsInput) {
-    updateState((current) => {
-      const now = new Date().toISOString();
-      if (input.id) {
-        const nextState = {
-          ...current,
-          newsItems: current.newsItems.map((item) =>
-            item.id === input.id
-              ? {
-                  ...item,
-                  ...input,
-                  keywords: uniqueTags(input.keywords),
-                  updatedAt: now,
-                }
-              : item,
-          ),
-        };
-        return pushLog(nextState, createLog('news', input.id, '更新资讯', `${input.title} 已更新内容。`));
-      }
-
-      const entry: NewsItem = {
-        id: nextId('news'),
-        ...input,
-        keywords: uniqueTags(input.keywords),
-        status: 'collected',
-        updatedAt: now,
-      };
-      const nextState = {
-        ...current,
-        newsItems: [entry, ...current.newsItems],
-      };
-      return pushLog(nextState, createLog('news', entry.id, '新增资讯', `${entry.title} 已进入采集池。`));
-    });
-  }
-
-  function setNewsStatus(newsId: string, status: NewsStatus) {
-    updateState((current) => {
-      const target = current.newsItems.find((item) => item.id === newsId);
-      if (!target) {
-        return current;
-      }
-      const nextState = {
-        ...current,
-        newsItems: current.newsItems.map((item) =>
-          item.id === newsId
-            ? {
-                ...item,
-                status,
-                updatedAt: new Date().toISOString(),
-              }
-            : item,
-        ),
-      };
-      const labels: Record<NewsStatus, string> = {
-        collected: '归入采集池',
-        editing: '进入编辑',
-        published: '发布资讯',
-      };
-      return pushLog(nextState, createLog('news', newsId, labels[status], `${target.title} 已更新为${labels[status]}状态。`));
-    });
-  }
-
-  function saveChallenge(input: ChallengeInput) {
-    updateState((current) => {
-      const now = new Date().toISOString();
-      if (input.id) {
-        const nextState = {
-          ...current,
-          challenges: current.challenges.map((item) =>
-            item.id === input.id
-              ? {
-                  ...item,
-                  ...input,
-                  tags: uniqueTags(input.tags),
-                  references: input.references.filter(Boolean),
-                  updatedAt: now,
-                }
-              : item,
-          ),
-        };
-        return pushLog(nextState, createLog('challenge', input.id, '更新挑战', `${input.title} 已更新内容。`));
-      }
-
-      const challenge: Challenge = {
-        id: nextId('challenge'),
-        ...input,
-        tags: uniqueTags(input.tags),
-        references: input.references.filter(Boolean),
-        status: 'draft',
-        participants: 0,
-        updatedAt: now,
-      };
-      const nextState = {
-        ...current,
-        challenges: [challenge, ...current.challenges],
-      };
-      return pushLog(nextState, createLog('challenge', challenge.id, '新增挑战', `${challenge.title} 已创建。`));
-    });
-  }
-
-  function setChallengeStatus(challengeId: string, status: ChallengeStatus) {
-    updateState((current) => {
-      const target = current.challenges.find((item) => item.id === challengeId);
-      if (!target) {
-        return current;
-      }
-      const nextState = {
-        ...current,
-        challenges: current.challenges.map((item) =>
-          item.id === challengeId
-            ? {
-                ...item,
-                status,
-                publishedAt: status === 'published' ? item.publishedAt ?? new Date().toISOString() : item.publishedAt,
-                updatedAt: new Date().toISOString(),
-              }
-            : item,
-        ),
-      };
-      const labels: Record<ChallengeStatus, string> = {
-        draft: '回到草稿',
-        ready: '待发布',
-        published: '发布挑战',
-        ended: '结束挑战',
-      };
-      return pushLog(nextState, createLog('challenge', challengeId, labels[status], `${target.title} 已更新为${labels[status]}状态。`));
-    });
-  }
-
-  function reviewSubmission(submissionId: string, finalScore: number, growthReward: number, comment: string) {
-    updateState((current) => {
-      const target = current.submissions.find((item) => item.id === submissionId);
-      if (!target) {
-        return current;
-      }
-      const nextState = {
-        ...current,
-        submissions: current.submissions.map<ChallengeSubmission>((item) =>
-          item.id === submissionId
-            ? {
-                ...item,
-                finalScore,
-                growthReward,
-                comment,
-                status: 'reviewed',
-              }
-            : item,
-        ),
-      };
-
-      return pushLog(
-        nextState,
-        createLog('submission', submissionId, '完成审核', `${target.studentName} 的挑战作品已完成审核并发放成长值。`),
       );
-    });
-  }
+    }
 
-  function updateAgentProfile(input: Pick<AgentProfile, 'name' | 'avatar' | 'greeting' | 'promptTemplate' | 'style'>) {
-    updateState((current) => {
-      const nextState = {
-        ...current,
-        agent: {
-          ...current.agent,
-          ...input,
-        },
+    function archiveKnowledgeEntry(entryId: string) {
+      setState((current) =>
+        addLog(
+          {
+            ...current,
+            knowledgeEntries: current.knowledgeEntries.map((entry) =>
+              entry.id === entryId ? { ...entry, archivedAt: nowIso() } : entry,
+            ),
+          },
+          '知识库',
+          '知识条目已删除',
+        ),
+      );
+    }
+
+    function restoreKnowledgeRevision(entryId: string, revisionId: string) {
+      setState((current) => {
+        const entry = current.knowledgeEntries.find((item) => item.id === entryId);
+        const revision = entry?.revisions.find((item) => item.id === revisionId);
+        if (!entry || !revision) {
+          return current;
+        }
+        return addLog(
+          {
+            ...current,
+            knowledgeEntries: current.knowledgeEntries.map((item) =>
+              item.id === entryId
+                ? {
+                    ...item,
+                    answer: revision.answer,
+                    revisions: [
+                      {
+                        id: uid('rev'),
+                        answer: item.answer,
+                        changedAt: nowIso(),
+                        note: '恢复版本前内容',
+                      },
+                      ...item.revisions,
+                    ],
+                    updatedAt: nowIso(),
+                  }
+                : item,
+            ),
+          },
+          '知识库',
+          '已恢复历史版本',
+        );
+      });
+    }
+
+    function saveCollectionRule(input: CollectionRuleInput, ruleId?: string) {
+      const id = ruleId ?? uid('collection_rule');
+      const timestamp = nowIso();
+      setState((current) => {
+        const exists = current.contentCollectionRules.some((rule) => rule.id === id);
+        const sourceRules = input.sourceNames.map((name, index) => ({
+          id: `${id}_source_${index}`,
+          name,
+          url: `https://source.yanxuebao.local/${encodeURIComponent(name)}`,
+          enabled: true,
+        }));
+        return addLog(
+          {
+            ...current,
+            contentCollectionRules: exists
+              ? current.contentCollectionRules.map((rule) =>
+                  rule.id === id
+                    ? {
+                        ...rule,
+                        ...input,
+                        sourceRules,
+                        updatedAt: timestamp,
+                      }
+                    : rule,
+                )
+              : [
+                  {
+                    id,
+                    ...input,
+                    sourceRules,
+                    enabled: true,
+                    createdAt: timestamp,
+                    updatedAt: timestamp,
+                  },
+                  ...current.contentCollectionRules,
+                ],
+          },
+          '资讯',
+          exists ? '资讯采集规则已更新' : '资讯采集规则已创建',
+        );
+      });
+      return id;
+    }
+
+    function runCollectionRule(ruleId: string) {
+      const rule = state.contentCollectionRules.find((item) => item.id === ruleId);
+      if (!rule) {
+        return null;
+      }
+      const id = uid('news');
+      const timestamp = nowIso();
+      const source = rule.sourceRules.find((item) => item.enabled)?.name ?? '领域来源';
+      const keyword = rule.keywords[0] ?? '研学';
+      setState((current) =>
+        addLog(
+          {
+            ...current,
+            contentCollectionRules: current.contentCollectionRules.map((item) =>
+              item.id === ruleId ? { ...item, lastCollectedAt: timestamp, updatedAt: timestamp } : item,
+            ),
+            newsItems: [
+              {
+                id,
+                agentId: rule.agentId,
+                collectionRuleId: rule.id,
+                title: `${keyword}领域精选资讯`,
+                status: 'collected',
+                sourceType: 'collection',
+                format: rule.formats[0] ?? '图文',
+                source,
+                summary: `围绕${keyword}自动采集到的领域资讯，待专家编辑后下发。`,
+                content: `请补充专家导读、适合学员收听的摘要和行动建议。`,
+                featured: false,
+                pushCount: 0,
+                createdAt: timestamp,
+                updatedAt: timestamp,
+              },
+              ...current.newsItems,
+            ],
+          },
+          '资讯',
+          '已按采集规则生成采集池资讯',
+        ),
+      );
+      return id;
+    }
+
+    function saveNewsItem(input: NewsInput, newsId?: string) {
+      const id = newsId ?? uid('news');
+      const timestamp = nowIso();
+      setState((current) => {
+        const exists = current.newsItems.some((item) => item.id === id);
+        return addLog(
+          {
+            ...current,
+            newsItems: exists
+              ? current.newsItems.map((item) =>
+                  item.id === id
+                    ? {
+                        ...item,
+                        ...input,
+                        agentId: input.agentId ?? item.agentId,
+                        sourceType: input.sourceType ?? item.sourceType,
+                        format: input.format ?? item.format,
+                        publishedAt: input.status === 'published' ? item.publishedAt ?? timestamp : item.publishedAt,
+                        updatedAt: timestamp,
+                      }
+                    : item,
+                )
+              : [
+                  {
+                    id,
+                    ...input,
+                    agentId: input.agentId ?? null,
+                    sourceType: input.sourceType ?? 'manual',
+                    format: input.format ?? '图文',
+                    publishedAt: input.status === 'published' ? timestamp : undefined,
+                    pushCount: input.status === 'published' ? 1 : 0,
+                    createdAt: timestamp,
+                    updatedAt: timestamp,
+                  },
+                  ...current.newsItems,
+                ],
+          },
+          '资讯',
+          exists ? '资讯已更新' : '资讯已新增',
+        );
+      });
+      return id;
+    }
+
+    function setNewsStatus(newsId: string, status: NewsStatus) {
+      setState((current) =>
+        addLog(
+          {
+            ...current,
+            newsItems: current.newsItems.map((item) =>
+              item.id === newsId
+                ? {
+                    ...item,
+                    status,
+                    publishedAt: status === 'published' ? nowIso() : item.publishedAt,
+                    pushCount: status === 'published' ? Math.max(1, item.pushCount) : item.pushCount,
+                    updatedAt: nowIso(),
+                  }
+                : item,
+            ),
+          },
+          '资讯',
+          status === 'published' ? '资讯已发布' : '资讯状态已更新',
+        ),
+      );
+    }
+
+    function saveChallenge(input: ChallengeInput, challengeId?: string) {
+      const id = challengeId ?? uid('challenge');
+      const timestamp = nowIso();
+      setState((current) => {
+        const exists = current.challenges.some((item) => item.id === id);
+        const defaultRubric: ChallengeRubric = {
+          dimensions: ['问题意识', '证据收集', '表达完整度'],
+          totalScore: 100,
+          passScore: 60,
+          rewardGrowth: 30,
+        };
+        return addLog(
+          {
+            ...current,
+            challenges: exists
+              ? current.challenges.map((item) =>
+                  item.id === id
+                    ? {
+                        ...item,
+                        ...input,
+                        workRequirement: input.workRequirement ?? item.workRequirement,
+                        attachments: input.attachments ?? item.attachments,
+                        rubric: input.rubric ?? item.rubric,
+                        updatedAt: timestamp,
+                      }
+                    : item,
+                )
+              : [
+                  {
+                    id,
+                    ...input,
+                    workRequirement: input.workRequirement ?? '提交观察记录、证据说明和解决建议。',
+                    attachments: input.attachments ?? [],
+                    rubric: input.rubric ?? defaultRubric,
+                    workflowStatus: 'draft',
+                    status: 'draft',
+                    submissionCount: 0,
+                    reviewedCount: 0,
+                    rewardGrowth: 0,
+                    createdAt: timestamp,
+                    updatedAt: timestamp,
+                  },
+                  ...current.challenges,
+                ],
+          },
+          '难题挑战',
+          exists ? '挑战已更新' : '挑战已创建',
+        );
+      });
+      return id;
+    }
+
+    function setChallengeStatus(challengeId: string, status: ChallengeStatus) {
+      const workflowStatus: Record<ChallengeStatus, ContentWorkflowStatus> = {
+        draft: 'draft',
+        ready: 'pending',
+        published: 'active',
+        ended: 'archived',
       };
-      return pushLog(nextState, createLog('agent', current.agent.id, '更新智能体', `${input.name} 的基础配置已更新。`));
-    });
-  }
+      setState((current) =>
+        addLog(
+          {
+            ...current,
+            challenges: current.challenges.map((item) =>
+              item.id === challengeId
+                ? {
+                    ...item,
+                    status,
+                    workflowStatus: workflowStatus[status],
+                    updatedAt: nowIso(),
+                  }
+                : item,
+            ),
+          },
+          '难题挑战',
+          '挑战状态已更新',
+        ),
+      );
+    }
 
-  function setAgentStatus(status: AgentStatus) {
-    updateState((current) => {
-      const nextState = {
-        ...current,
-        agent: {
-          ...current.agent,
-          status,
+    function importChallengeSubmission(input: SubmissionImportInput) {
+      const id = uid('submission');
+      const timestamp = nowIso();
+      setState((current) =>
+        addLog(
+          {
+            ...current,
+            challengeSubmissions: [
+              {
+                id,
+                challengeId: input.challengeId,
+                studentName: input.studentName,
+                workTitle: input.workTitle,
+                aiScore: input.aiScore,
+                status: 'pending',
+                submittedAt: timestamp,
+              },
+              ...current.challengeSubmissions,
+            ],
+            challenges: current.challenges.map((challenge) =>
+              challenge.id === input.challengeId
+                ? {
+                    ...challenge,
+                    submissionCount: challenge.submissionCount + 1,
+                    updatedAt: timestamp,
+                  }
+                : challenge,
+            ),
+          },
+          '作品审核',
+          '挑战作品已导入待审列表',
+        ),
+      );
+      return id;
+    }
+
+    function reviewSubmission(submissionId: string, expertScore: number, rewardGrowth: number, comment: string) {
+      setState((current) => {
+        const submission = current.challengeSubmissions.find((item) => item.id === submissionId);
+        if (!submission) {
+          return current;
+        }
+        const wasReviewed = submission.status === 'reviewed';
+        return addLog(
+          {
+            ...current,
+            challengeSubmissions: current.challengeSubmissions.map((item) =>
+              item.id === submissionId
+                ? {
+                    ...item,
+                    expertScore,
+                    rewardGrowth,
+                    reviewResult: {
+                      expertScore,
+                      rewardGrowth,
+                      comment,
+                      reviewedAt: nowIso(),
+                    },
+                    comment,
+                    status: 'reviewed',
+                    reviewedAt: nowIso(),
+                  }
+                : item,
+            ),
+            challenges: current.challenges.map((challenge) =>
+              challenge.id === submission.challengeId
+                ? {
+                    ...challenge,
+                    reviewedCount: wasReviewed ? challenge.reviewedCount : challenge.reviewedCount + 1,
+                    rewardGrowth: challenge.rewardGrowth + rewardGrowth,
+                    updatedAt: nowIso(),
+                  }
+                : challenge,
+            ),
+          },
+          '作品审核',
+          '作品评分与成长值已回写',
+        );
+      });
+    }
+
+    function createEvaluationBatch(input: EvaluationBatchInput) {
+      const timestamp = nowIso();
+      const attachments: EvaluationAttachment[] = [
+        {
+          id: uid('eval_photo'),
+          name: `活动照片 ${input.photoCount} 张`,
+          type: 'photo',
+          uploadedAt: timestamp,
         },
-      };
-      const label = status === 'published' ? '上架智能体' : '暂停智能体';
-      return pushLog(nextState, createLog('agent', current.agent.id, label, `${current.agent.name} 已更新状态。`));
-    });
-  }
-
-  function updateAgentBindings(knowledgeIds: string[]) {
-    updateState((current) => {
-      const bindings = knowledgeIds
-        .map((knowledgeId, index) => {
-          const matched = current.knowledgeEntries.find((entry) => entry.id === knowledgeId);
-          if (!matched) {
-            return null;
-          }
-          return {
-            id: `binding_${knowledgeId}`,
-            knowledgeId,
-            knowledgeTitle: matched.question,
-            priority: index + 1,
-          } satisfies KnowledgeBinding;
-        })
-        .filter((item): item is KnowledgeBinding => Boolean(item));
-
-      const nextState = {
-        ...current,
-        agent: {
-          ...current.agent,
-          bindings,
+        {
+          id: uid('eval_form'),
+          name: input.formName,
+          type: 'form',
+          uploadedAt: timestamp,
         },
-      };
-      return pushLog(nextState, createLog('agent', current.agent.id, '更新知识库绑定', `已调整 ${bindings.length} 个知识条目的优先级。`));
-    });
-  }
+      ];
+      setState((current) =>
+        addLog(
+          {
+            ...current,
+            evaluationBatches: [
+              {
+                id: uid('eval'),
+                productId: input.productId,
+                sessionId: input.sessionId,
+                title: input.title,
+                studentCount: input.studentCount,
+                attachments,
+                reportStatus: 'generating',
+                workflowStatus: 'pending',
+                diarySynced: false,
+                createdAt: timestamp,
+                updatedAt: timestamp,
+              },
+              ...current.evaluationBatches,
+            ],
+          },
+          '学生评价',
+          '评价批次已生成',
+        ),
+      );
+    }
 
-  const value = useMemo<ExpertStoreValue>(
-    () => ({
-      hydrated,
+    function advanceEvaluationBatch(batchId: string) {
+      const nextStatus: Record<EvaluationReportStatus, EvaluationReportStatus> = {
+        collecting: 'generating',
+        generating: 'completed',
+        completed: 'synced',
+        synced: 'synced',
+      };
+      const nextWorkflowStatus: Record<EvaluationReportStatus, ContentWorkflowStatus> = {
+        collecting: 'pending',
+        generating: 'pending',
+        completed: 'active',
+        synced: 'archived',
+      };
+      setState((current) =>
+        addLog(
+          {
+            ...current,
+            evaluationBatches: current.evaluationBatches.map((batch) =>
+              batch.id === batchId
+                ? {
+                    ...batch,
+                    reportStatus: nextStatus[batch.reportStatus],
+                    workflowStatus: nextWorkflowStatus[nextStatus[batch.reportStatus]],
+                    diarySynced: nextStatus[batch.reportStatus] === 'synced',
+                    updatedAt: nowIso(),
+                  }
+                : batch,
+            ),
+          },
+          '学生评价',
+          '评价批次状态已推进',
+        ),
+      );
+    }
+
+    function updateSettings(patch: Partial<ExpertState['settings']>) {
+      setState((current) => ({
+        ...current,
+        settings: {
+          ...current.settings,
+          ...patch,
+        },
+      }));
+    }
+
+    return {
       state,
-      metrics: createDashboardMetrics(state),
-      resetDemoData,
-      saveCourse,
-      setCourseStatus,
+      hydrated,
+      resetData,
+      submitApplication,
+      reviewApplication,
+      saveBankAccount,
+      reviewBankAccount,
+      saveInvoiceProfile,
+      reviewInvoiceProfile,
+      setActiveAgent,
+      createAgent,
+      updateAgent,
+      setAgentStatus,
+      updateAgentBindings,
+      addAgentTestRecord,
+      saveProduct,
+      setProductStatus,
+      createOrder,
+      writeOffOrder,
+      updateDistributionPlan,
+      createWithdrawal,
+      importQaRecord,
       supplementQa,
+      saveKnowledgeLibrary,
+      setKnowledgeLibraryEnabled,
+      uploadKnowledgeFile,
+      completeKnowledgeImport,
       saveKnowledgeEntry,
+      setKnowledgeEntryStatus,
       archiveKnowledgeEntry,
       restoreKnowledgeRevision,
+      saveCollectionRule,
+      runCollectionRule,
       saveNewsItem,
       setNewsStatus,
       saveChallenge,
       setChallengeStatus,
+      importChallengeSubmission,
       reviewSubmission,
-      updateAgentProfile,
-      setAgentStatus,
-      updateAgentBindings,
-    }),
-    [hydrated, state],
-  );
+      createEvaluationBatch,
+      advanceEvaluationBatch,
+      updateSettings,
+    };
+  }, [hydrated, state]);
 
   return <ExpertStoreContext.Provider value={value}>{children}</ExpertStoreContext.Provider>;
 }
@@ -1348,4 +2168,8 @@ export function useExpertStore() {
     throw new Error('useExpertStore must be used within ExpertStoreProvider');
   }
   return context;
+}
+
+export function getInitialExpertState() {
+  return cloneState(initialState());
 }

@@ -5,7 +5,7 @@ import { Providers } from './providers';
 
 export const metadata: Metadata = {
   title: '研学宝 · 专家端',
-  description: '研学宝 V1 专家端 H5 工作台',
+  description: '研学宝专家端 H5 工作台',
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
