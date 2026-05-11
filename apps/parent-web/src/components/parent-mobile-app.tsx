@@ -19,39 +19,86 @@ import {
   TeamOutlined,
   UserOutlined,
 } from '@ant-design/icons';
-import { Badge, Button, Checkbox, Drawer, Empty, Form, Input, InputNumber, Progress, Rate, Segmented, Spin, Tag, message } from 'antd';
+import { Badge, Button, Carousel, Checkbox, Drawer, Empty, Form, Input, Progress, Segmented, Select, Spin, Tag, message } from 'antd';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { clearSession } from '../lib/api';
 import {
   getCapabilityOverview,
   getCapabilityLevel,
   getMessageTypeLabel,
   getPortfolioAiRecordsByStudent,
+  getPortfolioTimelineEntries,
   getPortfolioWorksByStudent,
   getSortedMessageCenterItems,
-  getStudyDiaryItemsByStudent,
-  getStudyDiaryTypeLabel,
+  getTimelineEntryLabel,
+  INTEREST_OPTIONS,
+  TALENT_OPTIONS,
   useParentStore,
   type FamilyTask,
+  type ParentOrder,
+  type ParentPhotoRecord,
+  type ParentStudent,
+  type PortfolioAttachment,
+  type PortfolioTimelineEntry,
   type TaskWork,
 } from '../lib/parent-store';
-import { ParentCapabilityList, ParentCapabilityPlaneOverview, ParentGrowthFrameworkChart, ParentGrowthSourceBreakdown, ParentRadarCard } from './parent-growth-ui';
+import {
+  ParentAssessmentRecordCard,
+  ParentCapabilityImprovementList,
+  ParentCapabilityList,
+  ParentCapabilityPlaneOverview,
+  ParentGrowthFrameworkChart,
+  ParentGrowthSourceBreakdown,
+  ParentRadarCard,
+  buildCapabilityImprovementRadarItems,
+} from './parent-growth-ui';
 import { ParentPhoneFrame, ParentStudentSwitcher, useParentSessionReady } from './parent-mobile-shell';
 
-export type ParentTabKey = 'home' | 'growth' | 'portfolio' | 'tasks' | 'me';
-type PortfolioPanelKey = 'works' | 'diary' | 'qa' | 'creation';
+export type ParentTabKey = 'home' | 'tasks' | 'growth' | 'portfolio' | 'device' | 'me';
+type PortfolioPanelKey = 'timeline' | 'tasks' | 'qa' | 'photos' | 'achievements' | 'flash' | 'reviews';
+type HomeOrderTab = '全部' | '报名缴费' | '专家课程' | '难题挑战';
 
 const TAB_ITEMS: Array<{ key: ParentTabKey; label: string; icon: React.ComponentType; href: string }> = [
   { key: 'home', label: '首页', icon: HomeOutlined, href: '/home' },
-  { key: 'growth', label: '成长', icon: RadarChartOutlined, href: '/growth' },
-  { key: 'portfolio', label: '作品', icon: BookOutlined, href: '/portfolio' },
   { key: 'tasks', label: '任务', icon: CheckCircleOutlined, href: '/family-tasks' },
-  { key: 'me', label: '我的', icon: UserOutlined, href: '/me' },
+  { key: 'growth', label: '能力', icon: RadarChartOutlined, href: '/growth' },
+  { key: 'portfolio', label: '日记', icon: BookOutlined, href: '/portfolio' },
+  { key: 'device', label: '设备', icon: MobileOutlined, href: '/device' },
 ];
+const HOME_ORDER_TABS: HomeOrderTab[] = ['全部', '报名缴费', '专家课程', '难题挑战'];
+const SCORE_OPTIONS = Array.from({ length: 11 }, (_, index) => index);
 
 function formatDate(value: string) {
   return value.length > 10 ? value.slice(0, 16).replace('T', ' ') : value;
+}
+
+function formatDay(value: string) {
+  return value.slice(0, 10);
+}
+
+function getPortfolioEntryRoute(entry: PortfolioTimelineEntry) {
+  if (entry.relatedKind === 'work' && entry.relatedId) {
+    return `/portfolio/works/${entry.relatedId}`;
+  }
+  if (entry.relatedKind === 'report' && entry.relatedId) {
+    return `/portfolio/reports/${entry.relatedId}`;
+  }
+  if (entry.relatedKind === 'ai' && entry.relatedId) {
+    return `/portfolio/ai/${entry.relatedId}`;
+  }
+  if (entry.id.startsWith('timeline_manual_')) {
+    return `/portfolio/diaries/${entry.id.replace('timeline_manual_', '')}`;
+  }
+  return `/portfolio/records/${entry.id}`;
+}
+
+function getTimelineTagColor(type: PortfolioTimelineEntry['entryType']) {
+  if (type === 'photo' || type === 'achievement') return 'purple';
+  if (type === 'review' || type === 'assessment') return 'green';
+  if (type === 'challenge') return 'orange';
+  if (type === 'ai_qa' || type === 'ai_creation') return 'blue';
+  return 'gold';
 }
 
 function getTaskWork(task: FamilyTask, works: TaskWork[], studentId: string) {
@@ -78,16 +125,75 @@ function getTaskStatusTone(status: FamilyTask['status']) {
   return tones[status];
 }
 
-
-function MetricCard({ label, value, note, icon }: { label: string; value: string | number; note: string; icon: React.ReactNode }) {
+function StudentAvatar({ student, size = 'default' }: { student: ParentStudent; size?: 'default' | 'small' }) {
   return (
-    <div className="parent-metric">
+    <div className={`parent-avatar${size === 'small' ? ' small' : ''}`}>
+      {student.avatarImage ? (
+        <span
+          className="parent-avatar-photo"
+          role="img"
+          aria-label={`${student.name}头像`}
+          style={{ backgroundImage: `url(${student.avatarImage})` }}
+        />
+      ) : (
+        student.avatar
+      )}
+    </div>
+  );
+}
+
+function ScorePicker({ value, onChange }: { value?: number; onChange?: (value: number) => void }) {
+  return (
+    <div className="parent-score-picker">
+      {SCORE_OPTIONS.map((score) => (
+        <button
+          key={score}
+          type="button"
+          className={value === score ? 'active' : ''}
+          onClick={() => onChange?.(score)}
+        >
+          {score}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function MetricCard({
+  label,
+  value,
+  note,
+  icon,
+  onClick,
+}: {
+  label: string;
+  value: string | number;
+  note: string;
+  icon: React.ReactNode;
+  onClick?: () => void;
+}) {
+  const content = (
+    <>
       <span className="parent-metric-icon">{icon}</span>
       <div>
         <span>{label}</span>
         <strong>{value}</strong>
         <em>{note}</em>
       </div>
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <button type="button" className="parent-metric clickable" onClick={onClick}>
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <div className="parent-metric">
+      {content}
     </div>
   );
 }
@@ -137,9 +243,20 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
   const [scoreWorkItem, setScoreWorkItem] = useState<TaskWork | null>(null);
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [taskPanel, setTaskPanel] = useState<'tasks' | 'students' | 'works'>('tasks');
-  const [portfolioPanel, setPortfolioPanel] = useState<PortfolioPanelKey>('works');
+  const [portfolioPanel, setPortfolioPanel] = useState<PortfolioPanelKey>('timeline');
+  const [growthLedgerOpen, setGrowthLedgerOpen] = useState(false);
+  const [talentOpen, setTalentOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<ParentOrder | null>(null);
+  const [homeOrderTab, setHomeOrderTab] = useState<HomeOrderTab>('全部');
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [teamOpen, setTeamOpen] = useState(false);
+  const [selectedTaskDetail, setSelectedTaskDetail] = useState<FamilyTask | null>(null);
+  const [editingMedia, setEditingMedia] = useState<{ kind: 'photo' | 'achievement'; id: string } | null>(null);
+  const [contactSearch, setContactSearch] = useState('');
   const handledTaskQuery = useRef('');
   const growthReportsRef = useRef<HTMLElement | null>(null);
+  const photoInputRef = useRef<HTMLInputElement | null>(null);
+  const achievementInputRef = useRef<HTMLInputElement | null>(null);
 
   const flash = searchParams.get('flash');
   const selectTaskId = searchParams.get('selectTaskId');
@@ -156,16 +273,11 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
     if (!portfolioPanelParam) {
       return;
     }
-    if (
-      portfolioPanelParam === 'works' ||
-      portfolioPanelParam === 'diary' ||
-      portfolioPanelParam === 'qa' ||
-      portfolioPanelParam === 'creation'
-    ) {
+    if (portfolioPanelParam === 'timeline' || portfolioPanelParam === 'tasks' || portfolioPanelParam === 'qa' || portfolioPanelParam === 'photos' || portfolioPanelParam === 'achievements' || portfolioPanelParam === 'flash' || portfolioPanelParam === 'reviews') {
       setPortfolioPanel(portfolioPanelParam);
       return;
     }
-    setPortfolioPanel('works');
+    setPortfolioPanel(portfolioPanelParam === 'works' || portfolioPanelParam === 'diary' || portfolioPanelParam === 'creation' ? 'timeline' : 'timeline');
   }, [portfolioPanelParam]);
 
   useEffect(() => {
@@ -193,12 +305,21 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
   }, [flash, messageApi, router, selectTaskId]);
 
   const selectedStudentId = selectedStudent?.id ?? '';
+  const selectedFamilyTeam = useMemo(
+    () => state.familyTeams.find((team) => team.id === state.selectedFamilyTeamId) ?? state.familyTeams[0] ?? null,
+    [state.familyTeams, state.selectedFamilyTeamId],
+  );
   const tasksForStudent = useMemo(() => {
+    const activeTeamId = selectedFamilyTeam?.id;
     if (!selectedStudentId) {
-      return state.familyTasks.filter((task) => task.status === 'draft');
+      return state.familyTasks.filter((task) => task.status === 'draft' && (!activeTeamId || task.familyTeamId === activeTeamId));
     }
-    return state.familyTasks.filter((task) => task.status === 'draft' || task.assignedStudentIds.includes(selectedStudentId));
-  }, [selectedStudentId, state.familyTasks]);
+    return state.familyTasks.filter(
+      (task) =>
+        (!activeTeamId || task.familyTeamId === activeTeamId) &&
+        (task.status === 'draft' || task.assignedStudentIds.includes(selectedStudentId)),
+    );
+  }, [selectedFamilyTeam?.id, selectedStudentId, state.familyTasks]);
 
   const worksForStudent = useMemo(
     () => (selectedStudentId ? state.works.filter((work) => work.studentId === selectedStudentId) : []),
@@ -210,13 +331,45 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
     [selectedStudentId, state.reports],
   );
   const portfolioWorksForStudent = useMemo(() => getPortfolioWorksByStudent(state, selectedStudentId || null), [selectedStudentId, state]);
-  const studyDiaryItems = useMemo(() => getStudyDiaryItemsByStudent(state, selectedStudentId || null), [selectedStudentId, state]);
   const aiQaRecords = useMemo(() => getPortfolioAiRecordsByStudent(state, selectedStudentId || null, 'qa'), [selectedStudentId, state]);
   const aiCreationRecords = useMemo(
     () => getPortfolioAiRecordsByStudent(state, selectedStudentId || null, 'creation'),
     [selectedStudentId, state],
   );
+  const portfolioTimelineEntries = useMemo(
+    () => getPortfolioTimelineEntries(state, selectedStudentId || null),
+    [selectedStudentId, state],
+  );
   const messageCenterItems = useMemo(() => getSortedMessageCenterItems(state, selectedStudentId || null), [selectedStudentId, state]);
+  const ordersForStudent = useMemo(
+    () => state.orders.filter((order) => !order.studentId || !selectedStudentId || order.studentId === selectedStudentId),
+    [selectedStudentId, state.orders],
+  );
+  const filteredHomeOrders = useMemo(() => {
+    if (homeOrderTab === '全部') {
+      return ordersForStudent;
+    }
+    if (homeOrderTab === '报名缴费') {
+      return ordersForStudent.filter((order) => order.type === '团队报名');
+    }
+    return ordersForStudent.filter((order) => order.type === homeOrderTab);
+  }, [homeOrderTab, ordersForStudent]);
+  const growthLedger = useMemo(
+    () => state.growthValueLedger.filter((item) => item.studentId === selectedStudentId),
+    [selectedStudentId, state.growthValueLedger],
+  );
+  const capabilityAdjustments = useMemo(
+    () =>
+      state.capabilityAdjustmentRecords
+        .filter((item) => item.studentId === selectedStudentId)
+        .sort((left, right) => right.evaluatedAt.localeCompare(left.evaluatedAt)),
+    [selectedStudentId, state.capabilityAdjustmentRecords],
+  );
+  const latestCapabilityAdjustment = capabilityAdjustments[0] ?? null;
+  const improvementRadarItems = useMemo(
+    () => buildCapabilityImprovementRadarItems(selectedStudent?.capabilities ?? [], latestCapabilityAdjustment),
+    [latestCapabilityAdjustment, selectedStudent?.capabilities],
+  );
 
   const pendingWorks = worksForStudent.filter((work) => work.status === 'synced');
   const publishedTasks = tasksForStudent.filter((task) => task.status !== 'draft');
@@ -226,6 +379,38 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
   const unreadMessageCount = messageCenterItems.filter((item) => !item.read).length;
   const recentMessages = messageCenterItems.slice(0, 3);
   const shouldShowStudentContext = activeTab !== 'me' && Boolean(selectedStudent);
+
+  function openDeviceOrder() {
+    const createdAt = formatDate(new Date().toISOString());
+    const orderId = store.createOrder({
+      type: '研学宝',
+      title: '研学宝智能硬件家庭套装',
+      amount: 1299,
+      status: '待支付',
+      createdAt,
+      productName: '研学宝 Explorer S1 家庭套装',
+      sourceLabel: '研学宝订购',
+      description: '确认套装功能后填写收货人、地址和手机号码，再模拟提交订单并支付。',
+      receiver: state.parentProfile.name,
+      address: '',
+      phone: state.parentProfile.phone,
+    });
+    setSelectedOrder({
+      id: orderId,
+      type: '研学宝',
+      title: '研学宝智能硬件家庭套装',
+      amount: 1299,
+      status: '待支付',
+      createdAt,
+      studentId: selectedStudentId ?? undefined,
+      productName: '研学宝 Explorer S1 家庭套装',
+      sourceLabel: '研学宝订购',
+      description: '确认套装功能后填写收货人、地址和手机号码，再模拟提交订单并支付。',
+      receiver: state.parentProfile.name,
+      address: '',
+      phone: state.parentProfile.phone,
+    });
+  }
 
   useEffect(() => {
     if (activeTab !== 'growth' || growthFocusParam !== 'reports' || !growthReportsRef.current) {
@@ -264,13 +449,73 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
     messageApi.success('任务已下发到研学宝');
   }
 
-  function submitScore(values: { rating: number; score: number; comment: string }) {
+  function submitScore(values: { score: number; comment: string }) {
     if (!scoreWorkItem) {
       return;
     }
     store.scoreWork(scoreWorkItem.id, values);
     setScoreWorkItem(null);
     messageApi.success('评分已保存，成长记录已更新');
+  }
+
+  function filesToAttachments(files: FileList, uploadedBy: string): Promise<PortfolioAttachment[]> {
+    return Promise.all(
+      Array.from(files).map(
+        (file, index) =>
+          new Promise<PortfolioAttachment>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+              resolve({
+                id: `local_${Date.now()}_${index}`,
+                type: file.type.includes('pdf') ? '文档' : file.type.startsWith('image/') ? '照片' : '文档',
+                title: file.name,
+                summary: file.type.includes('pdf') ? 'PDF 成就文件' : '家长上传图片',
+                capturedAt: formatDate(new Date().toISOString()),
+                fileUrl: typeof reader.result === 'string' ? reader.result : undefined,
+                mimeType: file.type,
+                fileSize: file.size,
+                uploadedBy,
+              });
+            };
+            reader.onerror = () => reject(reader.error);
+            reader.readAsDataURL(file);
+          }),
+      ),
+    );
+  }
+
+  async function handlePortfolioUpload(kind: 'photo' | 'achievement', event: ChangeEvent<HTMLInputElement>) {
+    const files = event.target.files;
+    if (!files?.length || !selectedStudent) {
+      return;
+    }
+    const uploadedBy = state.parentProfile.name;
+    const attachments = await filesToAttachments(files, uploadedBy);
+    if (kind === 'photo') {
+      store.uploadPortfolioPhoto({
+        studentId: selectedStudent.id,
+        title: `${formatDay(new Date().toISOString())} 家长上传照片`,
+        summary: `家长上传 ${attachments.length} 张照片，已归档到成长日记。`,
+        content: '家长从手机相册上传的研学照片，可继续编辑标题、摘要并分享到朋友圈。',
+        uploadedBy,
+        attachments,
+      });
+      setPortfolioPanel('photos');
+      messageApi.success('照片已上传并归档');
+    } else {
+      store.uploadPortfolioAchievement({
+        studentId: selectedStudent.id,
+        title: attachments[0]?.title.includes('.pdf') ? '家长上传成就证明' : '家长上传荣誉成就',
+        summary: `家长上传 ${attachments.length} 个成就文件，支持图片或 PDF。`,
+        content: '家长上传的研学证书、奖状或证明文件，可在成就中管理。',
+        uploadedBy: '家长',
+        achievementType: attachments.some((item) => item.mimeType?.includes('pdf')) ? '证书' : '奖状',
+        attachments,
+      });
+      setPortfolioPanel('achievements');
+      messageApi.success('成就已上传并归档');
+    }
+    event.target.value = '';
   }
 
   function openTimelineEntry(target: { relatedKind?: 'work' | 'record' | 'report' | 'ai'; relatedId?: string; id: string }) {
@@ -359,6 +604,8 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
             <h1>{selectedStudent.name}</h1>
             <p>
               {selectedStudent.school} · {selectedStudent.grade} · 研学宝 ID {selectedStudent.yxbId}
+              <br />
+              证件号 {selectedStudent.idNumber || '待补充'}
             </p>
             <div className="parent-hero-actions">
               <Button size="small" onClick={() => router.push('/me/students')}>
@@ -369,13 +616,86 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
               </Button>
             </div>
           </div>
-          <div className="parent-avatar">{selectedStudent.avatar}</div>
+          <StudentAvatar student={selectedStudent} />
+        </section>
+
+        <section className="parent-section parent-talent-card">
+          <div className="parent-section-head">
+            <strong>天赋特长与兴趣热爱</strong>
+            <button type="button" onClick={() => setTalentOpen(true)}>
+              修改
+            </button>
+          </div>
+          <div className="parent-two-column">
+            <button type="button" onClick={() => navigate('growth')}>
+              <span>最强天赋</span>
+              <strong>{selectedStudent.talentProfile.strongestTalent}</strong>
+              <em>{selectedStudent.talentProfile.source === 'student_test' ? '来自天赋测试' : '来自家长评估'}</em>
+            </button>
+            <button type="button" onClick={() => navigate('growth')}>
+              <span>兴趣热爱</span>
+              <strong>{selectedStudent.interestProfile.studentTags.slice(0, 2).join('、') || '待选择'}</strong>
+              <em>孩子选择，可由家长补充</em>
+            </button>
+          </div>
         </section>
 
         <div className="parent-metric-grid">
-          <MetricCard label="能力指数" value={capabilityAverage.toFixed(1)} note={getCapabilityLevel(capabilityAverage)} icon={<RadarChartOutlined />} />
-          <MetricCard label="成长值" value={selectedStudent.growthValue} note="累计成长值" icon={<StarOutlined />} />
+          <MetricCard
+            label="能力指数"
+            value={capabilityAverage.toFixed(1)}
+            note={getCapabilityLevel(capabilityAverage)}
+            icon={<RadarChartOutlined />}
+            onClick={() => navigate('growth')}
+          />
+          <MetricCard
+            label="成长值"
+            value={selectedStudent.growthWallet.total}
+            note={`可用 ${selectedStudent.growthWallet.available}`}
+            icon={<StarOutlined />}
+            onClick={() => setGrowthLedgerOpen(true)}
+          />
         </div>
+
+        <section className="parent-section">
+          <div className="parent-section-head">
+            <strong>报名缴费</strong>
+            <span>{filteredHomeOrders.length} 条</span>
+          </div>
+          <div className="parent-scroll-tabs parent-order-tabs">
+            {HOME_ORDER_TABS.map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                className={homeOrderTab === tab ? 'active' : ''}
+                onClick={() => setHomeOrderTab(tab)}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+          <div className="parent-card-list">
+            {filteredHomeOrders.slice(0, 4).map((order) => (
+              <button
+                key={order.id}
+                type="button"
+                className="parent-list-card"
+                onClick={() => {
+                  store.markOrderViewed(order.id);
+                  setSelectedOrder(order);
+                }}
+              >
+                <span>{order.title}</span>
+                <em>
+                  {order.type === '团队报名' ? '报名缴费' : order.type} · {order.status} · {order.amount} 元
+                </em>
+              </button>
+            ))}
+            {!filteredHomeOrders.length ? (
+              <div className="parent-empty-line">当前分类暂无待处理订单</div>
+            ) : null}
+          </div>
+        </section>
 
         <section className="parent-section">
           <div className="parent-section-head">
@@ -410,10 +730,13 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
           </section>
         ) : null}
 
-        <section className="parent-shop-banner" onClick={() => router.push('/me/device')}>
+        <section
+          className="parent-shop-banner"
+          onClick={openDeviceOrder}
+        >
           <div>
             <span>研学宝智能硬件</span>
-            <strong>进入我的设备管理与购买入口</strong>
+            <strong>立即订购家庭套装</strong>
           </div>
           <ShoppingOutlined />
         </section>
@@ -432,7 +755,7 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
             </button>
             <button type="button" onClick={() => navigate('portfolio')}>
               <ReadOutlined />
-              作品档案
+              成长日记
             </button>
             <button type="button" onClick={() => router.push(`/me/device/scan?studentId=${selectedStudent.id}`)}>
               <MobileOutlined />
@@ -535,6 +858,31 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
           </div>
         </section>
 
+        <section className="parent-section parent-talent-card">
+          <div className="parent-section-head">
+            <strong>天赋兴趣</strong>
+            <button type="button" onClick={() => setTalentOpen(true)}>
+              编辑
+            </button>
+          </div>
+          <div className="parent-detail-stack">
+            <div className="parent-note-card">
+              <strong>天赋特长</strong>
+              <p>
+                学员：{selectedStudent.talentProfile.strongestTalent}；家长：{selectedStudent.talentProfile.parentTalent}。
+                {selectedStudent.talentProfile.testCompleted ? ' 已完成多元智能天赋测试。' : ' 当前为家长观察评估，可继续做天赋测试。'}
+              </p>
+            </div>
+            <div className="parent-note-card">
+              <strong>兴趣热爱</strong>
+              <p>
+                学员选择：{selectedStudent.interestProfile.studentTags.join('、') || '待选择'}；家长补充：
+                {selectedStudent.interestProfile.parentTags.join('、') || '待补充'}。
+              </p>
+            </div>
+          </div>
+        </section>
+
         <ParentGrowthFrameworkChart
           capabilities={selectedStudent.capabilities}
           onOpenCapability={(capabilityId) => router.push(`/growth/capabilities/${capabilityId}`)}
@@ -558,11 +906,42 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
           values={growthOverview.weakest.map((item) => item.score)}
           compareValues={growthOverview.weakest.map((item) => item.averageScore)}
         />
+        <ParentRadarCard
+          title="能力提升雷达图"
+          labels={improvementRadarItems.map((item) => item.elementKey)}
+          values={improvementRadarItems.map((item) => item.afterIndex)}
+          compareValues={improvementRadarItems.map((item) => item.beforeIndex)}
+          valueLabel="最新指数"
+          compareLabel="更新前指数"
+          summary={
+            latestCapabilityAdjustment
+              ? `${latestCapabilityAdjustment.reportTitle}：展示本次增长最多的 6 项能力元素，不足 6 项时补充当前高分且无变化的能力元素。`
+              : '暂无本次调整记录，先展示当前分值最高的 6 项能力元素作为待观察基线。'
+          }
+        >
+          <ParentCapabilityImprovementList items={improvementRadarItems} />
+        </ParentRadarCard>
         <ParentGrowthSourceBreakdown level={growthOverview.currentLevel} items={growthOverview.sourceBreakdown} />
         <ParentCapabilityList
           capabilities={selectedStudent.capabilities}
           onOpenCapability={(capabilityId) => router.push(`/growth/capabilities/${capabilityId}`)}
         />
+
+        <section className="parent-section">
+          <div className="parent-section-head">
+            <strong>研学报告评分记录</strong>
+            <span>{capabilityAdjustments.length} 条</span>
+          </div>
+          <div className="parent-card-list">
+            {capabilityAdjustments.map((record) => (
+              <ParentAssessmentRecordCard
+                key={record.id}
+                record={record}
+                onOpenReport={(item) => item.reportId && router.push(`/portfolio/reports/${item.reportId}`)}
+              />
+            ))}
+          </div>
+        </section>
 
         <section ref={growthReportsRef} className="parent-section">
           <div className="parent-section-head">
@@ -572,11 +951,19 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
           <div className="parent-card-list">
             {reportsForStudent.length ? (
               reportsForStudent.map((report) => (
-                <button key={report.id} type="button" className="parent-list-card" onClick={() => router.push(`/portfolio/reports/${report.id}`)}>
+                <button
+                  key={report.id}
+                  type="button"
+                  className={`parent-report-record-card ${report.recordType === '难题挑战' ? 'challenge' : report.recordType === '日常任务' ? 'daily' : report.recordType === '家庭研学' ? 'study' : 'review'}`}
+                  onClick={() => router.push(`/portfolio/reports/${report.id}`)}
+                >
                   <span>{report.title}</span>
                   <em>
-                    {report.date} · {report.planeTitle}
+                    {report.recordType ?? report.planeTitle} · {report.organizationName ?? '研学宝'} · {report.teamOrTaskName ?? report.planeTitle}
                   </em>
+                  <small>
+                    {formatDate(report.evaluatedAt ?? report.date)} · {report.evaluator ?? '系统'}
+                  </small>
                 </button>
               ))
             ) : (
@@ -595,8 +982,8 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
       return (
         <div className="parent-page">
           <OnboardingPanel
-            title="作品档案还没有开始积累"
-            description="学员创建、设备绑定、任务评分和家长评测之后，设备端成长记录、任务作品和 AI 记录会自动沉淀在这里。"
+            title="成长日记还没有开始积累"
+            description="学员创建、设备绑定、任务评分和家长评测之后，时间线、照片、成就和评价会自动沉淀在这里。"
             primaryLabel="去添加学员"
             onPrimary={() => router.push('/me/students/editor')}
           />
@@ -604,95 +991,86 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
       );
     }
 
-    const latestPortfolioUpdate = portfolioWorksForStudent[0]?.updatedAt ?? portfolioWorksForStudent[0]?.submittedAt ?? '--';
-    const latestDiaryDate = studyDiaryItems[0]?.date ?? '--';
-    const latestAiAgent = aiQaRecords[0]?.agentName ?? '--';
-    const creationTypes = Array.from(new Set(aiCreationRecords.map((record) => record.workType).filter(Boolean))).join(' / ') || '--';
+    const latestDiaryDate = portfolioTimelineEntries[0]?.occurredAt ?? '--';
+    const photoRecords = state.portfolioPhotos.filter((item) => item.studentId === selectedStudent.id);
+    const achievementRecords = state.portfolioAchievements.filter((item) => item.studentId === selectedStudent.id);
+    const visibleTimelineEntries = portfolioTimelineEntries.filter((item) => {
+      if (portfolioPanel === 'timeline') return true;
+      if (portfolioPanel === 'tasks') {
+        return ['work_submitted', 'work_scored', 'task', 'report', 'expert_course', 'challenge', 'study_diary'].includes(item.entryType);
+      }
+      if (portfolioPanel === 'flash') return item.entryType === 'flash_note';
+      if (portfolioPanel === 'reviews') return item.entryType === 'review' || item.entryType === 'assessment';
+      return false;
+    });
+    const photoGroups = Object.entries(
+      photoRecords.reduce<Record<string, ParentPhotoRecord[]>>((groups, record) => {
+        const key = formatDay(record.createdAt);
+        groups[key] = [...(groups[key] ?? []), record];
+        return groups;
+      }, {}),
+    ).sort(([left], [right]) => right.localeCompare(left));
 
     return (
       <div className="parent-page">
         <section className="parent-portfolio-overview">
           <div>
-            <span>学习作品</span>
-            <strong>{portfolioWorksForStudent.length} 项</strong>
-            <em>设备端同步创建</em>
+            <span>时间线记录</span>
+            <strong>{portfolioTimelineEntries.length} 条</strong>
+            <em>最近 {formatDate(latestDiaryDate)}</em>
           </div>
           <div>
-            <span>研学日记</span>
-            <strong>{studyDiaryItems.length} 篇</strong>
-            <em>最近 {formatDate(latestDiaryDate)}</em>
+            <span>照片与成就</span>
+            <strong>{photoRecords.length + achievementRecords.length} 组</strong>
+            <em>家长可模拟上传管理</em>
           </div>
         </section>
 
-        <Segmented
-          block
-          value={portfolioPanel}
-          onChange={(value) => setPortfolioPanel(value as PortfolioPanelKey)}
-          options={[
-            { label: '学习作品', value: 'works' },
-            { label: '研学日记', value: 'diary' },
-            { label: 'AI问答', value: 'qa' },
-            { label: 'AI创作', value: 'creation' },
-          ]}
-        />
+        <div className="parent-scroll-tabs">
+          {[
+            { label: '时间线', value: 'timeline' },
+            { label: '任务', value: 'tasks' },
+            { label: 'AI', value: 'qa' },
+            { label: '照片', value: 'photos' },
+            { label: '成就', value: 'achievements' },
+            { label: '闪记', value: 'flash' },
+            { label: '评价', value: 'reviews' },
+          ].map((item) => (
+            <button
+              key={item.value}
+              type="button"
+              className={portfolioPanel === item.value ? 'active' : ''}
+              onClick={() => setPortfolioPanel(item.value as PortfolioPanelKey)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
 
-        {portfolioPanel === 'works' ? (
+        {portfolioPanel === 'timeline' || portfolioPanel === 'tasks' || portfolioPanel === 'flash' || portfolioPanel === 'reviews' ? (
           <section className="parent-card-list">
             <div className="parent-stat-strip multi">
-              <span>累计作品 {portfolioWorksForStudent.length}</span>
-              <span>已同步 {portfolioWorksForStudent.length}</span>
-              <span>最近更新 {formatDate(latestPortfolioUpdate)}</span>
-            </div>
-            {portfolioWorksForStudent.length ? (
-              portfolioWorksForStudent.map((work) => (
-                <button key={work.id} type="button" className="parent-learning-work-card" onClick={() => router.push(`/portfolio/works/${work.id}`)}>
-                  <div className="parent-learning-work-head">
-                    <strong>{work.taskTitle}</strong>
-                    <Tag color={work.status === 'scored' ? 'green' : 'gold'}>{work.rating ?? (work.status === 'scored' ? '已提交' : '待评分')}</Tag>
-                  </div>
-                  <div className="parent-learning-work-tags">
-                    <Tag color={work.workCategory === '闪记日记' ? 'blue' : 'gold'}>{work.workCategory}</Tag>
-                    <span>
-                      {work.topicType} · {work.completionMode || '独立完成'} · {work.workKind}
-                    </span>
-                  </div>
-                  <p>{work.summary}</p>
-                  <em>当前内容：{work.currentContent || work.textContent || work.summary}</em>
-                  <small>最近更新：{formatDate(work.updatedAt || work.submittedAt)}</small>
-                </button>
-              ))
-            ) : (
-              <Empty description="暂无学习作品" />
-            )}
-          </section>
-        ) : null}
-
-        {portfolioPanel === 'diary' ? (
-          <section className="parent-card-list">
-            <div className="parent-stat-strip multi">
-              <span>累计日记 {studyDiaryItems.length}</span>
-              <span>关联作品 {studyDiaryItems.filter((item) => item.type === 'work').length}</span>
+              <span>当前记录 {visibleTimelineEntries.length}</span>
+              <span>关联作品 {portfolioWorksForStudent.length}</span>
               <span>最近日记 {formatDate(latestDiaryDate)}</span>
             </div>
-            {studyDiaryItems.length ? (
-              studyDiaryItems.map((item) => (
-                <button key={item.id} type="button" className="parent-diary-card" onClick={() => router.push(`/portfolio/diaries/${item.id}`)}>
+            {visibleTimelineEntries.length ? (
+              visibleTimelineEntries.map((item) => (
+                <button key={item.id} type="button" className="parent-diary-card" onClick={() => router.push(getPortfolioEntryRoute(item))}>
                   <div className="parent-diary-card-meta">
-                    <Tag color={item.type === 'work' ? 'blue' : item.type === 'growth_value' ? 'green' : 'gold'}>
-                      {getStudyDiaryTypeLabel(item.type)}
-                    </Tag>
-                    <em>{formatDate(item.date)}</em>
+                    <Tag color={getTimelineTagColor(item.entryType)}>{getTimelineEntryLabel(item.entryType)}</Tag>
+                    <em>{formatDate(item.occurredAt)}</em>
                   </div>
                   <strong>{item.title}</strong>
                   <p>{item.summary}</p>
                   <span>
-                    {item.source}
-                    {item.media?.length ? ` · ${item.media.length} 项素材` : ''}
+                    {item.sourceLabel}
+                    {item.rating ? ` · ${item.rating}` : ''}
                   </span>
                 </button>
               ))
             ) : (
-              <Empty description="暂无研学日记" />
+              <Empty description="当前分类暂无记录" />
             )}
           </section>
         ) : null}
@@ -700,41 +1078,126 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
         {portfolioPanel === 'qa' ? (
           <section className="parent-card-list">
             <div className="parent-stat-strip multi">
-              <span>累计问答 {aiQaRecords.length}</span>
-              <span>最近智能体 {latestAiAgent}</span>
+              <span>拍拍/问问 {aiQaRecords.length}</span>
+              <span>AI创作 {aiCreationRecords.length}</span>
+              <span>可分享朋友圈</span>
             </div>
-            {aiQaRecords.length ? (
-              aiQaRecords.map((item) => (
+            {[...aiQaRecords, ...aiCreationRecords].length ? (
+              [...aiQaRecords, ...aiCreationRecords].map((item) => (
                 <button key={item.id} type="button" className="parent-list-card" onClick={() => router.push(`/portfolio/ai/${item.id}`)}>
                   <span>{item.title}</span>
                   <em>
-                    {item.agentName} · {formatDate(item.createdAt)} · {item.questionCount ?? 1} 问
+                    {item.agentName} · {formatDate(item.createdAt)} · {item.kind === 'qa' ? `${item.questionCount ?? 1} 问` : item.workType ?? 'AI 创作'}
                   </em>
                 </button>
               ))
             ) : (
-              <Empty description="暂无 AI 问答" />
+              <Empty description="暂无 AI 记录" />
             )}
           </section>
         ) : null}
 
-        {portfolioPanel === 'creation' ? (
+        {portfolioPanel === 'photos' ? (
           <section className="parent-card-list">
-            <div className="parent-stat-strip multi">
-              <span>累计创作 {aiCreationRecords.length}</span>
-              <span>创作类型 {creationTypes}</span>
+            <div className="parent-action-row">
+              <Button block type="primary" onClick={() => photoInputRef.current?.click()}>
+                上传照片
+              </Button>
+              <Button block onClick={() => messageApi.success('已生成朋友圈分享卡片')}>
+                分享朋友圈
+              </Button>
             </div>
-            {aiCreationRecords.length ? (
-              aiCreationRecords.map((item) => (
-                <button key={item.id} type="button" className="parent-list-card" onClick={() => router.push(`/portfolio/ai/${item.id}`)}>
-                  <span>{item.title}</span>
-                  <em>
-                    {item.workType ?? 'AI 创作'} · {formatDate(item.createdAt)}
-                  </em>
-                </button>
+            <input ref={photoInputRef} type="file" accept="image/*" multiple hidden onChange={(event) => void handlePortfolioUpload('photo', event)} />
+            {photoGroups.length ? (
+              photoGroups.map(([day, records]) => (
+                <section key={day} className="parent-media-day-group">
+                  <div className="parent-section-head compact">
+                    <strong>{day}</strong>
+                    <span>{records.reduce((sum, record) => sum + record.attachments.length, 0)} 张</span>
+                  </div>
+                  {records.map((item) => (
+                    <div key={item.id} className="parent-media-manage-card">
+                      <button type="button" onClick={() => router.push(`/portfolio/records/timeline_photo_${item.id}`)}>
+                        <strong>{item.title}</strong>
+                        <span>
+                          {item.photoType} · {item.sourceLabel} · {item.attachments.length} 张
+                        </span>
+                        <em>{item.summary}</em>
+                      </button>
+                      <div className="parent-action-row compact">
+                        <Button size="small" onClick={() => setEditingMedia({ kind: 'photo', id: item.id })}>
+                          编辑
+                        </Button>
+                        <Button size="small" onClick={() => messageApi.success('已生成照片朋友圈分享卡片')}>
+                          分享
+                        </Button>
+                        <Button size="small" danger onClick={() => store.deletePortfolioPhoto(item.id)}>
+                          删除
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </section>
               ))
             ) : (
-              <Empty description="暂无 AI 创作" />
+              <section className="parent-empty-guide compact">
+                <Empty description="暂无照片记录" />
+                <Button type="primary" onClick={() => photoInputRef.current?.click()}>
+                  上传第一组照片
+                </Button>
+              </section>
+            )}
+          </section>
+        ) : null}
+
+        {portfolioPanel === 'achievements' ? (
+          <section className="parent-card-list">
+            <div className="parent-action-row">
+              <Button block type="primary" onClick={() => achievementInputRef.current?.click()}>
+                上传成就
+              </Button>
+              <Button block onClick={() => messageApi.success('已生成成就朋友圈分享卡片')}>
+                分享朋友圈
+              </Button>
+            </div>
+            <input
+              ref={achievementInputRef}
+              type="file"
+              accept="image/*,.pdf,application/pdf"
+              multiple
+              hidden
+              onChange={(event) => void handlePortfolioUpload('achievement', event)}
+            />
+            {achievementRecords.length ? (
+              achievementRecords.map((item) => (
+                <div key={item.id} className="parent-media-manage-card achievement">
+                  <button type="button" onClick={() => router.push(`/portfolio/records/timeline_achievement_${item.id}`)}>
+                    <strong>{item.title}</strong>
+                    <span>
+                      {item.achievementType} · {item.uploadedBy}上传 · {formatDate(item.createdAt)}
+                    </span>
+                    <em>{item.attachments.map((attachment) => attachment.mimeType?.includes('pdf') ? 'PDF' : attachment.type).join('、')}</em>
+                  </button>
+                  <div className="parent-action-row compact">
+                    <Button size="small" onClick={() => setEditingMedia({ kind: 'achievement', id: item.id })}>
+                      编辑
+                    </Button>
+                    <Button size="small" onClick={() => messageApi.success('已生成成就朋友圈分享卡片')}>
+                      分享
+                    </Button>
+                    <Button size="small" danger onClick={() => store.deletePortfolioAchievement(item.id)}>
+                      删除
+                    </Button>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <section className="parent-empty-guide compact">
+                <Empty description="暂无成就记录" />
+                <Button type="primary" onClick={() => achievementInputRef.current?.click()}>
+                  上传第一项成就
+                </Button>
+              </section>
             )}
           </section>
         ) : null}
@@ -769,9 +1232,50 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
           </section>
         ) : null}
 
+        <section className="parent-section parent-family-team-panel">
+          <div className="parent-section-head">
+            <strong>家庭研学团队面板</strong>
+            <button type="button" onClick={() => setTeamOpen(true)}>
+              创建团队
+            </button>
+          </div>
+          <div className="parent-filter-row">
+            {state.familyTeams.map((team) => (
+              <button
+                key={team.id}
+                type="button"
+                className={team.id === selectedFamilyTeam?.id ? 'active' : ''}
+                onClick={() => store.selectFamilyTeam(team.id)}
+              >
+                {team.name}
+              </button>
+            ))}
+          </div>
+          {selectedFamilyTeam ? (
+            <div className="parent-team-summary">
+              <strong>{selectedFamilyTeam.theme}</strong>
+              <span>
+                {selectedFamilyTeam.location} · {selectedFamilyTeam.studyDate} · {selectedFamilyTeam.studentIds.length} 位学员
+              </span>
+              <p>{selectedFamilyTeam.goal}</p>
+              <div className="parent-action-row compact">
+                <Button size="small" onClick={() => setInviteOpen(true)}>
+                  研学邀伴
+                </Button>
+                <Button size="small" onClick={() => messageApi.success('已复用导师端团队资料能力的演示入口')}>
+                  团队资料
+                </Button>
+                <Button size="small" onClick={() => messageApi.success('已进入团队消息广播演示')}>
+                  团队消息
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </section>
+
         <section className="parent-task-overview">
           <div>
-            <span>家庭研学任务面板</span>
+            <span>家庭研学团队面板</span>
             <strong>{progressPercent}%</strong>
             <em>
               已完成 {scoredTasks.length}/{publishedTasks.length || 0}
@@ -819,6 +1323,8 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
                         <p>{task.description}</p>
                         <div className="parent-tag-row">
                           <Tag>{task.base}</Tag>
+                          <Tag>{task.studyDate}</Tag>
+                          {task.publishedAt ? <Tag>下发 {formatDate(task.publishedAt)}</Tag> : null}
                           <Tag>{task.points} 分</Tag>
                           {task.capabilityTags.slice(0, 2).map((tag) => (
                             <Tag key={tag}>{tag}</Tag>
@@ -827,6 +1333,9 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
                         <div className="parent-action-row compact">
                           <Button size="small" onClick={() => router.push(`/family-tasks/editor?taskId=${task.id}`)} disabled={task.status !== 'draft'}>
                             编辑
+                          </Button>
+                          <Button size="small" onClick={() => setSelectedTaskDetail(task)}>
+                            详情
                           </Button>
                           {task.status === 'published' ? (
                             <Button size="small" type="primary" onClick={() => store.syncDeviceWork(task.id, selectedStudent.id)}>
@@ -859,7 +1368,7 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
               const completed = assigned.filter((task) => task.status === 'scored').length;
               return (
                 <div key={student.id} className="parent-student-progress">
-                  <div className="parent-avatar small">{student.avatar}</div>
+                  <StudentAvatar student={student} size="small" />
                   <div>
                     <strong>{student.name}</strong>
                     <span>
@@ -883,7 +1392,9 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
                     <button type="button" onClick={() => router.push(`/portfolio/works/${work.id}`)}>
                       <strong>{task?.title ?? '作品详情'}</strong>
                       <span>
-                        {formatDate(work.submittedAt)} · AI {work.aiScore ?? '-'} 分
+                        {selectedStudent.name} · 提交 {formatDate(work.submittedAt)} · AI评分{' '}
+                        {typeof work.aiScore === 'number' ? Math.round(work.aiScore) : '-'} /10
+                        {work.scoredAt ? ` · 评分 ${formatDate(work.scoredAt)}` : ''}
                       </span>
                     </button>
                     {work.status === 'synced' ? (
@@ -891,7 +1402,7 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
                         评分
                       </Button>
                     ) : (
-                      <Tag color="green">{work.rating} 星</Tag>
+                      <Tag color="green">{work.parentScore}/10</Tag>
                     )}
                   </div>
                 );
@@ -900,6 +1411,220 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
               <Empty description="暂无设备端同步作品" />
             )}
           </section>
+        ) : null}
+      </div>
+    );
+  }
+
+  function renderDevice() {
+    if (!selectedStudent) {
+      return (
+        <div className="parent-page">
+          <OnboardingPanel
+            title="先添加学员再管理设备"
+            description="每台研学宝都会绑定到具体学员，之后才能查看支付、网盘、通讯录、停用时间和轨迹。"
+            primaryLabel="去添加学员"
+            onPrimary={() => router.push('/me/students/editor')}
+          />
+        </div>
+      );
+    }
+
+    const device = selectedStudent.device;
+    const weekdayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+    const filteredContacts =
+      device?.contacts.filter((contact) => `${contact.name}${contact.relation}${contact.phone}`.includes(contactSearch.trim())) ?? [];
+
+    return (
+      <div className="parent-page">
+        <section className="parent-section">
+          <div className="parent-section-head">
+            <strong>{selectedStudent.name} 的研学宝</strong>
+            <Button size="small" type="primary" icon={<MobileOutlined />} onClick={() => router.push(`/me/device/scan?studentId=${selectedStudent.id}`)}>
+              {device ? '更换设备' : '扫码绑定'}
+            </Button>
+          </div>
+          {device ? (
+            <div className="parent-device-card rich">
+              <MobileOutlined />
+              <div>
+                <strong>{device.name}</strong>
+                <span>
+                  {device.deviceCode} · {device.model}
+                </span>
+                <em>最后在线 {formatDate(device.lastOnlineAt)}</em>
+              </div>
+              <div className="parent-device-chip-list">
+                <Tag color="green">电量 {device.batteryPercent}%</Tag>
+                <Tag>{device.mode === 'sale' ? '销售模式' : '租赁模式'}</Tag>
+              </div>
+            </div>
+          ) : (
+            <section className="parent-empty-guide compact">
+              <MobileOutlined />
+              <strong>这位学员还没有绑定设备</strong>
+              <p>扫码后会自动激活学员账号并同步设备信息。</p>
+            </section>
+          )}
+        </section>
+
+        <section className="parent-section parent-device-ad-section">
+          <div className="parent-section-head">
+            <strong>研学宝订购</strong>
+            <button type="button" onClick={openDeviceOrder}>
+              立即订购
+            </button>
+          </div>
+          <Carousel className="parent-device-carousel" autoplay dots>
+            {state.deviceAds.map((ad) => (
+              <div key={ad.id}>
+                <button type="button" className={`parent-device-ad-card ${ad.imageTone}`} onClick={openDeviceOrder}>
+                  <span
+                    className="parent-device-ad-image"
+                    role="img"
+                    aria-label={ad.title}
+                    style={{ backgroundImage: `url(${ad.imageUrl})` }}
+                  />
+                  <span>{ad.title}</span>
+                  <strong>{ad.subtitle}</strong>
+                  <em>{ad.features.join(' · ')}</em>
+                </button>
+              </div>
+            ))}
+          </Carousel>
+          <div className="parent-card-list">
+            {ordersForStudent
+              .filter((order) => order.type === '研学宝')
+              .slice(0, 2)
+              .map((order) => (
+                <button key={order.id} type="button" className="parent-list-card" onClick={() => setSelectedOrder(order)}>
+                  <span>{order.title}</span>
+                  <em>
+                    {order.status} · {order.amount} 元 · {formatDate(order.createdAt)}
+                  </em>
+                </button>
+              ))}
+          </div>
+        </section>
+
+        {device ? (
+          <>
+            <section className="parent-section">
+              <div className="parent-section-head">
+                <strong>支付卡</strong>
+                <button type="button" onClick={() => messageApi.info('已打开近期支付明细列表')}>
+                  更多
+                </button>
+              </div>
+              <Form
+                key={`payment-tab-${selectedStudent.id}-${device.paymentCard?.account ?? 'empty'}`}
+                initialValues={{ account: device.paymentCard?.account ?? '' }}
+                onFinish={(values: { account: string }) => store.savePaymentCard(selectedStudent.id, values.account)}
+                className="parent-inline-form"
+              >
+                <Form.Item name="account">
+                  <Input placeholder="支付宝亲子卡账号" />
+                </Form.Item>
+                <Button htmlType="submit">保存</Button>
+              </Form>
+              <div className="parent-compact-list">
+                {(device.paymentCard?.records ?? []).slice(0, 3).map((record) => (
+                  <div key={record.id}>
+                    <span>{record.title}</span>
+                    <em>
+                      {record.amount > 0 ? '+' : ''}
+                      {record.amount} 元
+                    </em>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="parent-section">
+              <div className="parent-section-head">
+                <strong>网盘</strong>
+                <span>{device.netDisk?.status ?? '未绑定'}</span>
+              </div>
+              <Form
+                key={`netdisk-tab-${selectedStudent.id}-${device.netDisk?.account ?? 'empty'}`}
+                initialValues={{ account: device.netDisk?.account ?? '' }}
+                onFinish={(values: { account: string }) => store.saveNetDisk(selectedStudent.id, values.account)}
+                className="parent-inline-form"
+              >
+                <Form.Item name="account">
+                  <Input placeholder="百度网盘账号" />
+                </Form.Item>
+                <Button htmlType="submit">绑定</Button>
+              </Form>
+            </section>
+
+            <section className="parent-section">
+              <div className="parent-section-head">
+                <strong>通讯录</strong>
+                <span>{device.contacts.length} 人</span>
+              </div>
+              <Input.Search placeholder="关键字查找联系人" value={contactSearch} onChange={(event) => setContactSearch(event.target.value)} />
+              <div className="parent-compact-list contact-list">
+                {filteredContacts.map((contact) => (
+                  <div key={contact.id}>
+                    <span>
+                      {contact.name} · {contact.relation}
+                    </span>
+                    <em>{contact.phone}</em>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="parent-section">
+              <div className="parent-section-head">
+                <strong>停用时间</strong>
+                <span>按星期配置</span>
+              </div>
+              <div className="parent-compact-list">
+                {device.quietTimes.map((item) => (
+                  <div key={item.id}>
+                    <span>
+                      {item.start}-次日{item.end} · {item.weekdays.map((day) => weekdayNames[day]).join(' ')}
+                    </span>
+                    <Button size="small" onClick={() => store.toggleQuietTime(selectedStudent.id, item.id)}>
+                      {item.enabled ? '已启用' : '已停用'}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="parent-section">
+              <div className="parent-section-head">
+                <strong>位置与轨迹</strong>
+                <button type="button" onClick={() => messageApi.success(device.latestLocation?.navigationText ?? '已模拟拉起地图')}>
+                  地图导航
+                </button>
+              </div>
+              <div className="parent-location-card">
+                <strong>{device.latestLocation?.address ?? '暂无位置'}</strong>
+                <span>最后接收 {formatDate(device.latestLocation?.receivedAt ?? device.lastOnlineAt)}</span>
+              </div>
+              <div className="parent-track-map">
+                <svg viewBox="0 0 100 100" aria-hidden>
+                  <polyline points={device.tracks.map((track) => `${track.x},${track.y}`).join(' ')} />
+                  {device.tracks.map((track) => (
+                    <circle key={track.id} cx={track.x} cy={track.y} r="3.2" />
+                  ))}
+                </svg>
+              </div>
+              <div className="parent-track-list">
+                {device.tracks.map((track) => (
+                  <div key={track.id}>
+                    <span>{track.time}</span>
+                    <strong>{track.address}</strong>
+                    <em>距离导师 {track.distanceMeters} 米</em>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </>
         ) : null}
       </div>
     );
@@ -1003,7 +1728,14 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
     );
   }
 
-  const activeTitle = TAB_ITEMS.find((item) => item.key === activeTab)?.label ?? '首页';
+  const activeTitle = TAB_ITEMS.find((item) => item.key === activeTab)?.label ?? (activeTab === 'me' ? '我的' : '首页');
+  const drawerOrder = selectedOrder ? state.orders.find((order) => order.id === selectedOrder.id) ?? selectedOrder : null;
+  const editingMediaRecord =
+    editingMedia?.kind === 'photo'
+      ? state.portfolioPhotos.find((record) => record.id === editingMedia.id)
+      : editingMedia?.kind === 'achievement'
+        ? state.portfolioAchievements.find((record) => record.id === editingMedia.id)
+        : null;
 
   return (
     <ParentPhoneFrame>
@@ -1013,6 +1745,10 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
           <span>研学宝家长端</span>
           <strong>{activeTitle}</strong>
         </div>
+        <button type="button" className="parent-header-message" onClick={() => router.push('/messages')}>
+          <MessageOutlined />
+          <Badge count={unreadMessageCount} size="small" />
+        </button>
       </header>
 
       <div className="parent-shell-content">
@@ -1037,6 +1773,7 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
         {activeTab === 'growth' ? renderGrowth() : null}
         {activeTab === 'portfolio' ? renderPortfolio() : null}
         {activeTab === 'tasks' ? renderTasks() : null}
+        {activeTab === 'device' ? renderDevice() : null}
         {activeTab === 'me' ? renderMe() : null}
       </div>
 
@@ -1051,6 +1788,363 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
           );
         })}
       </nav>
+
+      <Drawer
+        title={editingMedia?.kind === 'achievement' ? '编辑成就' : '编辑照片'}
+        open={Boolean(editingMediaRecord)}
+        onClose={() => setEditingMedia(null)}
+        placement="bottom"
+        height={420}
+        getContainer={false}
+        rootClassName="parent-detail-drawer"
+      >
+        {editingMediaRecord ? (
+          <Form
+            key={`${editingMedia?.kind}-${editingMediaRecord.id}`}
+            layout="vertical"
+            initialValues={{
+              title: editingMediaRecord.title,
+              summary: editingMediaRecord.summary,
+              content: editingMediaRecord.content,
+            }}
+            onFinish={(values: { title: string; summary: string; content?: string }) => {
+              if (editingMedia?.kind === 'photo') {
+                store.updatePortfolioPhoto(editingMediaRecord.id, values);
+              } else {
+                store.updatePortfolioAchievement(editingMediaRecord.id, values);
+              }
+              setEditingMedia(null);
+              messageApi.success('已保存');
+            }}
+          >
+            <Form.Item name="title" label="标题" rules={[{ required: true, message: '请输入标题' }]}>
+              <Input />
+            </Form.Item>
+            <Form.Item name="summary" label="摘要" rules={[{ required: true, message: '请输入摘要' }]}>
+              <Input.TextArea rows={2} />
+            </Form.Item>
+            <Form.Item name="content" label="正文">
+              <Input.TextArea rows={3} />
+            </Form.Item>
+            <Button block type="primary" htmlType="submit">
+              保存
+            </Button>
+          </Form>
+        ) : null}
+      </Drawer>
+
+      <Drawer
+        title="成长值详情"
+        open={growthLedgerOpen}
+        onClose={() => setGrowthLedgerOpen(false)}
+        placement="bottom"
+        height={460}
+        getContainer={false}
+        rootClassName="parent-detail-drawer"
+      >
+        {selectedStudent ? (
+          <div className="parent-detail-stack">
+            <div className="parent-mini-table">
+              <div>
+                <span>累计成长值</span>
+                <strong>{selectedStudent.growthWallet.total}</strong>
+                <em>研学宝等级标志</em>
+              </div>
+              <div>
+                <span>可用成长值</span>
+                <strong>{selectedStudent.growthWallet.available}</strong>
+                <em>可用于后续消费兑换</em>
+              </div>
+            </div>
+            <div className="parent-card-list">
+              {growthLedger.map((record) => (
+                <div key={record.id} className="parent-list-card static">
+                  <span>{record.title}</span>
+                  <em>
+                    {record.type === 'earn' ? '+' : ''}
+                    {record.value} · {record.source} · {formatDate(record.occurredAt)}
+                  </em>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </Drawer>
+
+      <Drawer
+        title="天赋兴趣"
+        open={talentOpen}
+        onClose={() => setTalentOpen(false)}
+        placement="bottom"
+        height={560}
+        getContainer={false}
+        rootClassName="parent-detail-drawer"
+      >
+        {selectedStudent ? (
+          <Form
+            key={`talent-${selectedStudent.id}-${selectedStudent.talentProfile.updatedAt}`}
+            layout="vertical"
+            initialValues={{
+              strongestTalent: selectedStudent.talentProfile.strongestTalent,
+              parentTalent: selectedStudent.talentProfile.parentTalent,
+              studentTags: selectedStudent.interestProfile.studentTags,
+              parentTags: selectedStudent.interestProfile.parentTags,
+              testCompleted: selectedStudent.talentProfile.testCompleted ? 'yes' : 'no',
+            }}
+            onFinish={(values: {
+              strongestTalent: string;
+              parentTalent: string;
+              studentTags: string[];
+              parentTags: string[];
+              testCompleted: 'yes' | 'no';
+            }) => {
+              store.updateTalentInterest(selectedStudent.id, { ...values, testCompleted: values.testCompleted === 'yes' });
+              setTalentOpen(false);
+              messageApi.success('天赋兴趣已更新');
+            }}
+          >
+            <Form.Item name="strongestTalent" label="学员天赋测试结果">
+              <Select options={TALENT_OPTIONS.map((item) => ({ label: item, value: item }))} />
+            </Form.Item>
+            <Form.Item name="parentTalent" label="家长观察评估">
+              <Select options={TALENT_OPTIONS.map((item) => ({ label: item, value: item }))} />
+            </Form.Item>
+            <Form.Item name="testCompleted" label="天赋测试状态">
+              <Select
+                options={[
+                  { label: '已完成多元智能问卷测试', value: 'yes' },
+                  { label: '暂由家长评估', value: 'no' },
+                ]}
+              />
+            </Form.Item>
+            <Form.Item name="studentTags" label="学员选择的兴趣">
+              <Select mode="multiple" options={INTEREST_OPTIONS.map((item) => ({ label: item, value: item }))} />
+            </Form.Item>
+            <Form.Item name="parentTags" label="家长补充的兴趣">
+              <Select mode="multiple" options={INTEREST_OPTIONS.map((item) => ({ label: item, value: item }))} />
+            </Form.Item>
+            <Button block type="primary" htmlType="submit">
+              保存天赋兴趣
+            </Button>
+          </Form>
+        ) : null}
+      </Drawer>
+
+      <Drawer
+        title={drawerOrder?.type === '研学宝' ? '研学宝提单页' : '订单详情'}
+        open={Boolean(drawerOrder)}
+        onClose={() => setSelectedOrder(null)}
+        placement="bottom"
+        height={drawerOrder?.type === '研学宝' ? 680 : 560}
+        getContainer={false}
+        rootClassName="parent-detail-drawer"
+      >
+        {drawerOrder ? (
+          <div className="parent-detail-stack">
+            <section className="parent-detail-hero compact">
+              <span className="parent-detail-eyebrow">{drawerOrder.type}</span>
+              <strong>{drawerOrder.title}</strong>
+              <p>{drawerOrder.description ?? '核实信息后可模拟拉起支付页面。'}</p>
+              <div className="parent-detail-chip-row">
+                <Tag color={drawerOrder.status.includes('已') ? 'green' : 'gold'}>{drawerOrder.status}</Tag>
+                <Tag>{drawerOrder.amount} 元</Tag>
+                <Tag>{formatDate(drawerOrder.createdAt)}</Tag>
+              </div>
+            </section>
+            {drawerOrder.type === '研学宝' ? (
+              <div className="parent-order-product">
+                <span className="parent-order-product-image" role="img" aria-label="研学宝 Explorer S1" />
+                <div>
+                  <strong>Explorer S1 家庭套装</strong>
+                  <span>含研学宝设备、亲子账号绑定、AI 问问、拍照识别、定位轨迹与成长报告。</span>
+                </div>
+              </div>
+            ) : null}
+            <div className="parent-mini-table">
+              <div>
+                <span>产品/服务</span>
+                <strong>{drawerOrder.productName ?? drawerOrder.type}</strong>
+                <em>{drawerOrder.sourceLabel ?? '研学宝'}</em>
+              </div>
+              <div>
+                <span>收货/报名人</span>
+                <strong>{drawerOrder.receiver ?? state.parentProfile.name}</strong>
+                <em>{drawerOrder.phone ?? state.parentProfile.phone}</em>
+              </div>
+            </div>
+            {drawerOrder.status === '待支付' || drawerOrder.status === '待缴费' || drawerOrder.status === '未查看' || drawerOrder.status === '未处理' ? (
+              <Form
+                key={`order-submit-${drawerOrder.id}-${drawerOrder.status}`}
+                layout="vertical"
+                className="parent-order-submit-form"
+                initialValues={{
+                  receiver: drawerOrder.receiver ?? state.parentProfile.name,
+                  address: drawerOrder.address ?? '',
+                  phone: drawerOrder.phone ?? state.parentProfile.phone,
+                }}
+                onFinish={(values: Pick<ParentOrder, 'receiver' | 'address' | 'phone'>) => {
+                  store.payOrder(drawerOrder.id, values);
+                  messageApi.success(drawerOrder.type === '团队报名' ? '已完成报名缴费' : '已提交订单并模拟支付成功');
+                }}
+              >
+                <Form.Item
+                  name="receiver"
+                  label={drawerOrder.type === '研学宝' ? '收货人' : '联系人'}
+                  rules={[{ required: true, message: drawerOrder.type === '研学宝' ? '请输入收货人' : '请输入联系人' }]}
+                >
+                  <Input size="large" placeholder="请输入姓名" />
+                </Form.Item>
+                {drawerOrder.type === '研学宝' ? (
+                  <Form.Item name="address" label="收货地址" rules={[{ required: true, message: '请输入收货地址' }]}>
+                    <Input.TextArea rows={2} placeholder="省市区、街道门牌号" />
+                  </Form.Item>
+                ) : null}
+                <Form.Item
+                  name="phone"
+                  label="手机号码"
+                  rules={[
+                    { required: true, message: '请输入手机号码' },
+                    { pattern: /^1\d{10}$/, message: '请输入 11 位手机号码' },
+                  ]}
+                >
+                  <Input size="large" inputMode="tel" placeholder="用于支付与配送通知" />
+                </Form.Item>
+                <Button block type="primary" htmlType="submit" size="large">
+                  {drawerOrder.type === '团队报名' ? '确认并缴费' : '提交订单并支付'}
+                </Button>
+              </Form>
+            ) : (
+              <div className="parent-paid-line">
+                已完成支付{drawerOrder.paidAt ? ` · ${formatDate(drawerOrder.paidAt)}` : ''}
+              </div>
+            )}
+          </div>
+        ) : null}
+      </Drawer>
+
+      <Drawer
+        title="任务详情"
+        open={Boolean(selectedTaskDetail)}
+        onClose={() => setSelectedTaskDetail(null)}
+        placement="bottom"
+        height={520}
+        getContainer={false}
+        rootClassName="parent-detail-drawer"
+      >
+        {selectedTaskDetail ? (
+          <div className="parent-detail-stack">
+            <section className="parent-detail-hero compact">
+              <span className="parent-detail-eyebrow">{selectedTaskDetail.taskType}</span>
+              <strong>{selectedTaskDetail.title}</strong>
+              <p>{selectedTaskDetail.description}</p>
+              <div className="parent-detail-chip-row">
+                <Tag>{selectedTaskDetail.base}</Tag>
+                <Tag>{selectedTaskDetail.studyDate}</Tag>
+                <Tag>{selectedTaskDetail.points} 分</Tag>
+              </div>
+            </section>
+            <div className="parent-card-list">
+              {selectedTaskDetail.requirements.map((item) => (
+                <div key={item.id} className="parent-list-card static">
+                  <span>{item.requirement}</span>
+                  <em>{item.type}</em>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </Drawer>
+
+      <Drawer
+        title="研学邀伴"
+        open={inviteOpen}
+        onClose={() => setInviteOpen(false)}
+        placement="bottom"
+        height={520}
+        getContainer={false}
+        rootClassName="parent-detail-drawer"
+      >
+        {selectedFamilyTeam ? (
+          <div className="parent-detail-stack">
+            <section className="parent-invite-card">
+              <strong>{selectedFamilyTeam.name}</strong>
+              <span>{selectedFamilyTeam.theme}</span>
+              <em>邀伴码 {selectedFamilyTeam.inviteCode}</em>
+            </section>
+            <Form
+              layout="vertical"
+              initialValues={{ childName: '好友孩子', grade: selectedStudent?.grade ?? '五年级', phone: '13900000009' }}
+              onFinish={(values: { childName: string; grade: string; phone: string }) => {
+                store.joinFamilyTeamFromInvite({ teamId: selectedFamilyTeam.id, ...values });
+                setInviteOpen(false);
+                messageApi.success('好友报名成功，未来任务已自动同步');
+              }}
+            >
+              <Form.Item name="childName" label="报名孩子姓名" rules={[{ required: true, message: '请输入孩子姓名' }]}>
+                <Input />
+              </Form.Item>
+              <Form.Item name="grade" label="年级">
+                <Input />
+              </Form.Item>
+              <Form.Item name="phone" label="家长手机号">
+                <Input />
+              </Form.Item>
+              <Button block type="primary" htmlType="submit">
+                模拟好友报名
+              </Button>
+            </Form>
+          </div>
+        ) : null}
+      </Drawer>
+
+      <Drawer
+        title="创建家庭研学团队"
+        open={teamOpen}
+        onClose={() => setTeamOpen(false)}
+        placement="bottom"
+        height={560}
+        getContainer={false}
+        rootClassName="parent-detail-drawer"
+      >
+        <Form
+          layout="vertical"
+          initialValues={{
+            name: '周末自然观察队',
+            theme: '社区自然观察',
+            location: '社区公园',
+            studyDate: new Date().toISOString().slice(0, 10),
+            goal: '观察自然线索，提升问题解决和自然研学兴趣。',
+            studentIds: selectedStudentId ? [selectedStudentId] : [],
+          }}
+          onFinish={(values: { name: string; theme: string; location: string; studyDate: string; goal: string; studentIds: string[] }) => {
+            store.createFamilyTeam(values);
+            setTeamOpen(false);
+            messageApi.success('家庭研学团队已创建');
+          }}
+        >
+          <Form.Item name="name" label="团队名称" rules={[{ required: true, message: '请输入团队名称' }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="theme" label="研学主题">
+            <Input />
+          </Form.Item>
+          <Form.Item name="location" label="地点">
+            <Input />
+          </Form.Item>
+          <Form.Item name="studyDate" label="日期">
+            <Input type="date" />
+          </Form.Item>
+          <Form.Item name="goal" label="研学目标">
+            <Input.TextArea rows={3} />
+          </Form.Item>
+          <Form.Item name="studentIds" label="团队学员">
+            <Checkbox.Group options={state.students.map((student) => ({ label: student.name, value: student.id }))} />
+          </Form.Item>
+          <Button block type="primary" htmlType="submit">
+            创建团队
+          </Button>
+        </Form>
+      </Drawer>
 
       <Drawer
         title="下发任务"
@@ -1088,7 +2182,7 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
         open={Boolean(scoreWorkItem)}
         onClose={() => setScoreWorkItem(null)}
         placement="bottom"
-        height={420}
+        height={500}
         getContainer={false}
         rootClassName="parent-detail-drawer"
       >
@@ -1105,23 +2199,29 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
               layout="vertical"
               onFinish={submitScore}
               initialValues={{
-                rating: scoreWorkItem.rating ?? 4,
                 score:
                   scoreWorkItem.parentScore ??
-                  scoreWorkItem.aiScore ??
-                  Math.round((state.familyTasks.find((task) => task.id === scoreWorkItem.taskId)?.points ?? 20) * 0.8),
+                  Math.round(scoreWorkItem.aiScore ?? 8),
                 comment: scoreWorkItem.comment ?? '观察认真，表达清楚，可以继续补充更多自己的判断。',
               }}
             >
-              <Form.Item name="rating" label="星级" rules={[{ required: true, message: '请选择星级' }]}>
-                <Rate />
+              <div className="parent-score-line">
+                <span>任务分值</span>
+                <strong>{state.familyTasks.find((task) => task.id === scoreWorkItem.taskId)?.points ?? 0} 分</strong>
+              </div>
+              <div className="parent-score-line">
+                <span>AI评分</span>
+                <strong>{typeof scoreWorkItem.aiScore === 'number' ? Math.round(scoreWorkItem.aiScore) : '-'} / 10</strong>
+              </div>
+              <Form.Item name="score" label="家长评分（点选 0-10 分）" rules={[{ required: true, message: '请选择评分' }]}>
+                <ScorePicker />
               </Form.Item>
-              <Form.Item name="score" label="分数" rules={[{ required: true, message: '请输入分数' }]}>
-                <InputNumber min={0} max={state.familyTasks.find((task) => task.id === scoreWorkItem.taskId)?.points ?? 50} style={{ width: '100%' }} />
+              <Form.Item name="comment" label="评价（支持语音识别模拟）">
+                <Input.TextArea rows={3} placeholder="可输入文字，或点击下方按钮模拟语音转写。" />
               </Form.Item>
-              <Form.Item name="comment" label="评价">
-                <Input.TextArea rows={3} />
-              </Form.Item>
+              <Button block onClick={() => messageApi.success('已模拟完成语音输入自动识别')}>
+                模拟语音输入
+              </Button>
               <Button block type="primary" htmlType="submit">
                 保存评分
               </Button>

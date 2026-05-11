@@ -3,13 +3,30 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 export type CapabilityPlaneKey = 'self' | 'learning' | 'future' | 'social';
-export type GrowthDiaryType = 'report' | 'work' | 'ai_qa' | 'ai_creation' | 'growth_value' | 'assessment';
+export type GrowthDiaryType =
+  | 'timeline'
+  | 'report'
+  | 'work'
+  | 'task'
+  | 'ai_qa'
+  | 'ai_creation'
+  | 'flash_note'
+  | 'photo'
+  | 'achievement'
+  | 'expert_course'
+  | 'challenge'
+  | 'review'
+  | 'study_diary'
+  | 'assessment';
 export type FamilyTaskStatus = 'draft' | 'published' | 'submitted' | 'scored';
 export type RequirementType = 'text' | 'choice' | 'judge' | 'image';
 export type MessageType = 'system' | 'team_broadcast' | 'group_broadcast' | 'direct' | 'sos';
 export type CapabilityLevel = '优秀' | '良好' | '待提升' | '待改进';
 export type CapabilitySourceBreakdown = Array<{ label: string; value: number }>;
 export type CapabilityIndicatorDimension = { label: string; score: number; average: number };
+export type TalentSource = 'student_test' | 'parent_review';
+export type OrderType = '研学宝' | '团队报名' | '专家课程' | '难题挑战' | '增值服务';
+export type OrderStatus = '未查看' | '未处理' | '待缴费' | '已缴费' | '待支付' | '已支付';
 
 export type CapabilityElement = {
   id: string;
@@ -76,21 +93,103 @@ export type ParentDevice = {
     status: '已绑定' | '未绑定';
   };
   contacts: Array<{ id: string; name: string; relation: string; phone: string; allowed: boolean }>;
-  quietTimes: Array<{ id: string; label: string; start: string; end: string; enabled: boolean }>;
-  tracks: Array<{ id: string; time: string; address: string; distanceMeters: number }>;
+  quietTimes: Array<{ id: string; label: string; start: string; end: string; weekdays: number[]; enabled: boolean }>;
+  latestLocation?: {
+    address: string;
+    receivedAt: string;
+    mapProvider: '高德地图' | '百度地图';
+    navigationText: string;
+  };
+  tracks: Array<{ id: string; time: string; address: string; distanceMeters: number; x: number; y: number }>;
+};
+
+export type StudentTalentProfile = {
+  strongestTalent: string;
+  source: TalentSource;
+  parentTalent: string;
+  testCompleted: boolean;
+  updatedAt: string;
+};
+
+export type StudentInterestProfile = {
+  studentTags: string[];
+  parentTags: string[];
+  updatedAt: string;
+};
+
+export type GrowthValueLedgerRecord = {
+  id: string;
+  studentId: string;
+  title: string;
+  type: 'earn' | 'spend';
+  value: number;
+  availableAfter: number;
+  occurredAt: string;
+  source: string;
+  relatedId?: string;
+};
+
+export type CapabilityAdjustmentRecord = {
+  id: string;
+  studentId: string;
+  recordType: '家庭研学' | '日常任务' | '难题挑战' | '家长评测';
+  sourceTitle: string;
+  organizationName: string;
+  teamOrTaskName: string;
+  reportTitle: string;
+  reportId?: string;
+  evaluator: string;
+  evaluatedAt: string;
+  sourceType: '导师' | '家长' | '专家' | '系统';
+  elementRecords: Array<{
+    elementKey: string;
+    beforeIndex: number;
+    assessmentValue: number;
+    afterIndex: number;
+  }>;
+};
+
+export type ParentFamilyTeam = {
+  id: string;
+  name: string;
+  type: 'long_term' | 'activity';
+  theme: string;
+  location: string;
+  studyDate: string;
+  goal: string;
+  studentIds: string[];
+  inviteCode: string;
+  createdAt: string;
+};
+
+export type ParentDeviceAd = {
+  id: string;
+  title: string;
+  subtitle: string;
+  imageUrl: string;
+  features: string[];
+  imageTone: 'ability' | 'safety' | 'ai';
 };
 
 export type ParentStudent = {
   id: string;
   yxbId: string;
   name: string;
+  idNumber: string;
   birthday: string;
   age: number;
   city: string;
   school: string;
   grade: string;
   avatar: string;
+  avatarImage?: string;
   growthValue: number;
+  growthWallet: {
+    total: number;
+    available: number;
+  };
+  talentProfile: StudentTalentProfile;
+  interestProfile: StudentInterestProfile;
   account: StudentAccount;
   setupState: 'pending_device' | 'ready';
   device?: ParentDevice;
@@ -103,6 +202,12 @@ export type CapabilityReport = {
   type: 'student_self_test' | 'parent_review' | 'study_report';
   title: string;
   date: string;
+  organizationName?: string;
+  teamOrTaskName?: string;
+  evaluator?: string;
+  evaluatedAt?: string;
+  sourceType?: '导师' | '家长' | '专家' | '系统';
+  recordType?: CapabilityAdjustmentRecord['recordType'];
   planeTitle: string;
   summary: string;
   rows: Array<{ elementKey: string; score: number; latestIndex: number; average: number }>;
@@ -110,11 +215,18 @@ export type CapabilityReport = {
 
 export type PortfolioTimelineEntryType =
   | 'report'
+  | 'task'
   | 'work_submitted'
   | 'work_scored'
   | 'ai_qa'
   | 'ai_creation'
   | 'photo'
+  | 'achievement'
+  | 'expert_course'
+  | 'challenge'
+  | 'review'
+  | 'study_diary'
+  | 'flash_note'
   | 'device_diary'
   | 'growth_value'
   | 'capability_update'
@@ -128,6 +240,10 @@ export type PortfolioAttachment = {
   duration?: string;
   locationLabel?: string;
   capturedAt?: string;
+  fileUrl?: string;
+  mimeType?: string;
+  fileSize?: number;
+  uploadedBy?: string;
 };
 
 export type PortfolioWorkAnswer = {
@@ -202,9 +318,12 @@ export type ParentPhotoRecord = {
   studentId: string;
   title: string;
   createdAt: string;
+  content: string;
   photoType: '团队照片' | '小组照片' | '学员照片' | '作品附件';
   sourceLabel: string;
   summary: string;
+  relatedWorkId?: string;
+  uploadedBy?: string;
   attachments: PortfolioAttachment[];
 };
 
@@ -217,6 +336,21 @@ export type ParentDeviceDiary = {
   content: string;
   sourceLabel: string;
   relatedWorkId?: string;
+  attachments: PortfolioAttachment[];
+};
+
+export type ParentAchievementRecord = {
+  id: string;
+  studentId: string;
+  title: string;
+  summary: string;
+  createdAt: string;
+  content: string;
+  sourceLabel: string;
+  relatedWorkId?: string;
+  achievementType: '证书' | '奖状' | '徽章' | '作品入选';
+  uploadedBy: '老师' | '家长' | '学生' | '系统';
+  attachments: PortfolioAttachment[];
 };
 
 export type ParentGrowthRecord = {
@@ -310,8 +444,10 @@ export type TaskWork = {
   attachments: string[];
   aiScore?: number;
   parentScore?: number;
+  actualScore?: number;
   rating?: number;
   comment?: string;
+  scoredAt?: string;
 };
 
 export type ParentMessage = {
@@ -327,11 +463,19 @@ export type ParentMessage = {
 
 export type ParentOrder = {
   id: string;
-  type: '研学宝';
+  type: OrderType;
   title: string;
   amount: number;
-  status: '待支付' | '已支付' | '已发货';
+  status: OrderStatus;
   createdAt: string;
+  studentId?: string;
+  productName?: string;
+  sourceLabel?: string;
+  description?: string;
+  receiver?: string;
+  address?: string;
+  phone?: string;
+  paidAt?: string;
 };
 
 export type TaskTemplate = {
@@ -349,19 +493,25 @@ export type ParentState = {
   version: number;
   parentProfile: ParentProfile;
   selectedStudentId: string | null;
+  selectedFamilyTeamId: string | null;
   students: ParentStudent[];
+  familyTeams: ParentFamilyTeam[];
   reports: CapabilityReport[];
   portfolioWorks: ParentStudyWork[];
   portfolioAiRecords: ParentAiRecord[];
   portfolioGrowthRecords: ParentGrowthRecord[];
   portfolioPhotos: ParentPhotoRecord[];
+  portfolioAchievements: ParentAchievementRecord[];
   portfolioDeviceDiaries: ParentDeviceDiary[];
   messageCenterItems: ParentMessageCenterItem[];
+  growthValueLedger: GrowthValueLedgerRecord[];
+  capabilityAdjustmentRecords: CapabilityAdjustmentRecord[];
   diaryItems: GrowthDiaryItem[];
   familyTasks: FamilyTask[];
   works: TaskWork[];
   messages: ParentMessage[];
   orders: ParentOrder[];
+  deviceAds: ParentDeviceAd[];
   scanDevices: DemoScanDevice[];
 };
 
@@ -371,9 +521,11 @@ type ParentContextValue = {
   selectedStudent: ParentStudent | null;
   capabilityAverage: number;
   selectStudent: (studentId: string) => void;
+  selectFamilyTeam: (teamId: string) => void;
   resetDemoData: () => void;
   addStudent: (input: StudentInput) => string;
   updateStudent: (studentId: string, input: StudentInput) => void;
+  updateTalentInterest: (studentId: string, input: TalentInterestInput) => void;
   bindDevice: (studentId: string, input: DeviceInput) => void;
   savePaymentCard: (studentId: string, account: string) => void;
   saveNetDisk: (studentId: string, account: string) => void;
@@ -383,20 +535,40 @@ type ParentContextValue = {
   createTasksFromTemplates: (input: QuickTaskInput) => string[];
   createCustomTask: (input: CustomTaskInput) => string;
   updateTask: (taskId: string, input: CustomTaskInput) => void;
+  createFamilyTeam: (input: FamilyTeamInput) => string;
+  joinFamilyTeamFromInvite: (input: InviteJoinInput) => string;
   publishTasks: (taskIds: string[], studentIds: string[]) => void;
   syncDeviceWork: (taskId: string, studentId: string) => void;
   scoreWork: (workId: string, input: ScoreInput) => void;
   addMessage: (input: MessageInput) => void;
-  createOrder: () => void;
+  uploadPortfolioPhoto: (input: PortfolioMediaInput) => string;
+  uploadPortfolioAchievement: (input: PortfolioAchievementInput) => string;
+  updatePortfolioPhoto: (recordId: string, input: PortfolioMediaUpdateInput) => void;
+  updatePortfolioAchievement: (recordId: string, input: PortfolioMediaUpdateInput) => void;
+  deletePortfolioPhoto: (recordId: string) => void;
+  deletePortfolioAchievement: (recordId: string) => void;
+  createOrder: (input?: Partial<ParentOrder>) => string;
+  payOrder: (orderId: string, submitInfo?: Pick<ParentOrder, 'receiver' | 'address' | 'phone'>) => void;
+  markOrderViewed: (orderId: string) => void;
 };
 
 export type StudentInput = {
   name: string;
+  idNumber: string;
   birthday: string;
   city: string;
   school: string;
   grade: string;
   avatar?: string;
+  avatarImage?: string;
+};
+
+export type TalentInterestInput = {
+  strongestTalent: string;
+  parentTalent: string;
+  studentTags: string[];
+  parentTags: string[];
+  testCompleted?: boolean;
 };
 
 export type DeviceInput = {
@@ -411,6 +583,7 @@ export type ContactInput = {
 };
 
 export type QuickTaskInput = {
+  familyTeamId?: string;
   studyDate: string;
   destination: string;
   taskTypes: string[];
@@ -419,6 +592,7 @@ export type QuickTaskInput = {
 };
 
 export type CustomTaskInput = {
+  familyTeamId?: string;
   title: string;
   base: string;
   taskType: string;
@@ -429,8 +603,23 @@ export type CustomTaskInput = {
   requirements: Array<{ type: RequirementType; requirement: string }>;
 };
 
+export type FamilyTeamInput = {
+  name: string;
+  theme: string;
+  location: string;
+  studyDate: string;
+  goal: string;
+  studentIds: string[];
+};
+
+export type InviteJoinInput = {
+  teamId: string;
+  childName: string;
+  grade: string;
+  phone: string;
+};
+
 export type ScoreInput = {
-  rating: number;
   score: number;
   comment: string;
 };
@@ -443,9 +632,38 @@ export type MessageInput = {
   content: string;
 };
 
-const STORE_KEY = 'yanxuebao_parent_h5_state_v4';
-const LEGACY_STORE_KEYS = ['yanxuebao_parent_h5_state_v3', 'yanxuebao_parent_h5_state_v2'];
-const STORE_VERSION = 4;
+export type PortfolioMediaInput = {
+  studentId: string;
+  title: string;
+  summary: string;
+  content?: string;
+  sourceLabel?: string;
+  relatedWorkId?: string;
+  uploadedBy?: string;
+  attachments: PortfolioAttachment[];
+};
+
+export type PortfolioAchievementInput = PortfolioMediaInput & {
+  achievementType?: ParentAchievementRecord['achievementType'];
+  uploadedBy?: ParentAchievementRecord['uploadedBy'];
+};
+
+export type PortfolioMediaUpdateInput = {
+  title: string;
+  summary: string;
+  content?: string;
+};
+
+const STORE_KEY = 'yanxuebao_parent_h5_state_v8';
+const LEGACY_STORE_KEYS = [
+  'yanxuebao_parent_h5_state_v7',
+  'yanxuebao_parent_h5_state_v6',
+  'yanxuebao_parent_h5_state_v5',
+  'yanxuebao_parent_h5_state_v4',
+  'yanxuebao_parent_h5_state_v3',
+  'yanxuebao_parent_h5_state_v2',
+];
+const STORE_VERSION = 8;
 
 export const CAPABILITY_PLANES: Array<{
   key: CapabilityPlaneKey;
@@ -458,6 +676,23 @@ export const CAPABILITY_PLANES: Array<{
   { key: 'future', title: '创新发展', summary: '创新、融合、领导与商业思维', elements: ['创新思维', '跨学科融合', '领导能力', '商业思维'] },
   { key: 'social', title: '社会参与', summary: '道德、责任、国家与国际理解', elements: ['公民道德', '社会责任', '国家认同', '国际理解'] },
 ];
+
+export const TALENT_OPTIONS = ['语言智能', '逻辑-数理智能', '音乐智能', '空间智能', '身体-动觉智能', '自我认识智能', '人际交往智能', '自然观察智能'];
+
+export const INTEREST_GROUPS: Array<{ group: string; tags: string[] }> = [
+  { group: '前沿科技', tags: ['AI 智能', '3D 打印', '编程', '机器人', '无人机', 'VR 创作', '智能硬件', '网络安全'] },
+  { group: '科创发明', tags: ['小发明', '小制作', '科学实验', '创客造物', '装置设计', '手工创意', '创意改良'] },
+  { group: '商业创业', tags: ['创业', '经营', '理财', '运营', '品牌设计', '市场调研'] },
+  { group: '文学创作', tags: ['阅读', '写作', '演讲', '朗诵', '辩论', '外语交际'] },
+  { group: '艺术表演', tags: ['书法', '绘画', '演奏', '歌唱', '戏曲', '舞蹈', '主持', 'Cosplay'] },
+  { group: '体育运动', tags: ['球类', '棋类', '田径', '武术', '格斗', '游泳', '攀岩', '轮滑', '骑行'] },
+  { group: '自然研学', tags: ['生态观察', '园艺种植', '天文观测', '地理探究', '环保实践'] },
+  { group: '模型手作', tags: ['积木', '航模', '木工', '陶艺', '泥塑', '编织', '布艺', '折纸'] },
+  { group: '新媒体', tags: ['摄影', '剪辑', '动漫', '配音', '二次元'] },
+  { group: '逻辑益智', tags: ['数独', '魔方', '桌游', '速记'] },
+];
+
+export const INTEREST_OPTIONS = INTEREST_GROUPS.flatMap((group) => group.tags);
 
 export const TASK_LIBRARY: TaskTemplate[] = [
   {
@@ -879,6 +1114,33 @@ function buildStudentAccount(yxbId: string, activated = false): StudentAccount {
   };
 }
 
+function buildDefaultTalentProfile(offset = 0): StudentTalentProfile {
+  const talent = TALENT_OPTIONS[Math.abs(offset) % TALENT_OPTIONS.length] ?? TALENT_OPTIONS[0];
+  return {
+    strongestTalent: talent,
+    source: offset % 2 === 0 ? 'student_test' : 'parent_review',
+    parentTalent: talent,
+    testCompleted: offset % 2 === 0,
+    updatedAt: nowText(),
+  };
+}
+
+function buildDefaultInterestProfile(offset = 0): StudentInterestProfile {
+  const start = Math.abs(offset) % Math.max(INTEREST_OPTIONS.length - 4, 1);
+  return {
+    studentTags: INTEREST_OPTIONS.slice(start, start + 4),
+    parentTags: INTEREST_OPTIONS.slice(start + 2, start + 6),
+    updatedAt: nowText(),
+  };
+}
+
+function buildGrowthWallet(growthValue: number) {
+  return {
+    total: growthValue,
+    available: Math.max(0, Math.round(growthValue * 0.72)),
+  };
+}
+
 function buildDevice(deviceCode: string, mode?: 'sale' | 'rental'): ParentDevice {
   const scanDevice = SCAN_DEVICE_POOL.find((item) => item.deviceCode === deviceCode);
   const resolvedMode = mode ?? scanDevice?.mode ?? 'sale';
@@ -908,27 +1170,39 @@ function buildDevice(deviceCode: string, mode?: 'sale' | 'rental'): ParentDevice
       { id: 'contact_03', name: '研学导师王老师', relation: '导师', phone: '13900000003', allowed: true },
     ],
     quietTimes: [
-      { id: 'quiet_01', label: '上课时间', start: '08:00', end: '12:00', enabled: true },
-      { id: 'quiet_02', label: '晚间休息', start: '21:30', end: '07:00', enabled: true },
+      { id: 'quiet_01', label: '上课时间', start: '08:00', end: '12:00', weekdays: [1, 2, 3, 4, 5], enabled: true },
+      { id: 'quiet_02', label: '晚间休息', start: '21:30', end: '07:00', weekdays: [1, 2, 3, 4, 5], enabled: true },
+      { id: 'quiet_03', label: '周末开放前休息', start: '23:00', end: '08:00', weekdays: [6, 0], enabled: false },
     ],
+    latestLocation: {
+      address: '深圳海洋馆集合广场',
+      receivedAt: '2026-04-16 16:05',
+      mapProvider: '高德地图',
+      navigationText: '已模拟拉起地图导航',
+    },
     tracks: [
-      { id: 'track_01', time: '09:10', address: '深圳海洋馆入口', distanceMeters: 0 },
-      { id: 'track_02', time: '10:40', address: '海豚展区', distanceMeters: 160 },
-      { id: 'track_03', time: '13:20', address: '科普教室', distanceMeters: 240 },
-      { id: 'track_04', time: '16:05', address: '集合广场', distanceMeters: 80 },
+      { id: 'track_01', time: '09:10', address: '深圳海洋馆入口', distanceMeters: 0, x: 18, y: 76 },
+      { id: 'track_02', time: '10:40', address: '海豚展区', distanceMeters: 160, x: 42, y: 42 },
+      { id: 'track_03', time: '13:20', address: '科普教室', distanceMeters: 240, x: 68, y: 58 },
+      { id: 'track_04', time: '16:05', address: '集合广场', distanceMeters: 80, x: 82, y: 28 },
     ],
   };
 }
 
 function buildDemoStudent(
-  input: Omit<ParentStudent, 'age' | 'account' | 'setupState'> & {
+  input: Omit<ParentStudent, 'age' | 'account' | 'setupState' | 'idNumber' | 'growthWallet' | 'talentProfile' | 'interestProfile'> &
+    Partial<Pick<ParentStudent, 'idNumber' | 'growthWallet' | 'talentProfile' | 'interestProfile'>> & {
     accountActive?: boolean;
     setupState?: ParentStudent['setupState'];
   },
 ): ParentStudent {
   return {
     ...input,
+    idNumber: input.idNumber ?? `ID${input.yxbId}20150918`,
     age: calcAge(input.birthday),
+    growthWallet: input.growthWallet ?? buildGrowthWallet(input.growthValue),
+    talentProfile: input.talentProfile ?? buildDefaultTalentProfile(Number(input.yxbId.slice(-1))),
+    interestProfile: input.interestProfile ?? buildDefaultInterestProfile(Number(input.yxbId.slice(-1))),
     account: buildStudentAccount(input.yxbId, input.accountActive ?? false),
     setupState: input.setupState ?? (input.device ? 'ready' : 'pending_device'),
   };
@@ -988,6 +1262,10 @@ function buildAttachment(title: string, overrides: Partial<PortfolioAttachment> 
     duration: overrides.duration,
     locationLabel: overrides.locationLabel,
     capturedAt: overrides.capturedAt,
+    fileUrl: overrides.fileUrl,
+    mimeType: overrides.mimeType,
+    fileSize: overrides.fileSize,
+    uploadedBy: overrides.uploadedBy,
   };
 }
 
@@ -1083,7 +1361,7 @@ function buildPortfolioWorkFromTaskWork(work: TaskWork, task?: FamilyTask): Pare
     summary: work.content,
     currentContent: work.content,
     textContent: work.content,
-    rating: typeof work.rating === 'number' ? `${work.rating} 星` : undefined,
+    rating: typeof work.rating === 'number' ? `${work.rating}/10` : undefined,
     mentorComment: '设备端 AI 与导师已根据任务目标给出初评建议。',
     parentComment,
     aiScore: work.aiScore,
@@ -1201,19 +1479,50 @@ function buildEmptyState(): ParentState {
       relationLabel: '已绑定 0 位学员',
     },
     selectedStudentId: null,
+    selectedFamilyTeamId: null,
     students: [],
+    familyTeams: [],
     reports: [],
     portfolioWorks: [],
     portfolioAiRecords: [],
     portfolioGrowthRecords: [],
     portfolioPhotos: [],
+    portfolioAchievements: [],
     portfolioDeviceDiaries: [],
     messageCenterItems: [buildMessageCenterItemFromMessage(welcomeMessage)],
+    growthValueLedger: [],
+    capabilityAdjustmentRecords: [],
     diaryItems: [],
     familyTasks: [],
     works: [],
     messages: [welcomeMessage],
     orders: [],
+    deviceAds: [
+      {
+        id: 'ad_device_01',
+        title: 'AI 问问与拍拍',
+        subtitle: '把孩子现场问题、照片和语音沉淀成研学记录',
+        imageUrl: '/parent-device-ai.svg',
+        features: ['语音问答', '拍照识别', '自动成册'],
+        imageTone: 'ai',
+      },
+      {
+        id: 'ad_device_02',
+        title: '能力成长看得见',
+        subtitle: '任务评分后自动回写能力元素和成长值',
+        imageUrl: '/parent-device-growth.svg',
+        features: ['能力雷达', '成长值', '报告回写'],
+        imageTone: 'ability',
+      },
+      {
+        id: 'ad_device_03',
+        title: '定位与安全守护',
+        subtitle: '查看当前位置、24 小时轨迹和 SoS 消息',
+        imageUrl: '/parent-device-safety.svg',
+        features: ['实时定位', '轨迹回放', 'SoS 提醒'],
+        imageTone: 'safety',
+      },
+    ],
     scanDevices: clone(SCAN_DEVICE_POOL),
   };
 }
@@ -1250,9 +1559,24 @@ function buildDemoState(): ParentState {
     setupState: 'pending_device',
   });
 
+  const familyTeamA = buildLongTermFamilyTeam(studentA);
+  const familyTeamB = buildLongTermFamilyTeam(studentB);
+  const weekendTeam: ParentFamilyTeam = {
+    id: 'family_team_weekend_01',
+    name: '深圳海洋馆亲子研学队',
+    type: 'activity',
+    theme: '海洋生命与环保观察',
+    location: '深圳海洋馆',
+    studyDate: '2026-04-16',
+    goal: '通过观察、提问和作品表达，提升问题解决、科技应用和语言沟通。',
+    studentIds: [studentA.id],
+    inviteCode: 'OCEAN0416',
+    createdAt: '2026-04-15 20:00',
+  };
+
   const familyTaskA: FamilyTask = {
     id: 'task_family_01',
-    familyTeamId: 'family_parent_demo_20260416',
+    familyTeamId: weekendTeam.id,
     title: '海洋动物行为观察',
     base: '深圳海洋馆',
     taskType: '观察记录',
@@ -1269,7 +1593,7 @@ function buildDemoState(): ParentState {
 
   const familyTaskB: FamilyTask = {
     id: 'task_family_02',
-    familyTeamId: 'family_parent_demo_20260417',
+    familyTeamId: familyTeamA.id,
     title: '设计一份健康早餐',
     base: '家庭厨房',
     taskType: '创作任务',
@@ -1292,7 +1616,7 @@ function buildDemoState(): ParentState {
     contentType: 'mixed',
     content: '我观察到海豚会跟随饲养员手势转圈，还会用声音和同伴交流。它们需要清洁的水域和团队配合。',
     attachments: ['海豚观察照片', '语音转文字记录'],
-    aiScore: 17,
+    aiScore: 9,
   };
 
   const portfolioWorkA = buildPortfolioWorkFromTaskWork(workA, familyTaskA);
@@ -1437,6 +1761,24 @@ function buildDemoState(): ParentState {
       ],
     },
     {
+      id: 'ai_record_identify_01',
+      studentId: studentA.id,
+      kind: 'qa',
+      scene: 'identify',
+      agentName: '拍拍识别助手',
+      title: '拍拍识别：贝壳纹理从哪里来',
+      summary: '孩子连续拍摄贝壳纹理并追问成因，AI 给出观察线索和记录建议。',
+      createdAt: '2026-04-16 14:36',
+      questionCount: 2,
+      relatedWorkId: portfolioWorkA.id,
+      blocks: [
+        { type: 'image', content: '贝壳纹理照片' },
+        { type: 'text', content: '提问：这些纹理是天然形成的吗？' },
+        { type: 'answer', content: '答复：多数纹理和贝壳生长周期、矿物沉积有关，可以记录颜色、方向和重复规律。' },
+        { type: 'answer', content: '记录建议：把同类纹理放在一起对比，尝试画出你的分类标准。' },
+      ],
+    },
+    {
       id: 'ai_record_creation_01',
       studentId: studentA.id,
       kind: 'creation',
@@ -1463,19 +1805,100 @@ function buildDemoState(): ParentState {
       studentId: studentA.id,
       title: '海洋馆现场观察照片',
       createdAt: '2026-04-16 15:20',
+      content: '海洋馆现场拍摄的观察照片，包含海豚展区和主展厅环境，用于支撑本次研学任务作品。',
       photoType: '学员照片',
       sourceLabel: '设备相册同步',
       summary: '设备端上传了 2 张现场观察照片，已关联到海洋动物行为观察任务。',
+      relatedWorkId: portfolioWorkA.id,
+      uploadedBy: '林一诺',
       attachments: [
         buildAttachment('海豚观察照片', {
           id: 'photo_01_attachment_01',
           capturedAt: '2026-04-16 15:18',
           locationLabel: '深圳海洋馆海豚展区',
+          uploadedBy: '林一诺',
         }),
         buildAttachment('海洋馆环境照片', {
           id: 'photo_01_attachment_02',
           capturedAt: '2026-04-16 14:55',
           locationLabel: '深圳海洋馆主展厅',
+          uploadedBy: '林一诺',
+        }),
+      ],
+    },
+    {
+      id: 'photo_02',
+      studentId: studentA.id,
+      title: '海洋馆团队合影',
+      createdAt: '2026-04-16 16:40',
+      content: '研学导师上传的团队合影，记录亲子研学队完成海洋馆任务后的集合瞬间。',
+      photoType: '团队照片',
+      sourceLabel: '研学导师上传',
+      summary: '导师上传 3 张团队研学照片，已按 2026-04-16 统一归档。',
+      uploadedBy: '导师王老师',
+      attachments: [
+        buildAttachment('团队合影', {
+          id: 'photo_02_attachment_01',
+          capturedAt: '2026-04-16 16:32',
+          locationLabel: '深圳海洋馆出口',
+          uploadedBy: '导师王老师',
+        }),
+        buildAttachment('小组分享现场', {
+          id: 'photo_02_attachment_02',
+          capturedAt: '2026-04-16 16:10',
+          locationLabel: '深圳海洋馆科普教室',
+          uploadedBy: '导师王老师',
+        }),
+        buildAttachment('亲子任务打卡', {
+          id: 'photo_02_attachment_03',
+          capturedAt: '2026-04-16 15:58',
+          locationLabel: '深圳海洋馆主展厅',
+          uploadedBy: '导师王老师',
+        }),
+      ],
+    },
+  ];
+
+  const achievementRecords: ParentAchievementRecord[] = [
+    {
+      id: 'achievement_01',
+      studentId: studentA.id,
+      title: '海洋观察小达人证书',
+      createdAt: '2026-04-16 18:20',
+      content: '导师根据本次海洋馆研学表现上传证书，鼓励孩子继续保持观察和表达。',
+      sourceLabel: '研学导师上传',
+      summary: '完成海洋馆亲子研学队任务后获得的电子证书。',
+      relatedWorkId: portfolioWorkA.id,
+      achievementType: '证书',
+      uploadedBy: '老师',
+      attachments: [
+        buildAttachment('海洋观察小达人证书', {
+          id: 'achievement_01_attachment_01',
+          type: '照片',
+          capturedAt: '2026-04-16 18:20',
+          uploadedBy: '导师王老师',
+          mimeType: 'image/png',
+        }),
+      ],
+    },
+    {
+      id: 'achievement_02',
+      studentId: studentA.id,
+      title: '难题挑战入选证明',
+      createdAt: '2026-04-28 20:30',
+      content: '海洋污染治理方案入选难题挑战优秀方案，专家上传 PDF 证明。',
+      sourceLabel: '专家上传',
+      summary: '难题挑战优秀方案入选证明，附件为 PDF。',
+      achievementType: '作品入选',
+      uploadedBy: '老师',
+      attachments: [
+        buildAttachment('难题挑战入选证明.pdf', {
+          id: 'achievement_02_attachment_01',
+          type: '文档',
+          capturedAt: '2026-04-28 20:30',
+          uploadedBy: '专家陈老师',
+          mimeType: 'application/pdf',
+          fileSize: 842000,
         }),
       ],
     },
@@ -1491,6 +1914,34 @@ function buildDemoState(): ParentState {
       content: '我发现海豚会跟着训练员一起配合动作，而且它们发出的声音不只是叫声，还像在互相提醒。',
       sourceLabel: '设备端闪记',
       relatedWorkId: portfolioWorkA.id,
+      attachments: [
+        buildAttachment('海豚协作语音闪记', {
+          id: 'device_diary_01_attachment_01',
+          type: '音频',
+          duration: '00:36',
+          capturedAt: '2026-04-16 15:28',
+          uploadedBy: '林一诺',
+        }),
+      ],
+    },
+    {
+      id: 'device_diary_02',
+      studentId: studentA.id,
+      title: '家庭观察闪记已同步',
+      summary: '孩子用语音记录家庭观察中的光线和植物变化。',
+      createdAt: '2026-04-30 18:54',
+      content: '我发现阳台植物在傍晚会向窗边倾斜，房间里声音也比白天更安静。',
+      sourceLabel: '设备端闪记',
+      relatedWorkId: flashDiaryWork.id,
+      attachments: [
+        buildAttachment('家庭观察语音闪记', {
+          id: 'device_diary_02_attachment_01',
+          type: '音频',
+          duration: '00:42',
+          capturedAt: '2026-04-30 18:54',
+          uploadedBy: '林一诺',
+        }),
+      ],
     },
   ];
 
@@ -1525,6 +1976,98 @@ function buildDemoState(): ParentState {
     },
   ];
 
+  const growthValueLedger: GrowthValueLedgerRecord[] = [
+    {
+      id: 'ledger_01',
+      studentId: studentA.id,
+      title: '深圳海洋馆研学报告奖励',
+      type: 'earn',
+      value: 1000,
+      availableAfter: studentA.growthWallet.available,
+      occurredAt: '2026-04-16 18:05',
+      source: '研学报告',
+      relatedId: 'report_01',
+    },
+    {
+      id: 'ledger_02',
+      studentId: studentA.id,
+      title: '兑换海洋主题徽章',
+      type: 'spend',
+      value: -120,
+      availableAfter: studentA.growthWallet.available - 120,
+      occurredAt: '2026-04-17 12:20',
+      source: '消费兑换',
+    },
+    {
+      id: 'ledger_03',
+      studentId: studentA.id,
+      title: '家庭观察任务奖励',
+      type: 'earn',
+      value: 80,
+      availableAfter: studentA.growthWallet.available - 40,
+      occurredAt: '2026-04-30 19:20',
+      source: '家庭任务',
+      relatedId: 'work_learning_01',
+    },
+  ];
+
+  const capabilityAdjustmentRecords: CapabilityAdjustmentRecord[] = [
+    {
+      id: 'adjust_01',
+      studentId: studentA.id,
+      recordType: '家庭研学',
+      sourceTitle: '深圳海洋馆研学评分',
+      organizationName: '南山实验学校',
+      teamOrTaskName: '深圳海洋馆亲子研学队',
+      reportTitle: '深圳海洋馆研学报告',
+      reportId: 'report_01',
+      evaluator: '导师王老师',
+      evaluatedAt: '2026-04-16 18:02',
+      sourceType: '导师',
+      elementRecords: [
+        { elementKey: '问题解决', beforeIndex: 8.1, assessmentValue: 9.1, afterIndex: 8.7 },
+        { elementKey: '科技应用', beforeIndex: 7.6, assessmentValue: 8.8, afterIndex: 8.3 },
+        { elementKey: '语言沟通', beforeIndex: 7.3, assessmentValue: 8.4, afterIndex: 7.9 },
+      ],
+    },
+    {
+      id: 'adjust_02',
+      studentId: studentA.id,
+      recordType: '日常任务',
+      sourceTitle: '家庭观察日常任务评分',
+      organizationName: '家庭研学',
+      teamOrTaskName: '日常任务：家庭观察闪记',
+      reportTitle: '家庭观察日常任务评测报告',
+      reportId: 'report_03',
+      evaluator: '林一诺妈妈',
+      evaluatedAt: '2026-04-30 19:18',
+      sourceType: '家长',
+      elementRecords: [
+        { elementKey: '自我管理', beforeIndex: 8.0, assessmentValue: 8.8, afterIndex: 8.4 },
+        { elementKey: '创新思维', beforeIndex: 8.5, assessmentValue: 9.0, afterIndex: 8.8 },
+        { elementKey: '语言沟通', beforeIndex: 7.7, assessmentValue: 8.6, afterIndex: 8.1 },
+      ],
+    },
+    {
+      id: 'adjust_03',
+      studentId: studentA.id,
+      recordType: '难题挑战',
+      sourceTitle: '海洋污染治理难题挑战评分',
+      organizationName: '深圳青少年科创营',
+      teamOrTaskName: '难题挑战：海洋污染治理方案',
+      reportTitle: '海洋污染治理难题挑战评测报告',
+      reportId: 'report_04',
+      evaluator: '专家陈老师',
+      evaluatedAt: '2026-04-28 20:10',
+      sourceType: '专家',
+      elementRecords: [
+        { elementKey: '问题解决', beforeIndex: 8.4, assessmentValue: 9.3, afterIndex: 8.9 },
+        { elementKey: '社会责任', beforeIndex: 8.0, assessmentValue: 9.1, afterIndex: 8.6 },
+        { elementKey: '跨学科融合', beforeIndex: 8.1, assessmentValue: 8.9, afterIndex: 8.5 },
+      ],
+    },
+  ];
+
   const messages: ParentMessage[] = [
     { id: 'msg_01', type: 'team_broadcast', scope: 'team', studentId: studentA.id, title: '集合提醒', content: '16:30 在海洋馆出口集合，请注意设备电量。', createdAt: '2026-04-16 16:05', read: false },
     { id: 'msg_02', type: 'sos', scope: 'student', studentId: studentA.id, title: 'SoS 演示记录', content: '设备端发出 SoS，定位在海洋馆科普教室附近，已解除。', createdAt: '2026-04-16 13:10', read: true },
@@ -1538,7 +2081,9 @@ function buildDemoState(): ParentState {
       relationLabel: '已绑定 2 位学员',
     },
     selectedStudentId: studentA.id,
+    selectedFamilyTeamId: weekendTeam.id,
     students: [studentA, studentB],
+    familyTeams: [weekendTeam, familyTeamA, familyTeamB],
     reports: [
       {
         id: 'report_01',
@@ -1546,6 +2091,12 @@ function buildDemoState(): ParentState {
         type: 'study_report',
         title: '深圳海洋馆研学报告',
         date: '2026-04-16',
+        organizationName: '南山实验学校',
+        teamOrTaskName: '深圳海洋馆亲子研学队',
+        evaluator: '导师王老师',
+        evaluatedAt: '2026-04-16 18:02',
+        sourceType: '导师',
+        recordType: '家庭研学',
         planeTitle: '综合研学',
         summary: '在观察记录、表达分享和团队协作中表现稳定，问题解决与科技应用能力提升明显。',
         rows: [
@@ -1555,11 +2106,57 @@ function buildDemoState(): ParentState {
         ],
       },
       {
+        id: 'report_03',
+        studentId: studentA.id,
+        type: 'study_report',
+        title: '家庭观察日常任务评测报告',
+        date: '2026-04-30',
+        organizationName: '家庭研学',
+        teamOrTaskName: '日常任务：家庭观察闪记',
+        evaluator: '林一诺妈妈',
+        evaluatedAt: '2026-04-30 19:18',
+        sourceType: '家长',
+        recordType: '日常任务',
+        planeTitle: '日常任务',
+        summary: '孩子能在家庭观察中主动记录现象，并用闪记复盘自己的判断，日常任务完成度较高。',
+        rows: [
+          { elementKey: '自我管理', score: 8.8, latestIndex: 8.4, average: 7.6 },
+          { elementKey: '创新思维', score: 9.0, latestIndex: 8.8, average: 7.7 },
+          { elementKey: '语言沟通', score: 8.6, latestIndex: 8.1, average: 7.3 },
+        ],
+      },
+      {
+        id: 'report_04',
+        studentId: studentA.id,
+        type: 'study_report',
+        title: '海洋污染治理难题挑战评测报告',
+        date: '2026-04-28',
+        organizationName: '深圳青少年科创营',
+        teamOrTaskName: '难题挑战：海洋污染治理方案',
+        evaluator: '专家陈老师',
+        evaluatedAt: '2026-04-28 20:10',
+        sourceType: '专家',
+        recordType: '难题挑战',
+        planeTitle: '难题挑战',
+        summary: '孩子能从污染来源、治理成本和公众参与三个角度提出方案，问题解决与社会责任表现突出。',
+        rows: [
+          { elementKey: '问题解决', score: 9.3, latestIndex: 8.9, average: 7.9 },
+          { elementKey: '社会责任', score: 9.1, latestIndex: 8.6, average: 7.8 },
+          { elementKey: '跨学科融合', score: 8.9, latestIndex: 8.5, average: 7.5 },
+        ],
+      },
+      {
         id: 'report_02',
         studentId: studentA.id,
         type: 'student_self_test',
         title: '学员能力自测报告',
         date: '2026-04-10',
+        organizationName: '研学宝系统',
+        teamOrTaskName: '学员能力自测',
+        evaluator: '系统',
+        evaluatedAt: '2026-04-10 20:00',
+        sourceType: '系统',
+        recordType: '家长评测',
         planeTitle: '自主发展',
         summary: '自测显示孩子在问题解决上有较强主动性，自我管理仍有提升空间。',
         rows: [
@@ -1574,6 +2171,7 @@ function buildDemoState(): ParentState {
     portfolioAiRecords: aiRecords,
     portfolioGrowthRecords: growthRecords,
     portfolioPhotos: photoRecords,
+    portfolioAchievements: achievementRecords,
     portfolioDeviceDiaries: deviceDiaries,
     messageCenterItems: [
       {
@@ -1588,6 +2186,8 @@ function buildDemoState(): ParentState {
       },
       buildMessageCenterItemFromMessage(messages[2]),
     ],
+    growthValueLedger,
+    capabilityAdjustmentRecords,
     diaryItems: [
       {
         id: 'diary_01',
@@ -1603,7 +2203,7 @@ function buildDemoState(): ParentState {
       {
         id: 'diary_02',
         studentId: studentA.id,
-        type: 'work',
+        type: 'study_diary',
         title: '闪记日记：家庭观察感想',
         date: '2026-04-30 19:02',
         source: '家庭研学',
@@ -1649,20 +2249,150 @@ function buildDemoState(): ParentState {
         media: ['观察方式记录表'],
       },
       {
-        id: 'diary_05',
+        id: 'diary_07',
         studentId: studentA.id,
-        type: 'growth_value',
-        title: '团体研学成长值奖励',
-        date: '2026-04-16 18:05',
-        source: '成长值',
-        summary: '综合评级 A，获得 1000 成长值。',
+        type: 'flash_note',
+        title: '家庭观察语音闪记',
+        date: '2026-04-30 18:54',
+        source: '设备端闪记',
+        summary: '孩子用 42 秒语音记录了家庭观察中的光线、声音和植物变化。',
+        rating: '00:42',
+        relatedId: 'device_diary_02',
+        content: '我发现阳台植物在傍晚会向窗边倾斜，房间里声音也比白天更安静。',
+        media: ['语音闪记'],
+      },
+      {
+        id: 'diary_08',
+        studentId: studentA.id,
+        type: 'review',
+        title: '导师个性化评价',
+        date: '2026-04-16 18:12',
+        source: '导师王老师',
+        summary: '观察很细致，能把海豚行为和环境保护联系起来，建议下次继续补充更多对比证据。',
+        rating: '导师评价',
+        relatedId: 'report_01',
+        content: '一诺在海洋馆研学中能主动提问，也能用照片和文字表达观察结果。后续可继续训练“证据-观点”的表达结构。',
+        media: ['研学报告评价'],
+      },
+      {
+        id: 'diary_09',
+        studentId: studentA.id,
+        type: 'expert_course',
+        title: '海洋生物专家直播课',
+        date: '2026-04-18 20:30',
+        source: '专家课程',
+        summary: '学习专家课程 45 分钟，了解海豚回声定位和海洋生态保护。',
+        rating: '45 分钟',
+        content: '课程重点：回声定位、海洋动物协作、塑料污染对海洋生态的影响。',
+        media: ['课程回放', '学习时长'],
+      },
+      {
+        id: 'diary_10',
+        studentId: studentA.id,
+        type: 'challenge',
+        title: '接受海洋污染治理难题挑战',
+        date: '2026-04-28 18:00',
+        source: '难题挑战',
+        summary: '孩子接受“海洋污染治理方案”挑战，并提交了治理设想。',
+        rating: '已接受',
+        relatedId: 'report_04',
+        content: '挑战要求：从污染来源、治理成本和公众参与三个角度提出可执行方案。',
+        media: ['挑战任务书'],
+      },
+      {
+        id: 'diary_11',
+        studentId: studentA.id,
+        type: 'achievement',
+        title: '海洋观察小达人证书',
+        date: '2026-04-16 18:20',
+        source: '研学导师上传',
+        summary: '完成海洋馆亲子研学队任务后获得电子证书。',
+        rating: '证书',
+        relatedId: 'achievement_01',
+        content: '导师上传了“海洋观察小达人”电子证书，可在成就中查看和分享。',
+        media: ['电子证书'],
       },
     ],
     familyTasks: [familyTaskA, familyTaskB],
     works: [workA],
     messages,
     orders: [
-      { id: 'order_01', type: '研学宝', title: '研学宝智能硬件优惠订购', amount: 1299, status: '待支付', createdAt: '2026-04-16 20:30' },
+      {
+        id: 'order_01',
+        type: '研学宝',
+        title: '研学宝智能硬件优惠订购',
+        amount: 1299,
+        status: '待支付',
+        createdAt: '2026-04-16 20:30',
+        productName: '研学宝 Explorer S1 家庭套装',
+        sourceLabel: '研学宝订购',
+        description: '待支付订单，点击后可继续填写收货信息并模拟支付。',
+        receiver: '林一诺妈妈',
+        address: '深圳市南山区科技园演示地址',
+        phone: '13800000001',
+      },
+      {
+        id: 'order_02',
+        type: '团队报名',
+        title: '深圳海洋馆亲子研学队报名',
+        amount: 398,
+        status: '待缴费',
+        createdAt: '2026-04-16 09:10',
+        studentId: studentA.id,
+        productName: '团队研学报名',
+        sourceLabel: '导师分享报名二维码',
+        description: '家长扫码后自动关联待报名研学团队，可选择学员并完成模拟缴费。',
+      },
+      {
+        id: 'order_03',
+        type: '专家课程',
+        title: '海洋生物专家直播课',
+        amount: 99,
+        status: '未查看',
+        createdAt: '2026-04-15 18:30',
+        studentId: studentA.id,
+        productName: '专家课程',
+        sourceLabel: '学员看中后请家长购买',
+        description: '查看课程和费用信息后，可核实学员信息并模拟支付。',
+      },
+      {
+        id: 'order_04',
+        type: '难题挑战',
+        title: '海洋污染治理难题挑战',
+        amount: 49,
+        status: '未处理',
+        createdAt: '2026-04-15 12:20',
+        studentId: studentA.id,
+        productName: '难题挑战',
+        sourceLabel: '学员发起挑战',
+        description: '学员希望报名难题挑战，家长确认后可模拟支付并开通挑战任务。',
+      },
+    ],
+    deviceAds: [
+      {
+        id: 'ad_device_01',
+        title: 'AI 问问与拍拍',
+        subtitle: '把孩子现场问题、照片和语音沉淀成研学记录',
+        imageUrl: '/parent-device-ai.svg',
+        features: ['语音问答', '拍照识别', '自动成册'],
+        imageTone: 'ai',
+      },
+      {
+        id: 'ad_device_02',
+        title: '能力成长看得见',
+        subtitle: '任务评分后自动回写能力元素和成长值',
+        imageUrl: '/parent-device-growth.svg',
+        features: ['能力雷达', '成长值', '报告回写'],
+        imageTone: 'ability',
+      },
+      {
+        id: 'ad_device_03',
+        title: '定位与安全守护',
+        subtitle: '查看当前位置、24 小时轨迹和 SoS 消息',
+        imageUrl: '/parent-device-safety.svg',
+        features: ['实时定位', '轨迹回放', 'SoS 提醒'],
+        imageTone: 'safety',
+      },
     ],
     scanDevices: clone(SCAN_DEVICE_POOL),
   };
@@ -1679,15 +2409,56 @@ function normalizeState(state: ParentState): ParentState {
     ...state,
     parentProfile: state.parentProfile ?? base.parentProfile,
     selectedStudentId: state.selectedStudentId ?? null,
+    selectedFamilyTeamId: state.selectedFamilyTeamId ?? null,
     students: Array.isArray(state.students)
-      ? state.students.map((student) => ({
-          ...student,
-          capabilities: Array.isArray(student.capabilities)
-            ? student.capabilities.map((capability) => normalizeCapability(capability as CapabilityElement & Partial<{ updatedAt: string }>))
-            : [],
-        }))
+      ? state.students.map((student, index) => {
+          const growthValue = Number(student.growthValue) || 0;
+          return {
+            ...student,
+            idNumber: student.idNumber ?? `ID${student.yxbId}${student.birthday?.replaceAll('-', '') ?? ''}`,
+            avatarImage: student.avatarImage,
+            growthWallet: student.growthWallet ?? buildGrowthWallet(growthValue),
+            talentProfile: student.talentProfile ?? buildDefaultTalentProfile(index),
+            interestProfile: student.interestProfile ?? buildDefaultInterestProfile(index),
+            device: student.device
+              ? {
+                  ...student.device,
+                  quietTimes: student.device.quietTimes.map((item, quietIndex) => ({
+                    ...item,
+                    weekdays: item.weekdays ?? (quietIndex === 2 ? [6, 0] : [1, 2, 3, 4, 5]),
+                  })),
+                  latestLocation:
+                    student.device.latestLocation ?? {
+                      address: student.device.tracks.at(-1)?.address ?? '暂无位置',
+                      receivedAt: student.device.lastOnlineAt,
+                      mapProvider: '高德地图',
+                      navigationText: '已模拟拉起地图导航',
+                    },
+                  tracks: student.device.tracks.map((track, trackIndex) => ({
+                    ...track,
+                    x: track.x ?? 18 + trackIndex * 18,
+                    y: track.y ?? 72 - trackIndex * 12,
+                  })),
+                }
+              : undefined,
+            capabilities: Array.isArray(student.capabilities)
+              ? student.capabilities.map((capability) => normalizeCapability(capability as CapabilityElement & Partial<{ updatedAt: string }>))
+              : [],
+          };
+        })
       : base.students,
-    reports: Array.isArray(state.reports) ? state.reports : base.reports,
+    familyTeams: Array.isArray(state.familyTeams) ? state.familyTeams : base.familyTeams,
+    reports: Array.isArray(state.reports)
+      ? state.reports.map((report) => ({
+          ...report,
+          organizationName: report.organizationName ?? '研学宝',
+          teamOrTaskName: report.teamOrTaskName ?? report.planeTitle,
+          evaluator: report.evaluator ?? (report.type === 'parent_review' ? state.parentProfile?.name ?? '家长' : '系统'),
+          evaluatedAt: report.evaluatedAt ?? report.date,
+          sourceType: report.sourceType ?? (report.type === 'parent_review' ? '家长' : report.type === 'student_self_test' ? '系统' : '导师'),
+          recordType: report.recordType ?? (report.type === 'parent_review' ? '家长评测' : '家庭研学'),
+        }))
+      : base.reports,
     portfolioWorks: Array.isArray(state.portfolioWorks)
       ? state.portfolioWorks
       : Array.isArray(state.works)
@@ -1696,17 +2467,38 @@ function normalizeState(state: ParentState): ParentState {
     portfolioAiRecords: Array.isArray(state.portfolioAiRecords) ? state.portfolioAiRecords : base.portfolioAiRecords,
     portfolioGrowthRecords: Array.isArray(state.portfolioGrowthRecords) ? state.portfolioGrowthRecords : base.portfolioGrowthRecords,
     portfolioPhotos: Array.isArray(state.portfolioPhotos) ? state.portfolioPhotos : base.portfolioPhotos,
+    portfolioAchievements: Array.isArray(state.portfolioAchievements) ? state.portfolioAchievements : base.portfolioAchievements,
     portfolioDeviceDiaries: Array.isArray(state.portfolioDeviceDiaries) ? state.portfolioDeviceDiaries : base.portfolioDeviceDiaries,
     messageCenterItems: Array.isArray(state.messageCenterItems)
       ? state.messageCenterItems
       : Array.isArray(state.messages)
         ? state.messages.map(buildMessageCenterItemFromMessage)
         : base.messageCenterItems,
+    growthValueLedger: Array.isArray(state.growthValueLedger) ? state.growthValueLedger : base.growthValueLedger,
+    capabilityAdjustmentRecords: Array.isArray(state.capabilityAdjustmentRecords)
+      ? state.capabilityAdjustmentRecords.map((record) => ({
+          ...record,
+          recordType: record.recordType ?? '家庭研学',
+          reportId:
+            record.reportId ??
+            (Array.isArray(state.reports)
+              ? state.reports.find((report) => report.title === record.reportTitle || report.title === record.sourceTitle)?.id
+              : undefined),
+        }))
+      : base.capabilityAdjustmentRecords,
     diaryItems: Array.isArray(state.diaryItems) ? state.diaryItems : base.diaryItems,
     familyTasks: Array.isArray(state.familyTasks) ? state.familyTasks : base.familyTasks,
     works: Array.isArray(state.works) ? state.works : base.works,
     messages: Array.isArray(state.messages) ? state.messages : base.messages,
     orders: Array.isArray(state.orders) ? state.orders : base.orders,
+    deviceAds: Array.isArray(state.deviceAds)
+      ? state.deviceAds.map((ad, index) => ({
+          ...base.deviceAds[index % base.deviceAds.length],
+          ...ad,
+          imageUrl: ad.imageUrl ?? base.deviceAds[index % base.deviceAds.length]?.imageUrl ?? '/parent-device-ai.svg',
+          features: Array.isArray(ad.features) ? ad.features : base.deviceAds[index % base.deviceAds.length]?.features ?? [],
+        }))
+      : base.deviceAds,
     scanDevices: Array.isArray(state.scanDevices) && state.scanDevices.length ? state.scanDevices : clone(SCAN_DEVICE_POOL),
   };
 
@@ -1716,6 +2508,18 @@ function normalizeState(state: ParentState): ParentState {
 
   if (!nextState.selectedStudentId && nextState.students.length) {
     nextState.selectedStudentId = nextState.students[0].id;
+  }
+
+  if (!nextState.familyTeams.length && nextState.students.length) {
+    nextState.familyTeams = nextState.students.map(buildLongTermFamilyTeam);
+  }
+
+  if (nextState.selectedFamilyTeamId && !nextState.familyTeams.some((team) => team.id === nextState.selectedFamilyTeamId)) {
+    nextState.selectedFamilyTeamId = nextState.familyTeams[0]?.id ?? null;
+  }
+
+  if (!nextState.selectedFamilyTeamId && nextState.familyTeams.length) {
+    nextState.selectedFamilyTeamId = nextState.familyTeams[0].id;
   }
 
   nextState.parentProfile = {
@@ -1801,11 +2605,18 @@ export function getCapabilityOverview(student: ParentStudent | null) {
 export function getTimelineEntryLabel(entryType: PortfolioTimelineEntryType) {
   const labels: Record<PortfolioTimelineEntryType, string> = {
     report: '研学报告',
+    task: '任务',
     work_submitted: '作品提交',
     work_scored: '作品评分',
-    ai_qa: 'AI问答',
+    ai_qa: '拍拍/问问',
     ai_creation: 'AI创作',
     photo: '现场照片',
+    achievement: '成就',
+    expert_course: '专家课程',
+    challenge: '难题挑战',
+    review: '评价',
+    study_diary: '研学日记',
+    flash_note: '闪记',
     device_diary: '设备日记',
     growth_value: '成长值',
     capability_update: '能力更新',
@@ -1855,11 +2666,19 @@ export function getStudyDiaryItemsByStudent(state: ParentState, studentId: strin
 
 export function getStudyDiaryTypeLabel(type: GrowthDiaryType) {
   const labels: Record<GrowthDiaryType, string> = {
+    timeline: '时间线',
     report: '研学报告',
     work: '学习作品',
-    ai_qa: 'AI问答',
+    task: '任务',
+    ai_qa: '拍拍/问问',
     ai_creation: 'AI创作',
-    growth_value: '成长值',
+    flash_note: '闪记',
+    photo: '照片',
+    achievement: '成就',
+    expert_course: '专家课程',
+    challenge: '难题挑战',
+    review: '评价',
+    study_diary: '研学日记',
     assessment: '家长评测',
   };
   return labels[type];
@@ -1971,7 +2790,22 @@ export function getPortfolioTimelineEntries(state: ParentState, studentId: strin
       summary: photo.summary,
       relatedId: photo.id,
       relatedKind: 'record',
-      rating: `${photo.attachments.length} 项素材`,
+      rating: `${photo.attachments.length} 张照片`,
+    }));
+
+  const achievementEntries = state.portfolioAchievements
+    .filter((achievement) => achievement.studentId === studentId)
+    .map<PortfolioTimelineEntry>((achievement) => ({
+      id: `timeline_achievement_${achievement.id}`,
+      studentId,
+      entryType: 'achievement',
+      sourceLabel: achievement.sourceLabel,
+      occurredAt: achievement.createdAt,
+      title: achievement.title,
+      summary: achievement.summary,
+      relatedId: achievement.id,
+      relatedKind: 'record',
+      rating: `${achievement.achievementType} · ${achievement.uploadedBy}`,
     }));
 
   const diaryEntries = state.portfolioDeviceDiaries
@@ -1979,17 +2813,38 @@ export function getPortfolioTimelineEntries(state: ParentState, studentId: strin
     .map<PortfolioTimelineEntry>((item) => ({
       id: `timeline_diary_${item.id}`,
       studentId,
-      entryType: 'device_diary',
+      entryType: 'flash_note',
       sourceLabel: item.sourceLabel,
       occurredAt: item.createdAt,
       title: item.title,
       summary: item.summary,
       relatedId: item.id,
       relatedKind: 'record',
+      rating: `${item.attachments.length} 项素材`,
+    }));
+
+  const manualDiaryEntries = state.diaryItems
+    .filter((item) => item.studentId === studentId && !['timeline', 'report', 'work', 'ai_qa', 'ai_creation', 'photo', 'achievement', 'flash_note'].includes(item.type))
+    .map<PortfolioTimelineEntry>((item) => ({
+      id: `timeline_manual_${item.id}`,
+      studentId,
+      entryType: (item.type === 'assessment' ? 'assessment' : item.type) as PortfolioTimelineEntryType,
+      sourceLabel: item.source,
+      occurredAt: item.date,
+      title: item.title,
+      summary: item.summary,
+      relatedId: item.relatedId,
+      relatedKind:
+        item.type === 'challenge'
+          ? 'report'
+          : item.type === 'achievement' || item.type === 'flash_note'
+            ? 'record'
+            : undefined,
+      rating: item.rating,
     }));
 
   const growthEntries = state.portfolioGrowthRecords
-    .filter((record) => record.studentId === studentId)
+    .filter((record) => record.studentId === studentId && record.type !== 'growth_value')
     .map<PortfolioTimelineEntry>((record) => ({
       id: `timeline_growth_${record.id}`,
       studentId,
@@ -2003,8 +2858,8 @@ export function getPortfolioTimelineEntries(state: ParentState, studentId: strin
       rating: record.type === 'growth_value' ? `${record.delta > 0 ? '+' : ''}${record.delta}` : `${record.value.toFixed(1)}`,
     }));
 
-  return [...reportEntries, ...workEntries, ...aiEntries, ...photoEntries, ...diaryEntries, ...growthEntries].sort((left, right) =>
-    compareByDateDesc(left.occurredAt, right.occurredAt),
+  return [...reportEntries, ...workEntries, ...aiEntries, ...photoEntries, ...achievementEntries, ...diaryEntries, ...manualDiaryEntries, ...growthEntries].sort(
+    (left, right) => compareByDateDesc(left.occurredAt, right.occurredAt),
   );
 }
 
@@ -2033,6 +2888,35 @@ function familyTeamId(studentId: string | null, studyDate: string) {
   return `family_${studentId ?? 'parent'}_${studyDate.replaceAll('-', '')}`;
 }
 
+function getTaskAdjustmentRecordType(task: Pick<FamilyTask, 'base' | 'taskType' | 'title'>): CapabilityAdjustmentRecord['recordType'] {
+  if (task.taskType.includes('难题') || task.title.includes('挑战')) {
+    return '难题挑战';
+  }
+  if (task.base.includes('家庭') || task.taskType.includes('日常')) {
+    return '日常任务';
+  }
+  return '家庭研学';
+}
+
+function buildLongTermFamilyTeam(student: ParentStudent): ParentFamilyTeam {
+  return {
+    id: `family_team_${student.id}`,
+    name: `${student.name}家庭研学长期`,
+    type: 'long_term',
+    theme: '家庭长期研学',
+    location: student.city || '家庭研学',
+    studyDate: today(),
+    goal: '围绕日常观察、家庭任务和亲子研学持续沉淀能力成长。',
+    studentIds: [student.id],
+    inviteCode: `YXB${student.yxbId}`,
+    createdAt: nowText(),
+  };
+}
+
+function getSelectedFamilyTeamId(state: ParentState) {
+  return state.selectedFamilyTeamId ?? state.familyTeams[0]?.id ?? null;
+}
+
 function refreshRelationLabel(state: ParentState): ParentState {
   return {
     ...state,
@@ -2045,17 +2929,23 @@ function refreshRelationLabel(state: ParentState): ParentState {
 
 function createStudent(students: ParentStudent[], input: StudentInput): ParentStudent {
   const yxbId = nextYxbId(students);
+  const growthValue = 0;
   return {
     id: makeId('student'),
     yxbId,
     name: input.name,
+    idNumber: input.idNumber,
     birthday: input.birthday,
     age: calcAge(input.birthday),
     city: input.city,
     school: input.school,
     grade: input.grade,
     avatar: input.avatar || input.name.slice(-2),
-    growthValue: 0,
+    avatarImage: input.avatarImage,
+    growthValue,
+    growthWallet: buildGrowthWallet(growthValue),
+    talentProfile: buildDefaultTalentProfile(students.length + 1),
+    interestProfile: buildDefaultInterestProfile(students.length + 1),
     account: buildStudentAccount(yxbId, false),
     setupState: 'pending_device',
     capabilities: buildCapabilities(-0.2),
@@ -2088,16 +2978,22 @@ export function ParentStoreProvider({ children }: { children: ReactNode }) {
       selectStudent(studentId) {
         setState((current) => ({ ...current, selectedStudentId: studentId }));
       },
+      selectFamilyTeam(teamId) {
+        setState((current) => ({ ...current, selectedFamilyTeamId: teamId }));
+      },
       resetDemoData() {
         setState(buildDemoState());
       },
       addStudent(input) {
         const nextStudent = createStudent(state.students, input);
+        const nextTeam = buildLongTermFamilyTeam(nextStudent);
         setState((current) =>
           refreshRelationLabel({
             ...current,
             selectedStudentId: nextStudent.id,
+            selectedFamilyTeamId: nextTeam.id,
             students: [...current.students, nextStudent],
+            familyTeams: [nextTeam, ...current.familyTeams],
           }),
         );
         return nextStudent.id;
@@ -2110,8 +3006,29 @@ export function ParentStoreProvider({ children }: { children: ReactNode }) {
               ...input,
               age: calcAge(input.birthday),
               avatar: input.avatar || input.name.slice(-2),
+              avatarImage: input.avatarImage,
             })),
           ),
+        );
+      },
+      updateTalentInterest(studentId, input) {
+        setState((current) =>
+          withStudent(current, studentId, (student) => ({
+            ...student,
+            talentProfile: {
+              ...student.talentProfile,
+              strongestTalent: input.strongestTalent,
+              parentTalent: input.parentTalent,
+              source: input.testCompleted ? 'student_test' : 'parent_review',
+              testCompleted: input.testCompleted ?? student.talentProfile.testCompleted,
+              updatedAt: nowText(),
+            },
+            interestProfile: {
+              studentTags: input.studentTags,
+              parentTags: input.parentTags,
+              updatedAt: nowText(),
+            },
+          })),
         );
       },
       bindDevice(studentId, input) {
@@ -2249,6 +3166,12 @@ export function ParentStoreProvider({ children }: { children: ReactNode }) {
             type: 'parent_review',
             title: `${getPlaneTitle(planeKey)}家长能力评测报告`,
             date: today(),
+            organizationName: '家庭研学',
+            teamOrTaskName: getPlaneTitle(planeKey),
+            evaluator: current.parentProfile.name,
+            evaluatedAt: nowText(),
+            sourceType: '家长',
+            recordType: '家长评测',
             planeTitle: getPlaneTitle(planeKey),
             summary: `本次完成 ${reportRows.length} 个能力元素评测，已更新能力指数。`,
             rows: reportRows,
@@ -2277,10 +3200,30 @@ export function ParentStoreProvider({ children }: { children: ReactNode }) {
             summary: report.summary,
             relatedId: report.id,
           };
+          const adjustmentRecord: CapabilityAdjustmentRecord = {
+            id: makeId('adjust'),
+            studentId,
+            recordType: '家长评测',
+            sourceTitle: report.title,
+            organizationName: '家庭研学',
+            teamOrTaskName: getPlaneTitle(planeKey),
+            reportTitle: report.title,
+            reportId: report.id,
+            evaluator: current.parentProfile.name,
+            evaluatedAt: nowText(),
+            sourceType: '家长',
+            elementRecords: reportRows.map((row) => ({
+              elementKey: row.elementKey,
+              beforeIndex: round1((row.latestIndex - row.score * 0.3) / 0.7),
+              assessmentValue: row.score,
+              afterIndex: row.latestIndex,
+            })),
+          };
           return {
             ...nextState,
             reports: [report, ...nextState.reports],
             portfolioGrowthRecords: [capabilityUpdateRecord, ...nextState.portfolioGrowthRecords],
+            capabilityAdjustmentRecords: [adjustmentRecord, ...nextState.capabilityAdjustmentRecords],
             diaryItems: [diaryItem, ...nextState.diaryItems],
           };
         });
@@ -2289,9 +3232,10 @@ export function ParentStoreProvider({ children }: { children: ReactNode }) {
         const templates = TASK_LIBRARY.filter((template) => input.templateIds.includes(template.id));
         const taskIds = templates.map(() => makeId('task'));
         setState((current) => {
+          const targetTeamId = input.familyTeamId ?? getSelectedFamilyTeamId(current) ?? familyTeamId(current.selectedStudentId, input.studyDate);
           const tasks = templates.map((template, index): FamilyTask => ({
             id: taskIds[index],
-            familyTeamId: familyTeamId(current.selectedStudentId, input.studyDate),
+            familyTeamId: targetTeamId,
             title: template.title,
             base: input.destination || template.base,
             taskType: template.taskType,
@@ -2304,16 +3248,17 @@ export function ParentStoreProvider({ children }: { children: ReactNode }) {
             assignedStudentIds: [],
             createdAt: nowText(),
           }));
-          return { ...current, familyTasks: [...tasks, ...current.familyTasks] };
+          return { ...current, selectedFamilyTeamId: targetTeamId, familyTasks: [...tasks, ...current.familyTasks] };
         });
         return taskIds;
       },
       createCustomTask(input) {
         const taskId = makeId('task');
         setState((current) => {
+          const targetTeamId = input.familyTeamId ?? getSelectedFamilyTeamId(current) ?? familyTeamId(current.selectedStudentId, input.studyDate);
           const task: FamilyTask = {
             id: taskId,
-            familyTeamId: familyTeamId(current.selectedStudentId, input.studyDate),
+            familyTeamId: targetTeamId,
             title: input.title,
             base: input.base,
             taskType: input.taskType,
@@ -2328,7 +3273,7 @@ export function ParentStoreProvider({ children }: { children: ReactNode }) {
             assignedStudentIds: [],
             createdAt: nowText(),
           };
-          return { ...current, familyTasks: [task, ...current.familyTasks] };
+          return { ...current, selectedFamilyTeamId: targetTeamId, familyTasks: [task, ...current.familyTasks] };
         });
         return taskId;
       },
@@ -2353,6 +3298,84 @@ export function ParentStoreProvider({ children }: { children: ReactNode }) {
               : task,
           ),
         }));
+      },
+      createFamilyTeam(input) {
+        const teamId = makeId('family_team');
+        setState((current) => {
+          const team: ParentFamilyTeam = {
+            id: teamId,
+            name: input.name,
+            type: 'activity',
+            theme: input.theme,
+            location: input.location,
+            studyDate: input.studyDate,
+            goal: input.goal,
+            studentIds: input.studentIds,
+            inviteCode: `INV${Date.now().toString(36).slice(-6).toUpperCase()}`,
+            createdAt: nowText(),
+          };
+          return {
+            ...current,
+            selectedFamilyTeamId: teamId,
+            familyTeams: [team, ...current.familyTeams],
+          };
+        });
+        return teamId;
+      },
+      joinFamilyTeamFromInvite(input) {
+        let joinedStudentId = '';
+        setState((current) => {
+          const existingStudent = current.students.find((student) => student.name === input.childName);
+          const nextStudent =
+            existingStudent ??
+            createStudent(current.students, {
+              name: input.childName,
+              idNumber: `INVITE${Date.now().toString().slice(-8)}`,
+              birthday: '2016-09-01',
+              city: '深圳',
+              school: '好友家庭',
+              grade: input.grade,
+              avatar: input.childName.slice(-2),
+            });
+          joinedStudentId = nextStudent.id;
+          const nextTeam = existingStudent ? null : buildLongTermFamilyTeam(nextStudent);
+          const now = today();
+          return refreshRelationLabel({
+            ...current,
+            selectedStudentId: nextStudent.id,
+            selectedFamilyTeamId: input.teamId,
+            students: existingStudent ? current.students : [...current.students, nextStudent],
+            familyTeams: [
+              ...(nextTeam ? [nextTeam] : []),
+              ...current.familyTeams.map((team) =>
+                team.id === input.teamId && !team.studentIds.includes(nextStudent.id)
+                  ? { ...team, studentIds: [...team.studentIds, nextStudent.id] }
+                  : team,
+              ),
+            ],
+            familyTasks: current.familyTasks.map((task) =>
+              task.familyTeamId === input.teamId &&
+              task.status !== 'draft' &&
+              task.studyDate >= now &&
+              !task.assignedStudentIds.includes(nextStudent.id)
+                ? { ...task, assignedStudentIds: [...task.assignedStudentIds, nextStudent.id] }
+                : task,
+            ),
+            messages: [
+              {
+                id: makeId('msg'),
+                type: 'system',
+                scope: 'system',
+                title: '研学邀伴报名成功',
+                content: `${input.childName} 已通过邀伴链接加入家庭研学团队，未来任务会自动下发。`,
+                createdAt: nowText(),
+                read: false,
+              },
+              ...current.messages,
+            ],
+          });
+        });
+        return joinedStudentId;
       },
       publishTasks(taskIds, studentIds) {
         setState((current) => {
@@ -2401,7 +3424,7 @@ export function ParentStoreProvider({ children }: { children: ReactNode }) {
             contentType: 'mixed',
             content: `设备端已同步作品：完成《${task.title}》，提交了文字记录和现场照片。孩子能够围绕任务目标描述观察过程，并提出自己的发现。`,
             attachments: ['设备端照片', '语音转文字'],
-            aiScore: Math.min(task.points, Math.max(8, Math.round(task.points * 0.82))),
+            aiScore: 9,
           };
           const portfolioWork = buildPortfolioWorkFromTaskWork(work, task);
           return {
@@ -2434,14 +3457,18 @@ export function ParentStoreProvider({ children }: { children: ReactNode }) {
           if (!work || !task) {
             return current;
           }
-          const growthDelta = Math.round((input.score / Math.max(task.points, 1)) * 100);
+          const normalizedScore = Math.round(Math.max(0, Math.min(10, input.score)));
+          const actualScore = round1((task.points * normalizedScore) / 10);
+          const growthDelta = Math.round(actualScore * 5);
           const scoreRecordedAt = nowText();
           const scoredWork: TaskWork = {
             ...work,
             status: 'scored',
-            parentScore: input.score,
-            rating: input.rating,
+            parentScore: normalizedScore,
+            actualScore,
+            rating: normalizedScore,
             comment: input.comment,
+            scoredAt: scoreRecordedAt,
           };
           const nextState = withStudent(current, work.studentId, (student) => {
             const nextCapabilities = student.capabilities.map((capability) => {
@@ -2450,7 +3477,7 @@ export function ParentStoreProvider({ children }: { children: ReactNode }) {
               }
               return normalizeCapability({
                 ...capability,
-                score: round1(capability.score * 0.82 + (input.score / Math.max(task.points, 1)) * 10 * 0.18),
+                score: round1(capability.score * 0.82 + normalizedScore * 0.18),
                 source: 'family_task' as const,
                 recordedAt: nowIso(),
               });
@@ -2458,6 +3485,10 @@ export function ParentStoreProvider({ children }: { children: ReactNode }) {
             return {
               ...student,
               growthValue: student.growthValue + growthDelta,
+              growthWallet: {
+                total: student.growthWallet.total + growthDelta,
+                available: student.growthWallet.available + growthDelta,
+              },
               capabilities: nextCapabilities,
             };
           });
@@ -2476,7 +3507,7 @@ export function ParentStoreProvider({ children }: { children: ReactNode }) {
             value: growthDelta,
             delta: growthDelta,
             occurredAt: scoreRecordedAt,
-            summary: `家长评分 ${input.score}/${task.points}，获得 ${growthDelta} 成长值。${input.comment}`,
+            summary: `家长评分 ${normalizedScore}/10，实际得分 ${actualScore}/${task.points}，获得 ${growthDelta} 成长值。${input.comment}`,
             displaySource: '成长值',
             relatedId: workId,
           };
@@ -2487,33 +3518,99 @@ export function ParentStoreProvider({ children }: { children: ReactNode }) {
             category: task.capabilityTags[0] ?? task.taskType,
             sourceType: 'task',
             title: `${task.title}能力指数回写`,
-            value: round1((input.score / Math.max(task.points, 1)) * 10),
-            delta: round1((input.score / Math.max(task.points, 1)) * 2),
+            value: normalizedScore,
+            delta: round1(normalizedScore * 0.2),
             occurredAt: scoreRecordedAt,
             summary: `作品评分已同步到 ${task.capabilityTags.join('、')} 等相关能力元素。`,
             displaySource: '能力更新',
             relatedId: workId,
+          };
+          const ledgerRecord: GrowthValueLedgerRecord = {
+            id: makeId('ledger'),
+            studentId: work.studentId,
+            title: `${task.title}成长值奖励`,
+            type: 'earn',
+            value: growthDelta,
+            availableAfter:
+              nextState.students.find((student) => student.id === work.studentId)?.growthWallet.available ?? growthDelta,
+            occurredAt: scoreRecordedAt,
+            source: '家庭任务评分',
+            relatedId: workId,
+          };
+          const scoreReportId = makeId('report');
+          const recordType = getTaskAdjustmentRecordType(task);
+          const adjustmentRecord: CapabilityAdjustmentRecord = {
+            id: makeId('adjust'),
+            studentId: work.studentId,
+            recordType,
+            sourceTitle: `${task.title}作品评分`,
+            organizationName: recordType === '难题挑战' ? '家庭研学专家挑战' : '家庭研学',
+            teamOrTaskName: task.title,
+            reportTitle: `${task.title}评测报告`,
+            reportId: scoreReportId,
+            evaluator: current.parentProfile.name,
+            evaluatedAt: scoreRecordedAt,
+            sourceType: '家长',
+            elementRecords: task.capabilityTags.map((elementKey) => {
+              const before = current.students.find((student) => student.id === work.studentId)?.capabilities.find((item) => item.elementKey === elementKey)?.score ?? normalizedScore;
+              const after = nextState.students.find((student) => student.id === work.studentId)?.capabilities.find((item) => item.elementKey === elementKey)?.score ?? normalizedScore;
+              return {
+                elementKey,
+                beforeIndex: before,
+                assessmentValue: normalizedScore,
+                afterIndex: after,
+              };
+            }),
+          };
+          const scoreReport: CapabilityReport = {
+            id: scoreReportId,
+            studentId: work.studentId,
+            type: 'study_report',
+            title: adjustmentRecord.reportTitle,
+            date: scoreRecordedAt.slice(0, 10),
+            organizationName: adjustmentRecord.organizationName,
+            teamOrTaskName: adjustmentRecord.teamOrTaskName,
+            evaluator: adjustmentRecord.evaluator,
+            evaluatedAt: adjustmentRecord.evaluatedAt,
+            sourceType: adjustmentRecord.sourceType,
+            recordType,
+            planeTitle: recordType,
+            summary: `家长完成《${task.title}》作品评分，评分 ${normalizedScore}/10，实际得分 ${actualScore}/${task.points}，相关能力指数已同步回写。`,
+            rows: adjustmentRecord.elementRecords.map((item) => {
+              const capability = nextState.students
+                .find((student) => student.id === work.studentId)
+                ?.capabilities.find((capabilityItem) => capabilityItem.elementKey === item.elementKey);
+              return {
+                elementKey: item.elementKey,
+                score: item.assessmentValue,
+                latestIndex: item.afterIndex,
+                average: capability?.averageScore ?? round1((item.beforeIndex + item.afterIndex) / 2),
+              };
+            }),
           };
           return {
             ...nextState,
             familyTasks: nextState.familyTasks.map((item) => (item.id === task.id ? { ...item, status: 'scored' } : item)),
             works: nextState.works.map((item) => (item.id === workId ? scoredWork : item)),
             portfolioWorks: nextState.portfolioWorks.map((item) => (item.id === workId ? scoredPortfolioWork : item)),
+            reports: [scoreReport, ...nextState.reports],
             portfolioGrowthRecords: [capabilityUpdateRecord, growthValueRecord, ...nextState.portfolioGrowthRecords],
+            growthValueLedger: [ledgerRecord, ...nextState.growthValueLedger],
+            capabilityAdjustmentRecords: [adjustmentRecord, ...nextState.capabilityAdjustmentRecords],
             diaryItems: [
               {
                 id: makeId('diary'),
                 studentId: work.studentId,
-                type: 'growth_value',
+                type: 'review',
                 title: `${task.title}评分完成`,
                 date: scoreRecordedAt,
                 source: '家庭研学评分',
-                summary: `家长评分 ${input.score}/${task.points}，获得 ${growthDelta} 成长值。${input.comment}`,
-                rating: `${input.rating} 星`,
+                summary: `家长评分 ${normalizedScore}/10，实际得分 ${actualScore}/${task.points}。${input.comment}`,
+                rating: `${normalizedScore}/10`,
                 relatedId: workId,
               },
               ...nextState.diaryItems.map((item) =>
-                item.relatedId === workId ? { ...item, rating: `${input.rating} 星`, summary: input.comment || item.summary } : item,
+                item.relatedId === workId ? { ...item, rating: `${normalizedScore}/10`, summary: input.comment || item.summary } : item,
               ),
             ],
           };
@@ -2541,20 +3638,130 @@ export function ParentStoreProvider({ children }: { children: ReactNode }) {
           };
         });
       },
-      createOrder() {
+      uploadPortfolioPhoto(input) {
+        const recordId = makeId('photo');
+        setState((current) => ({
+          ...current,
+          portfolioPhotos: [
+            {
+              id: recordId,
+              studentId: input.studentId,
+              title: input.title,
+              createdAt: nowText(),
+              content: input.content ?? input.summary,
+              photoType: '学员照片',
+              sourceLabel: input.sourceLabel ?? '家长上传',
+              summary: input.summary,
+              relatedWorkId: input.relatedWorkId,
+              uploadedBy: input.uploadedBy ?? current.parentProfile.name,
+              attachments: input.attachments,
+            },
+            ...current.portfolioPhotos,
+          ],
+        }));
+        return recordId;
+      },
+      uploadPortfolioAchievement(input) {
+        const recordId = makeId('achievement');
+        setState((current) => ({
+          ...current,
+          portfolioAchievements: [
+            {
+              id: recordId,
+              studentId: input.studentId,
+              title: input.title,
+              createdAt: nowText(),
+              content: input.content ?? input.summary,
+              sourceLabel: input.sourceLabel ?? '家长上传',
+              summary: input.summary,
+              relatedWorkId: input.relatedWorkId,
+              achievementType: input.achievementType ?? '证书',
+              uploadedBy: input.uploadedBy ?? '家长',
+              attachments: input.attachments,
+            },
+            ...current.portfolioAchievements,
+          ],
+        }));
+        return recordId;
+      },
+      updatePortfolioPhoto(recordId, input) {
+        setState((current) => ({
+          ...current,
+          portfolioPhotos: current.portfolioPhotos.map((record) =>
+            record.id === recordId ? { ...record, title: input.title, summary: input.summary, content: input.content ?? input.summary } : record,
+          ),
+        }));
+      },
+      updatePortfolioAchievement(recordId, input) {
+        setState((current) => ({
+          ...current,
+          portfolioAchievements: current.portfolioAchievements.map((record) =>
+            record.id === recordId ? { ...record, title: input.title, summary: input.summary, content: input.content ?? input.summary } : record,
+          ),
+        }));
+      },
+      deletePortfolioPhoto(recordId) {
+        setState((current) => ({
+          ...current,
+          portfolioPhotos: current.portfolioPhotos.filter((record) => record.id !== recordId),
+        }));
+      },
+      deletePortfolioAchievement(recordId) {
+        setState((current) => ({
+          ...current,
+          portfolioAchievements: current.portfolioAchievements.filter((record) => record.id !== recordId),
+        }));
+      },
+      createOrder(input) {
+        const orderId = makeId('order');
         setState((current) => ({
           ...current,
           orders: [
             {
-              id: makeId('order'),
-              type: '研学宝',
-              title: '研学宝智能硬件优惠订购',
-              amount: 1299,
-              status: '待支付',
-              createdAt: nowText(),
+              id: orderId,
+              type: input?.type ?? '研学宝',
+              title: input?.title ?? '研学宝智能硬件优惠订购',
+              amount: input?.amount ?? 1299,
+              status: input?.status ?? '待支付',
+              createdAt: input?.createdAt ?? nowText(),
+              studentId: input?.studentId ?? current.selectedStudentId ?? undefined,
+              productName: input?.productName ?? '研学宝 Explorer S1 家庭套装',
+              sourceLabel: input?.sourceLabel ?? '研学宝订购',
+              description: input?.description ?? '请填写收货人、收货地址和手机号码后模拟拉起支付。',
+              receiver: input?.receiver ?? current.parentProfile.name,
+              address: input?.address ?? '深圳市南山区科技园演示地址',
+              phone: input?.phone ?? current.parentProfile.phone,
             },
             ...current.orders,
           ],
+        }));
+        return orderId;
+      },
+      payOrder(orderId, submitInfo) {
+        setState((current) => ({
+          ...current,
+          orders: current.orders.map((order) =>
+            order.id === orderId
+              ? {
+                  ...order,
+                  receiver: submitInfo?.receiver ?? order.receiver,
+                  address: submitInfo?.address ?? order.address,
+                  phone: submitInfo?.phone ?? order.phone,
+                  status: order.type === '团队报名' ? '已缴费' : '已支付',
+                  paidAt: nowText(),
+                }
+              : order,
+          ),
+        }));
+      },
+      markOrderViewed(orderId) {
+        setState((current) => ({
+          ...current,
+          orders: current.orders.map((order) =>
+            order.id === orderId && (order.status === '未查看' || order.status === '未处理')
+              ? { ...order, status: order.type === '团队报名' ? '待缴费' : '待支付' }
+              : order,
+          ),
         }));
       },
     };

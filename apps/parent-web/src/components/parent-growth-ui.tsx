@@ -3,7 +3,14 @@
 import '@ant-design/v5-patch-for-react-19';
 import { RightOutlined } from '@ant-design/icons';
 import { Tag } from 'antd';
-import { getCapabilityLevelColor, type CapabilityElement, type CapabilityLevel, type CapabilitySourceBreakdown } from '../lib/parent-store';
+import type { ReactNode } from 'react';
+import {
+  getCapabilityLevelColor,
+  type CapabilityAdjustmentRecord,
+  type CapabilityElement,
+  type CapabilityLevel,
+  type CapabilitySourceBreakdown,
+} from '../lib/parent-store';
 
 function polarPoint(index: number, total: number, radius: number, valueRatio: number) {
   const angle = -Math.PI / 2 + (Math.PI * 2 * index) / total;
@@ -20,6 +27,70 @@ function buildPolygon(labels: string[], values: number[], radius: number) {
       return `${point.x},${point.y}`;
     })
     .join(' ');
+}
+
+function roundRadarValue(value: number) {
+  return Math.round(value * 10) / 10;
+}
+
+export type CapabilityImprovementRadarItem = {
+  elementKey: string;
+  beforeIndex: number;
+  afterIndex: number;
+  assessmentValue?: number;
+  delta: number;
+  source: 'growth' | 'supplement';
+};
+
+export function buildCapabilityImprovementRadarItems(
+  capabilities: CapabilityElement[],
+  record?: CapabilityAdjustmentRecord | null,
+  limit = 6,
+): CapabilityImprovementRadarItem[] {
+  const capabilityMap = new Map(capabilities.map((capability) => [capability.elementKey, capability]));
+  const records = (record?.elementRecords ?? [])
+    .map((item) => {
+      const beforeIndex = roundRadarValue(item.beforeIndex);
+      const afterIndex = roundRadarValue(item.afterIndex);
+      return {
+        elementKey: item.elementKey,
+        beforeIndex,
+        afterIndex,
+        assessmentValue: roundRadarValue(item.assessmentValue),
+        delta: roundRadarValue(afterIndex - beforeIndex),
+        source: 'growth' as const,
+      };
+    })
+    .sort((left, right) => right.delta - left.delta || right.afterIndex - left.afterIndex);
+
+  const selected: CapabilityImprovementRadarItem[] = [];
+  const selectedKeys = new Set<string>();
+  const addItem = (item: CapabilityImprovementRadarItem) => {
+    if (selected.length >= limit || selectedKeys.has(item.elementKey)) {
+      return;
+    }
+    selected.push(item);
+    selectedKeys.add(item.elementKey);
+  };
+
+  records.filter((item) => item.delta > 0).forEach(addItem);
+
+  capabilities
+    .filter((capability) => !selectedKeys.has(capability.elementKey))
+    .sort((left, right) => right.score - left.score)
+    .forEach((capability) => {
+      const score = roundRadarValue(capability.score);
+      addItem({
+        elementKey: capability.elementKey,
+        beforeIndex: score,
+        afterIndex: score,
+        assessmentValue: score,
+        delta: 0,
+        source: capabilityMap.has(capability.elementKey) ? 'supplement' : 'growth',
+      });
+    });
+
+  return selected.slice(0, limit);
 }
 
 export function getCapabilitySourceLabel(source: CapabilityElement['source']) {
@@ -53,11 +124,19 @@ export function ParentRadarCard({
   labels,
   values,
   compareValues,
+  valueLabel = '我的指数',
+  compareLabel = '同龄平均',
+  summary,
+  children,
 }: {
   title: string;
   labels: string[];
   values: number[];
   compareValues: number[];
+  valueLabel?: string;
+  compareLabel?: string;
+  summary?: string;
+  children?: ReactNode;
 }) {
   const rings = [0.2, 0.4, 0.6, 0.8, 1];
   const stageRadius = labels.length <= 4 ? 68 : 62;
@@ -66,8 +145,9 @@ export function ParentRadarCard({
     <section className="parent-section parent-radar-card">
       <div className="parent-section-head">
         <strong>{title}</strong>
-        <span>我的指数 / 同龄平均</span>
+        <span>{valueLabel} / {compareLabel}</span>
       </div>
+      {summary ? <p className="parent-radar-summary">{summary}</p> : null}
       <div className="parent-radar-stage">
         <div className="parent-radar-stage-glow" aria-hidden />
         <div className="parent-radar-wrap">
@@ -98,16 +178,106 @@ export function ParentRadarCard({
           <div className="parent-radar-legend">
             <span>
               <i className="mine" />
-              我的指数
+              {valueLabel}
             </span>
             <span>
               <i className="compare" />
-              同龄平均
+              {compareLabel}
             </span>
           </div>
         </div>
       </div>
+      {children}
     </section>
+  );
+}
+
+export function ParentCapabilityImprovementList({ items }: { items: CapabilityImprovementRadarItem[] }) {
+  return (
+    <div className="parent-improvement-list">
+      {items.map((item, index) => (
+        <div key={`${item.elementKey}_${index}`} className="parent-improvement-item">
+          <span>{item.elementKey}</span>
+          <strong>{item.afterIndex.toFixed(1)}</strong>
+          <em className={item.delta > 0 ? 'up' : ''}>
+            {item.delta > 0 ? `提升 +${item.delta.toFixed(1)}` : '无变化'}
+          </em>
+          <small>更新前 {item.beforeIndex.toFixed(1)}</small>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function getAdjustmentTone(recordType: CapabilityAdjustmentRecord['recordType']) {
+  const toneMap: Record<CapabilityAdjustmentRecord['recordType'], string> = {
+    家庭研学: 'study',
+    日常任务: 'daily',
+    难题挑战: 'challenge',
+    家长评测: 'review',
+  };
+  return toneMap[recordType];
+}
+
+export function ParentAssessmentRecordCard({
+  record,
+  elementRecords,
+  onOpenReport,
+}: {
+  record: CapabilityAdjustmentRecord;
+  elementRecords?: CapabilityAdjustmentRecord['elementRecords'];
+  onOpenReport?: (record: CapabilityAdjustmentRecord) => void;
+}) {
+  const records = elementRecords ?? record.elementRecords;
+  const canOpenReport = Boolean(record.reportId && onOpenReport);
+  return (
+    <article className={`parent-assessment-record-card ${getAdjustmentTone(record.recordType)}`}>
+      <div className="parent-assessment-record-top">
+        <span>{record.recordType}</span>
+        <em>{record.sourceType}评测</em>
+      </div>
+      <button
+        type="button"
+        className="parent-assessment-report-link"
+        disabled={!canOpenReport}
+        onClick={() => {
+          if (canOpenReport) {
+            onOpenReport?.(record);
+          }
+        }}
+      >
+        {record.reportTitle}
+        {canOpenReport ? <RightOutlined /> : null}
+      </button>
+      <div className="parent-assessment-record-meta">
+        <div>
+          <span>研学机构</span>
+          <strong>{record.organizationName}</strong>
+        </div>
+        <div>
+          <span>团队/任务</span>
+          <strong>{record.teamOrTaskName}</strong>
+        </div>
+        <div>
+          <span>本次评测</span>
+          <strong>{formatParentDateTime(record.evaluatedAt)}</strong>
+        </div>
+        <div>
+          <span>评测人</span>
+          <strong>{record.evaluator}</strong>
+        </div>
+      </div>
+      <div className="parent-assessment-element-list">
+        {records.map((item) => (
+          <span key={item.elementKey}>
+            {item.elementKey}
+            <em>
+              {item.beforeIndex.toFixed(1)} → {item.afterIndex.toFixed(1)}
+            </em>
+          </span>
+        ))}
+      </div>
+    </article>
   );
 }
 

@@ -52,6 +52,7 @@ export function ParentDeviceManagementScreen() {
   const sessionReady = useParentSessionReady();
   const store = useParentStore();
   const studentId = searchParams.get('studentId');
+  const weekdayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
 
   const activeStudent = useMemo(() => {
     if (studentId) {
@@ -179,6 +180,17 @@ export function ParentDeviceManagementScreen() {
                     余额 {device.paymentCard.balance.toFixed(2)} 元 · 消费记录 {device.paymentCard.records.length} 条
                   </p>
                 ) : null}
+                <div className="parent-compact-list">
+                  {(device.paymentCard?.records ?? []).slice(0, 3).map((record) => (
+                    <div key={record.id}>
+                      <span>{record.title}</span>
+                      <em>
+                        {record.amount > 0 ? '+' : ''}
+                        {record.amount} 元
+                      </em>
+                    </div>
+                  ))}
+                </div>
               </section>
 
               <section className="parent-section">
@@ -221,7 +233,7 @@ export function ParentDeviceManagementScreen() {
                   {device.quietTimes.map((item) => (
                     <div key={item.id}>
                       <span>
-                        {item.label} · {item.start}-{item.end}
+                        {item.label} · {item.start}-次日{item.end} · {item.weekdays.map((day) => weekdayNames[day]).join(' ')}
                       </span>
                       <Switch size="small" checked={item.enabled} onChange={() => store.toggleQuietTime(activeStudent.id, item.id)} />
                     </div>
@@ -233,6 +245,10 @@ export function ParentDeviceManagementScreen() {
                 <div className="parent-section-head">
                   <strong>24 小时轨迹</strong>
                   <span>{device.tracks.length} 个位置</span>
+                </div>
+                <div className="parent-location-card">
+                  <strong>{device.latestLocation?.address ?? '暂无位置'}</strong>
+                  <span>最后接收 {formatDateTime(device.latestLocation?.receivedAt ?? device.lastOnlineAt)}</span>
                 </div>
                 <div className="parent-track-list">
                   {device.tracks.map((track) => (
@@ -259,7 +275,7 @@ export function ParentDeviceManagementScreen() {
                 <em>订单、支付状态采用本地 mock 数据演示。</em>
               </div>
               <Button type="primary" icon={<ShoppingOutlined />} onClick={() => store.createOrder()}>
-                生成订单
+                立即订购
               </Button>
             </div>
             <div className="parent-compact-list order-list">

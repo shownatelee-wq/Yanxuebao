@@ -2,7 +2,7 @@
 
 import '@ant-design/v5-patch-for-react-19';
 import { MessageOutlined, SendOutlined } from '@ant-design/icons';
-import { Badge, Button, Empty, Segmented, Tag } from 'antd';
+import { Badge, Button, Empty, Segmented, Tag, message } from 'antd';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { ParentRouteFallback } from './parent-route-fallback';
@@ -324,6 +324,7 @@ export function ParentPortfolioAiDetailScreen({ recordId }: { recordId: string }
 export function ParentPortfolioReportDetailScreen({ reportId }: { reportId: string }) {
   const router = useRouter();
   const store = useParentStore();
+  const [messageApi, messageHolder] = message.useMessage();
   const report = store.state.reports.find((item) => item.id === reportId);
 
   if (!report) {
@@ -346,19 +347,49 @@ export function ParentPortfolioReportDetailScreen({ reportId }: { reportId: stri
           <Button block onClick={() => router.push('/portfolio')}>
             返回作品
           </Button>
+          <Button block onClick={() => messageApi.success('已生成研学报告朋友圈分享卡片')}>
+            分享朋友圈
+          </Button>
           <Button block type="primary" onClick={() => router.push('/growth?focus=reports')}>
             查看成长页
           </Button>
         </div>
       }
     >
+      {messageHolder}
       <section className="parent-detail-hero">
-        <span className="parent-detail-eyebrow">{report.planeTitle}</span>
+        <span className="parent-detail-eyebrow">{report.recordType ?? report.planeTitle}</span>
         <strong>{report.title}</strong>
         <p>{report.summary}</p>
         <div className="parent-detail-chip-row">
-          <Tag>{report.date}</Tag>
+          <Tag>{formatDate(report.evaluatedAt ?? report.date)}</Tag>
           <Tag>{report.type === 'study_report' ? '研学报告' : report.type === 'parent_review' ? '家长评测' : '学员自测'}</Tag>
+          <Tag>{report.sourceType ?? '系统'}评测</Tag>
+        </div>
+      </section>
+
+      <section className="parent-section">
+        <div className="parent-section-head">
+          <strong>评分记录信息</strong>
+          <span>{report.recordType ?? report.planeTitle}</span>
+        </div>
+        <div className="parent-report-meta-grid">
+          <div>
+            <span>研学机构</span>
+            <strong>{report.organizationName ?? '研学宝'}</strong>
+          </div>
+          <div>
+            <span>团队/任务</span>
+            <strong>{report.teamOrTaskName ?? report.planeTitle}</strong>
+          </div>
+          <div>
+            <span>评测日期时间</span>
+            <strong>{formatDate(report.evaluatedAt ?? report.date)}</strong>
+          </div>
+          <div>
+            <span>评测人</span>
+            <strong>{report.evaluator ?? '系统'}</strong>
+          </div>
         </div>
       </section>
 
@@ -402,6 +433,7 @@ function getDiaryRelatedRoute(type: string, relatedId?: string) {
 export function ParentStudyDiaryDetailScreen({ diaryId }: { diaryId: string }) {
   const router = useRouter();
   const store = useParentStore();
+  const [messageApi, messageHolder] = message.useMessage();
   const diary = store.state.diaryItems.find((item) => item.id === diaryId);
   const relatedRoute = diary ? getDiaryRelatedRoute(diary.type, diary.relatedId) : null;
 
@@ -421,13 +453,19 @@ export function ParentStudyDiaryDetailScreen({ diaryId }: { diaryId: string }) {
       subtitle="作品"
       backTo="/portfolio?panel=diary"
       footer={
-        relatedRoute ? (
-          <Button block type="primary" onClick={() => router.push(relatedRoute)}>
-            查看关联详情
+        <div className="parent-split-footer">
+          <Button block onClick={() => messageApi.success('已生成朋友圈分享卡片')}>
+            分享朋友圈
           </Button>
-        ) : undefined
+          {relatedRoute ? (
+            <Button block type="primary" onClick={() => router.push(relatedRoute)}>
+              查看关联详情
+            </Button>
+          ) : null}
+        </div>
       }
     >
+      {messageHolder}
       <section className="parent-detail-hero">
         <span className="parent-detail-eyebrow">{getStudyDiaryTypeLabel(diary.type)}</span>
         <strong>{diary.title}</strong>
@@ -469,12 +507,14 @@ export function ParentStudyDiaryDetailScreen({ diaryId }: { diaryId: string }) {
 export function ParentPortfolioRecordDetailScreen({ entryId }: { entryId: string }) {
   const router = useRouter();
   const store = useParentStore();
+  const [messageApi, messageHolder] = message.useMessage();
   const entries = useMemo(
     () => store.state.students.flatMap((student) => getPortfolioTimelineEntries(store.state, student.id)),
     [store.state],
   );
   const entry = entries.find((item) => item.id === entryId);
   const photoRecord = entry?.relatedId ? store.state.portfolioPhotos.find((item) => item.id === entry.relatedId) : null;
+  const achievementRecord = entry?.relatedId ? store.state.portfolioAchievements.find((item) => item.id === entry.relatedId) : null;
   const diaryRecord = entry?.relatedId ? store.state.portfolioDeviceDiaries.find((item) => item.id === entry.relatedId) : null;
   const growthRecord = entry?.relatedId ? store.state.portfolioGrowthRecords.find((item) => item.id === entry.relatedId) : null;
   const relatedRoute = entry ? getRelatedRoute(entry.relatedKind, entry.relatedId, entry.id) : '/portfolio';
@@ -495,13 +535,19 @@ export function ParentPortfolioRecordDetailScreen({ entryId }: { entryId: string
       subtitle="作品"
       backTo="/portfolio"
       footer={
-        entry.relatedKind && entry.relatedKind !== 'record' ? (
-          <Button block type="primary" onClick={() => router.push(relatedRoute)}>
-            查看关联详情
+        <div className="parent-split-footer">
+          <Button block onClick={() => messageApi.success('已生成朋友圈分享卡片')}>
+            分享朋友圈
           </Button>
-        ) : undefined
+          {entry.relatedKind && entry.relatedKind !== 'record' ? (
+            <Button block type="primary" onClick={() => router.push(relatedRoute)}>
+              查看关联详情
+            </Button>
+          ) : null}
+        </div>
       }
     >
+      {messageHolder}
       <section className="parent-detail-hero">
         <span className="parent-detail-eyebrow">{getTimelineEntryLabel(entry.entryType)}</span>
         <strong>{entry.title}</strong>
@@ -516,12 +562,48 @@ export function ParentPortfolioRecordDetailScreen({ entryId }: { entryId: string
       {photoRecord ? (
         <section className="parent-section">
           <div className="parent-section-head">
-            <strong>现场素材</strong>
-            <span>{photoRecord.photoType}</span>
+            <strong>照片素材</strong>
+            <span>{photoRecord.attachments.length} 张</span>
           </div>
-          <div className="parent-tag-row">
+          <div className="parent-note-card">
+            <p>{photoRecord.content}</p>
+          </div>
+          <div className="parent-attachment-grid">
             {photoRecord.attachments.map((attachment) => (
-              <Tag key={attachment.id}>{attachment.title}</Tag>
+              <div key={attachment.id} className="parent-attachment-tile">
+                {attachment.fileUrl && attachment.mimeType?.startsWith('image/') ? (
+                  <span className="parent-attachment-preview" style={{ backgroundImage: `url(${attachment.fileUrl})` }} />
+                ) : (
+                  <span className="parent-attachment-file">{attachment.type}</span>
+                )}
+                <strong>{attachment.title}</strong>
+                <em>{attachment.locationLabel ?? attachment.uploadedBy ?? photoRecord.sourceLabel}</em>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {achievementRecord ? (
+        <section className="parent-section">
+          <div className="parent-section-head">
+            <strong>成就附件</strong>
+            <span>{achievementRecord.achievementType}</span>
+          </div>
+          <div className="parent-note-card">
+            <p>{achievementRecord.content}</p>
+          </div>
+          <div className="parent-attachment-grid">
+            {achievementRecord.attachments.map((attachment) => (
+              <div key={attachment.id} className="parent-attachment-tile">
+                {attachment.fileUrl && attachment.mimeType?.startsWith('image/') ? (
+                  <span className="parent-attachment-preview" style={{ backgroundImage: `url(${attachment.fileUrl})` }} />
+                ) : (
+                  <span className="parent-attachment-file">{attachment.mimeType?.includes('pdf') ? 'PDF' : attachment.type}</span>
+                )}
+                <strong>{attachment.title}</strong>
+                <em>{attachment.uploadedBy ?? achievementRecord.uploadedBy}</em>
+              </div>
             ))}
           </div>
         </section>
@@ -535,6 +617,11 @@ export function ParentPortfolioRecordDetailScreen({ entryId }: { entryId: string
           </div>
           <div className="parent-note-card">
             <p>{diaryRecord.content}</p>
+          </div>
+          <div className="parent-tag-row">
+            {diaryRecord.attachments.map((attachment) => (
+              <Tag key={attachment.id}>{attachment.title}</Tag>
+            ))}
           </div>
         </section>
       ) : null}

@@ -4,10 +4,27 @@ import '@ant-design/v5-patch-for-react-19';
 import { CheckCircleOutlined, EditOutlined, PlusOutlined, UserOutlined } from '@ant-design/icons';
 import { Button, Empty, Form, Input, Tag } from 'antd';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useMemo } from 'react';
+import { type ChangeEvent, useEffect, useMemo } from 'react';
 import { ParentRouteFallback } from './parent-route-fallback';
 import { ParentPhoneFrame, ParentSubpageShell, useParentSessionReady } from './parent-mobile-shell';
 import { useParentStore, type ParentStudent, type StudentInput } from '../lib/parent-store';
+
+function StudentAvatar({ student }: { student: ParentStudent }) {
+  return (
+    <div className="parent-avatar">
+      {student.avatarImage ? (
+        <span
+          className="parent-avatar-photo"
+          role="img"
+          aria-label={`${student.name}头像`}
+          style={{ backgroundImage: `url(${student.avatarImage})` }}
+        />
+      ) : (
+        student.avatar
+      )}
+    </div>
+  );
+}
 
 function StudentCard({
   student,
@@ -23,13 +40,14 @@ function StudentCard({
   return (
     <section className="parent-student-manage-card">
       <div className="parent-student-manage-top">
-        <div className="parent-avatar">{student.avatar}</div>
+        <StudentAvatar student={student} />
         <div className="parent-student-manage-main">
           <strong>{student.name}</strong>
           <span>
             {student.school} · {student.grade}
           </span>
           <em>研学宝 ID {student.yxbId}</em>
+          <em>证件号 {student.idNumber || '待补充'}</em>
         </div>
         <Tag color={student.setupState === 'ready' ? 'green' : 'gold'}>
           {student.setupState === 'ready' ? '已绑定设备' : '待绑定设备'}
@@ -120,6 +138,8 @@ export function ParentStudentEditorScreen() {
   const sessionReady = useParentSessionReady();
   const store = useParentStore();
   const [form] = Form.useForm<StudentInput>();
+  const avatarImage = Form.useWatch('avatarImage', form);
+  const avatarText = Form.useWatch('avatar', form);
 
   const studentId = searchParams.get('studentId');
   const editingStudent = useMemo(
@@ -135,21 +155,25 @@ export function ParentStudentEditorScreen() {
     if (editingStudent) {
       form.setFieldsValue({
         name: editingStudent.name,
+        idNumber: editingStudent.idNumber,
         birthday: editingStudent.birthday,
         city: editingStudent.city,
         school: editingStudent.school,
         grade: editingStudent.grade,
         avatar: editingStudent.avatar,
+        avatarImage: editingStudent.avatarImage,
       });
       return;
     }
 
     form.setFieldsValue({
       birthday: '2016-09-01',
+      idNumber: '',
       city: '深圳',
       school: '',
       grade: '',
       avatar: '',
+      avatarImage: '',
     });
   }, [editingStudent, form, store.hydrated]);
 
@@ -165,6 +189,21 @@ export function ParentStudentEditorScreen() {
     }
     const createdId = store.addStudent(values);
     router.push(`/me/students/account?studentId=${createdId}`);
+  }
+
+  function handleAvatarFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        form.setFieldValue('avatarImage', reader.result);
+      }
+    };
+    reader.readAsDataURL(file);
+    event.target.value = '';
   }
 
   if (!sessionReady || !store.hydrated) {
@@ -207,6 +246,9 @@ export function ParentStudentEditorScreen() {
           <Form.Item name="name" label="学员姓名" rules={[{ required: true, message: '请输入学员姓名' }]}>
             <Input placeholder="例如 林一诺" />
           </Form.Item>
+          <Form.Item name="idNumber" label="证件号码" rules={[{ required: true, message: '请输入证件号码' }]}>
+            <Input placeholder="用于与学校、研学机构名单匹配同步" />
+          </Form.Item>
           <Form.Item name="birthday" label="出生日期" rules={[{ required: true, message: '请选择出生日期' }]}>
             <Input type="date" />
           </Form.Item>
@@ -219,8 +261,35 @@ export function ParentStudentEditorScreen() {
           <Form.Item name="grade" label="当前年级" rules={[{ required: true, message: '请输入当前年级' }]}>
             <Input placeholder="例如 五年级" />
           </Form.Item>
+          <Form.Item name="avatarImage" hidden>
+            <Input />
+          </Form.Item>
+          <div className="parent-avatar-uploader">
+            <label>
+              <input type="file" accept="image/*" onChange={handleAvatarFileChange} />
+              <span className="parent-avatar-uploader-preview">
+                {avatarImage ? (
+                  <span
+                    className="parent-avatar-uploader-photo"
+                    role="img"
+                    aria-label="学员头像预览"
+                    style={{ backgroundImage: `url(${avatarImage})` }}
+                  />
+                ) : (
+                  <em>{avatarText || '头像'}</em>
+                )}
+              </span>
+              <strong>{avatarImage ? '更换头像' : '上传头像'}</strong>
+              <small>支持从手机相册选择或拍照</small>
+            </label>
+            {avatarImage ? (
+              <Button size="small" onClick={() => form.setFieldValue('avatarImage', '')}>
+                恢复文字头像
+              </Button>
+            ) : null}
+          </div>
           <Form.Item name="avatar" label="头像文字">
-            <Input placeholder="例如 一诺" maxLength={4} />
+            <Input placeholder="未上传照片时显示，例如 一诺" maxLength={4} />
           </Form.Item>
         </Form>
       </ParentSubpageShell>
@@ -284,7 +353,7 @@ export function ParentStudentAccountScreen() {
 
         <section className="parent-account-card">
           <div className="parent-account-head">
-            <div className="parent-avatar">{student.avatar}</div>
+            <StudentAvatar student={student} />
             <div>
               <strong>{student.name}</strong>
               <span>
@@ -296,6 +365,10 @@ export function ParentStudentAccountScreen() {
             <span>
               研学宝 ID
               <strong>{student.yxbId}</strong>
+            </span>
+            <span>
+              证件号码
+              <strong>{student.idNumber || '待补充'}</strong>
             </span>
             <span>
               学员账号

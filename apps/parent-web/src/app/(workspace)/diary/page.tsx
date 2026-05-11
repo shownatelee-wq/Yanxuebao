@@ -1,5 +1,11 @@
-import { redirect } from 'next/navigation';
+import { Suspense } from 'react';
+import { ParentMobileApp } from '../../../components/parent-mobile-app';
+import { ParentRouteFallback } from '../../../components/parent-route-fallback';
 
 export default function ParentDiaryPage() {
-  redirect('/portfolio?panel=diary');
+  return (
+    <Suspense fallback={<ParentRouteFallback />}>
+      <ParentMobileApp initialTab="portfolio" />
+    </Suspense>
+  );
 }

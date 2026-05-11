@@ -2,7 +2,7 @@
 
 import '@ant-design/v5-patch-for-react-19';
 import { CheckCircleOutlined, RocketOutlined } from '@ant-design/icons';
-import { Button, Checkbox, Form, Input, Select } from 'antd';
+import { Button, Checkbox, Form, Input, Select, message } from 'antd';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { ParentRouteFallback } from './parent-route-fallback';
@@ -18,6 +18,8 @@ export function ParentQuickTaskScreen() {
   const store = useParentStore();
   const [form] = Form.useForm();
   const [createdTaskIds, setCreatedTaskIds] = useState<string[]>([]);
+  const [aiPrompt, setAiPrompt] = useState('我想带孩子去深圳海洋馆做一次亲子研学，希望提升问题解决、科技应用和语言沟通。');
+  const [analysisText, setAnalysisText] = useState('已识别：地点/场景=深圳海洋馆；主题=海洋动物观察；能力目标=问题解决、科技应用、语言沟通。');
 
   useEffect(() => {
     if (!store.hydrated) {
@@ -47,6 +49,21 @@ export function ParentQuickTaskScreen() {
       templateIds: values.templateIds ?? [],
     });
     setCreatedTaskIds(taskIds);
+  }
+
+  function analyzePrompt() {
+    const nextDestination = aiPrompt.includes('公园') ? '社区公园' : aiPrompt.includes('厨房') ? '家庭厨房' : '深圳海洋馆';
+    const nextCapabilities = aiPrompt.includes('表达') ? ['语言沟通', '人文审美'] : ['问题解决', '科技应用', '语言沟通'];
+    form.setFieldsValue({
+      destination: nextDestination,
+      capabilityTags: nextCapabilities,
+      templateIds: TASK_LIBRARY.filter((template) => template.base === nextDestination || nextCapabilities.some((tag) => template.capabilityTags.includes(tag)))
+        .slice(0, 5)
+        .map((template) => template.id),
+    });
+    setAnalysisText(`已识别：地点/场景=${nextDestination}；检索关键字=${nextCapabilities.join('、')}；最多展示 30 条，本地任务库当前命中 ${
+      TASK_LIBRARY.length
+    } 条。`);
   }
 
   if (!sessionReady || !store.hydrated) {
@@ -111,8 +128,21 @@ export function ParentQuickTaskScreen() {
         }
       >
         <section className="parent-editor-intro">
-          <strong>快速匹配家庭研学任务</strong>
-          <span>根据日期、目的地、任务类型和能力元素，从本地任务库里匹配可直接使用的任务模板。</span>
+          <strong>AI 对话式创建任务</strong>
+          <span>用语音或文字描述研学地点、主题、目标和能力方向，智能体会提取条件并检索任务库。</span>
+        </section>
+
+        <section className="parent-section parent-ai-task-chat">
+          <div className="parent-chat-bubble user">
+            <Input.TextArea rows={4} value={aiPrompt} onChange={(event) => setAiPrompt(event.target.value)} />
+          </div>
+          <div className="parent-action-row">
+            <Button onClick={() => message.success('已模拟语音输入并转写到对话框')}>语音输入</Button>
+            <Button type="primary" onClick={analyzePrompt}>
+              分析并检索
+            </Button>
+          </div>
+          <div className="parent-chat-bubble ai">{analysisText}</div>
         </section>
 
         <Form form={form} layout="vertical" onFinish={submitQuickTask} className="parent-editor-form">

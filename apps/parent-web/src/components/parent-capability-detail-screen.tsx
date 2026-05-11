@@ -4,7 +4,16 @@ import '@ant-design/v5-patch-for-react-19';
 import { Button, Empty, Tag } from 'antd';
 import { useParams, useRouter } from 'next/navigation';
 import { ParentRouteFallback } from './parent-route-fallback';
-import { ParentRadarCard, ParentGrowthSourceBreakdown, formatParentDateTime, getCapabilitySourceDescription, getCapabilitySourceLabel } from './parent-growth-ui';
+import {
+  ParentAssessmentRecordCard,
+  ParentCapabilityImprovementList,
+  ParentGrowthSourceBreakdown,
+  ParentRadarCard,
+  buildCapabilityImprovementRadarItems,
+  formatParentDateTime,
+  getCapabilitySourceDescription,
+  getCapabilitySourceLabel,
+} from './parent-growth-ui';
 import { ParentPhoneFrame, ParentSubpageShell, useParentSessionReady } from './parent-mobile-shell';
 import { getCapabilityById, getCapabilityLevelColor, useParentStore } from '../lib/parent-store';
 
@@ -51,6 +60,18 @@ export function ParentCapabilityDetailScreen() {
   }
 
   const accentColor = getCapabilityLevelColor(capability.level);
+  const studentAdjustmentRecords = store.state.capabilityAdjustmentRecords
+    .filter((record) => record.studentId === store.selectedStudent?.id)
+    .sort((left, right) => right.evaluatedAt.localeCompare(left.evaluatedAt));
+  const latestAdjustmentRecord = studentAdjustmentRecords[0] ?? null;
+  const improvementRadarItems = buildCapabilityImprovementRadarItems(store.selectedStudent.capabilities, latestAdjustmentRecord);
+  const adjustmentRecords = store.state.capabilityAdjustmentRecords
+    .filter((record) => record.studentId === store.selectedStudent?.id)
+    .flatMap((record) =>
+      record.elementRecords
+        .filter((item) => item.elementKey === capability.elementKey)
+        .map((item) => ({ ...item, record })),
+    );
 
   return (
     <ParentPhoneFrame>
@@ -118,12 +139,44 @@ export function ParentCapabilityDetailScreen() {
 
         <ParentGrowthSourceBreakdown level={capability.level} items={capability.sourceBreakdown} />
 
+        <section className="parent-section">
+          <div className="parent-section-head">
+            <strong>研学报告评分记录详情</strong>
+            <span>{adjustmentRecords.length} 条</span>
+          </div>
+          <div className="parent-card-list">
+            {adjustmentRecords.length ? (
+              adjustmentRecords.map((item) => (
+                <ParentAssessmentRecordCard
+                  key={`${item.record.id}_${item.elementKey}`}
+                  record={item.record}
+                  elementRecords={[item]}
+                  onOpenReport={(record) => record.reportId && router.push(`/portfolio/reports/${record.reportId}`)}
+                />
+              ))
+            ) : (
+              <section className="parent-empty-guide compact">
+                <Empty description="暂无调整记录" />
+              </section>
+            )}
+          </div>
+        </section>
+
         <ParentRadarCard
-          title={`${capability.elementKey}指标能力图`}
-          labels={capability.indicatorDimensions.map((item) => item.label)}
-          values={capability.indicatorDimensions.map((item) => item.score)}
-          compareValues={capability.indicatorDimensions.map((item) => item.average)}
-        />
+          title="能力提升雷达图"
+          labels={improvementRadarItems.map((item) => item.elementKey)}
+          values={improvementRadarItems.map((item) => item.afterIndex)}
+          compareValues={improvementRadarItems.map((item) => item.beforeIndex)}
+          valueLabel="最新指数"
+          compareLabel="更新前指数"
+          summary={
+            latestAdjustmentRecord
+              ? `${latestAdjustmentRecord.reportTitle}：按本次研学/评测增长最多的能力元素排序展示，不足 6 项时补充当前高分且无变化的能力元素。`
+              : '暂无本次研学/评测调整记录，先展示当前分值最高的 6 项能力元素作为待观察基线。'
+          }
+        >
+          <ParentCapabilityImprovementList items={improvementRadarItems} />
+        </ParentRadarCard>
       </ParentSubpageShell>
     </ParentPhoneFrame>
   );
