@@ -4,6 +4,10 @@ import '@ant-design/v5-patch-for-react-19';
 import {
   BookOutlined,
   CheckCircleOutlined,
+  CloudOutlined,
+  CreditCardOutlined,
+  EnvironmentOutlined,
+  FieldTimeOutlined,
   HomeOutlined,
   LogoutOutlined,
   MessageOutlined,
@@ -252,13 +256,13 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
   const [teamOpen, setTeamOpen] = useState(false);
   const [selectedTaskDetail, setSelectedTaskDetail] = useState<FamilyTask | null>(null);
   const [editingMedia, setEditingMedia] = useState<{ kind: 'photo' | 'achievement'; id: string } | null>(null);
-  const [contactSearch, setContactSearch] = useState('');
   const handledTaskQuery = useRef('');
   const growthReportsRef = useRef<HTMLElement | null>(null);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
   const achievementInputRef = useRef<HTMLInputElement | null>(null);
 
   const flash = searchParams.get('flash');
+  const studentIdParam = searchParams.get('studentId');
   const selectTaskId = searchParams.get('selectTaskId');
   const portfolioPanelParam = searchParams.get('panel');
   const growthFocusParam = searchParams.get('focus');
@@ -268,6 +272,15 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
   useEffect(() => {
     setActiveTab(initialTab);
   }, [initialTab]);
+
+  useEffect(() => {
+    if (!studentIdParam || state.selectedStudentId === studentIdParam) {
+      return;
+    }
+    if (state.students.some((student) => student.id === studentIdParam)) {
+      store.selectStudent(studentIdParam);
+    }
+  }, [state.selectedStudentId, state.students, store, studentIdParam]);
 
   useEffect(() => {
     if (!portfolioPanelParam) {
@@ -1431,28 +1444,72 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
     }
 
     const device = selectedStudent.device;
-    const weekdayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-    const filteredContacts =
-      device?.contacts.filter((contact) => `${contact.name}${contact.relation}${contact.phone}`.includes(contactSearch.trim())) ?? [];
+    const deviceFeatures = [
+      {
+        key: 'payment-card',
+        title: '支付卡',
+        icon: CreditCardOutlined,
+        summary: device?.paymentCard
+          ? device.paymentCard.status === '已绑定'
+            ? `余额 ${device.paymentCard.balance.toFixed(2)} 元`
+            : device.paymentCard.status
+          : '未添加支付卡',
+      },
+      {
+        key: 'netdisk',
+        title: '网盘',
+        icon: CloudOutlined,
+        summary: device?.netDisk
+          ? device.netDisk.status === '已绑定'
+            ? `${device.netDisk.status} · ${device.netDisk.capacityUsed}/${device.netDisk.capacityTotal}GB`
+            : device.netDisk.status
+          : '未绑定网盘',
+      },
+      {
+        key: 'contacts',
+        title: '通讯录',
+        icon: TeamOutlined,
+        summary: device ? `${device.contacts.length} 人` : '待绑定设备',
+      },
+      {
+        key: 'quiet-times',
+        title: '停用时间',
+        icon: FieldTimeOutlined,
+        summary: device ? `${device.quietTimes.filter((item) => item.enabled).length} 条启用` : '待绑定设备',
+      },
+      {
+        key: 'location',
+        title: '位置与轨迹',
+        icon: EnvironmentOutlined,
+        summary: device?.latestLocation ? formatDate(device.latestLocation.receivedAt) : '暂无定位',
+      },
+      {
+        key: 'me',
+        title: '我的',
+        icon: UserOutlined,
+        summary: '个人中心',
+      },
+    ];
 
     return (
       <div className="parent-page">
-        <section className="parent-section">
-          <div className="parent-section-head">
-            <strong>{selectedStudent.name} 的研学宝</strong>
-            <Button size="small" type="primary" icon={<MobileOutlined />} onClick={() => router.push(`/me/device/scan?studentId=${selectedStudent.id}`)}>
-              {device ? '更换设备' : '扫码绑定'}
-            </Button>
+        <section className="parent-device-hero">
+          <div>
+            <span>{selectedStudent.name} 的研学宝</span>
+            <strong>{device ? device.name : '未绑定设备'}</strong>
+            <em>{device ? `${device.deviceCode} · 最后在线 ${formatDate(device.lastOnlineAt)}` : '绑定后开启设备管控功能'}</em>
           </div>
+          <Button size="small" type="primary" icon={<MobileOutlined />} onClick={() => router.push(`/me/device/scan?studentId=${selectedStudent.id}`)}>
+            {device ? '更换设备' : '扫码绑定'}
+          </Button>
+        </section>
+
+        <section className="parent-section">
           {device ? (
-            <div className="parent-device-card rich">
-              <MobileOutlined />
+            <div className="parent-device-status-card">
               <div>
-                <strong>{device.name}</strong>
-                <span>
-                  {device.deviceCode} · {device.model}
-                </span>
-                <em>最后在线 {formatDate(device.lastOnlineAt)}</em>
+                <strong>设备状态</strong>
+                <span>序列号 {device.serialNumber}</span>
               </div>
               <div className="parent-device-chip-list">
                 <Tag color="green">电量 {device.batteryPercent}%</Tag>
@@ -1461,11 +1518,50 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
             </div>
           ) : (
             <section className="parent-empty-guide compact">
-              <MobileOutlined />
-              <strong>这位学员还没有绑定设备</strong>
-              <p>扫码后会自动激活学员账号并同步设备信息。</p>
-            </section>
-          )}
+                <MobileOutlined />
+                <strong>这位学员还没有绑定设备</strong>
+                <p>扫码后会自动激活学员账号并同步设备信息。</p>
+                <Button type="primary" onClick={() => router.push(`/me/device/scan?studentId=${selectedStudent.id}`)}>
+                  立即扫码绑定
+                </Button>
+              </section>
+            )}
+        </section>
+
+        <section className="parent-section">
+          <div className="parent-section-head">
+            <strong>设备功能</strong>
+            <span>点击进入二级功能</span>
+          </div>
+          <div className="parent-device-feature-grid">
+            {deviceFeatures.map((feature) => {
+              const Icon = feature.icon;
+              return (
+                <button
+                  key={feature.key}
+                  type="button"
+                  className={`parent-device-feature-entry ${device || feature.key === 'me' ? '' : 'disabled'}`}
+                  onClick={() => {
+                    if (feature.key === 'me') {
+                      router.push('/me');
+                      return;
+                    }
+                    if (!device) {
+                      messageApi.warning('请先绑定研学宝设备');
+                      return;
+                    }
+                    router.push(`/me/device/${feature.key}?studentId=${selectedStudent.id}`);
+                  }}
+                >
+                  <span className={`parent-device-feature-icon ${feature.key}`}>
+                    <Icon />
+                  </span>
+                  <strong>{feature.title}</strong>
+                  <em>{feature.summary}</em>
+                </button>
+              );
+            })}
+          </div>
         </section>
 
         <section className="parent-section parent-device-ad-section">
@@ -1506,126 +1602,6 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
               ))}
           </div>
         </section>
-
-        {device ? (
-          <>
-            <section className="parent-section">
-              <div className="parent-section-head">
-                <strong>支付卡</strong>
-                <button type="button" onClick={() => messageApi.info('已打开近期支付明细列表')}>
-                  更多
-                </button>
-              </div>
-              <Form
-                key={`payment-tab-${selectedStudent.id}-${device.paymentCard?.account ?? 'empty'}`}
-                initialValues={{ account: device.paymentCard?.account ?? '' }}
-                onFinish={(values: { account: string }) => store.savePaymentCard(selectedStudent.id, values.account)}
-                className="parent-inline-form"
-              >
-                <Form.Item name="account">
-                  <Input placeholder="支付宝亲子卡账号" />
-                </Form.Item>
-                <Button htmlType="submit">保存</Button>
-              </Form>
-              <div className="parent-compact-list">
-                {(device.paymentCard?.records ?? []).slice(0, 3).map((record) => (
-                  <div key={record.id}>
-                    <span>{record.title}</span>
-                    <em>
-                      {record.amount > 0 ? '+' : ''}
-                      {record.amount} 元
-                    </em>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <section className="parent-section">
-              <div className="parent-section-head">
-                <strong>网盘</strong>
-                <span>{device.netDisk?.status ?? '未绑定'}</span>
-              </div>
-              <Form
-                key={`netdisk-tab-${selectedStudent.id}-${device.netDisk?.account ?? 'empty'}`}
-                initialValues={{ account: device.netDisk?.account ?? '' }}
-                onFinish={(values: { account: string }) => store.saveNetDisk(selectedStudent.id, values.account)}
-                className="parent-inline-form"
-              >
-                <Form.Item name="account">
-                  <Input placeholder="百度网盘账号" />
-                </Form.Item>
-                <Button htmlType="submit">绑定</Button>
-              </Form>
-            </section>
-
-            <section className="parent-section">
-              <div className="parent-section-head">
-                <strong>通讯录</strong>
-                <span>{device.contacts.length} 人</span>
-              </div>
-              <Input.Search placeholder="关键字查找联系人" value={contactSearch} onChange={(event) => setContactSearch(event.target.value)} />
-              <div className="parent-compact-list contact-list">
-                {filteredContacts.map((contact) => (
-                  <div key={contact.id}>
-                    <span>
-                      {contact.name} · {contact.relation}
-                    </span>
-                    <em>{contact.phone}</em>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <section className="parent-section">
-              <div className="parent-section-head">
-                <strong>停用时间</strong>
-                <span>按星期配置</span>
-              </div>
-              <div className="parent-compact-list">
-                {device.quietTimes.map((item) => (
-                  <div key={item.id}>
-                    <span>
-                      {item.start}-次日{item.end} · {item.weekdays.map((day) => weekdayNames[day]).join(' ')}
-                    </span>
-                    <Button size="small" onClick={() => store.toggleQuietTime(selectedStudent.id, item.id)}>
-                      {item.enabled ? '已启用' : '已停用'}
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <section className="parent-section">
-              <div className="parent-section-head">
-                <strong>位置与轨迹</strong>
-                <button type="button" onClick={() => messageApi.success(device.latestLocation?.navigationText ?? '已模拟拉起地图')}>
-                  地图导航
-                </button>
-              </div>
-              <div className="parent-location-card">
-                <strong>{device.latestLocation?.address ?? '暂无位置'}</strong>
-                <span>最后接收 {formatDate(device.latestLocation?.receivedAt ?? device.lastOnlineAt)}</span>
-              </div>
-              <div className="parent-track-map">
-                <svg viewBox="0 0 100 100" aria-hidden>
-                  <polyline points={device.tracks.map((track) => `${track.x},${track.y}`).join(' ')} />
-                  {device.tracks.map((track) => (
-                    <circle key={track.id} cx={track.x} cy={track.y} r="3.2" />
-                  ))}
-                </svg>
-              </div>
-              <div className="parent-track-list">
-                {device.tracks.map((track) => (
-                  <div key={track.id}>
-                    <span>{track.time}</span>
-                    <strong>{track.address}</strong>
-                    <em>距离导师 {track.distanceMeters} 米</em>
-                  </div>
-                ))}
-              </div>
-            </section>
-          </>
-        ) : null}
       </div>
     );
   }
@@ -1675,7 +1651,7 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
             </div>
             <RightOutlined />
           </button>
-          <button type="button" className="parent-entry-card" onClick={() => router.push('/me/device')}>
+          <button type="button" className="parent-entry-card" onClick={() => router.push('/device')}>
             <div>
               <MobileOutlined />
               <div>
@@ -1695,7 +1671,7 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
             </div>
             <RightOutlined />
           </button>
-          <button type="button" className="parent-entry-card" onClick={() => router.push('/me/device')}>
+          <button type="button" className="parent-entry-card" onClick={() => router.push('/device')}>
             <div>
               <ShoppingOutlined />
               <div>
@@ -1745,10 +1721,17 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
           <span>研学宝家长端</span>
           <strong>{activeTitle}</strong>
         </div>
-        <button type="button" className="parent-header-message" onClick={() => router.push('/messages')}>
-          <MessageOutlined />
-          <Badge count={unreadMessageCount} size="small" />
-        </button>
+        <div className="parent-header-actions">
+          <button type="button" className="parent-header-message" onClick={() => router.push('/messages')}>
+            <MessageOutlined />
+            <Badge count={unreadMessageCount} size="small" />
+          </button>
+          {activeTab === 'device' ? (
+            <button type="button" className="parent-header-message" aria-label="我的" onClick={() => router.push('/me')}>
+              <UserOutlined />
+            </button>
+          ) : null}
+        </div>
       </header>
 
       <div className="parent-shell-content">

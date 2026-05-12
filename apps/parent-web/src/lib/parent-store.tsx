@@ -72,6 +72,93 @@ export type DemoScanDevice = {
   mode: 'sale' | 'rental';
 };
 
+export type PaymentRecord = {
+  id: string;
+  title: string;
+  amount: number;
+  createdAt: string;
+  type: '充值' | '消费' | '退款';
+  status: '成功' | '处理中';
+};
+
+export type ParentPaymentCard = {
+  id: string;
+  provider: '支付宝亲子卡';
+  alias: string;
+  account: string;
+  accountTail: string;
+  status: '已绑定' | '未绑定' | '授权中';
+  bindType: 'alipay_family_pay';
+  authStatus: '待授权' | '授权中' | '已授权';
+  limitAmount: number;
+  boundAt: string;
+  updatedAt: string;
+  balance: number;
+  records: PaymentRecord[];
+};
+
+export type NetDiskSyncRecord = {
+  id: string;
+  title: string;
+  fileType: '照片' | '作品' | '报告';
+  syncedAt: string;
+  status: '已同步' | '同步中';
+};
+
+export type ParentNetDisk = {
+  provider: '百度网盘';
+  alias: string;
+  account: string;
+  status: '已绑定' | '未绑定' | '授权中';
+  bindMethod: 'mock_qr';
+  authStatus: '待扫码' | '授权中' | '已授权';
+  qrSessionId: string;
+  boundAt: string;
+  capacityUsed: number;
+  capacityTotal: number;
+  lastSyncAt: string;
+  syncRecords: NetDiskSyncRecord[];
+};
+
+export type DeviceContactCategory = '家长' | '导师' | '紧急联系人' | '其他';
+
+export type DeviceContact = {
+  id: string;
+  name: string;
+  relation: string;
+  phone: string;
+  allowed: boolean;
+  category: DeviceContactCategory;
+  isEmergency: boolean;
+  updatedAt: string;
+};
+
+export type DeviceQuietTime = {
+  id: string;
+  label: string;
+  start: string;
+  end: string;
+  weekdays: number[];
+  enabled: boolean;
+  updatedAt: string;
+  syncStatus: '已同步' | '待同步';
+};
+
+export type DeviceTrackType = 'home' | 'school' | 'training' | 'current' | 'study';
+
+export type DeviceTrack = {
+  id: string;
+  time: string;
+  title: string;
+  address: string;
+  distanceMeters: number;
+  x: number;
+  y: number;
+  type: DeviceTrackType;
+  stayDuration: string;
+  status: string;
+};
+
 export type ParentDevice = {
   id: string;
   name: string;
@@ -82,25 +169,17 @@ export type ParentDevice = {
   lastOnlineAt: string;
   mode: 'sale' | 'rental';
   boundAt: string;
-  paymentCard?: {
-    account: string;
-    balance: number;
-    records: Array<{ id: string; title: string; amount: number; createdAt: string }>;
-  };
-  netDisk?: {
-    provider: '百度网盘';
-    account: string;
-    status: '已绑定' | '未绑定';
-  };
-  contacts: Array<{ id: string; name: string; relation: string; phone: string; allowed: boolean }>;
-  quietTimes: Array<{ id: string; label: string; start: string; end: string; weekdays: number[]; enabled: boolean }>;
+  paymentCard?: ParentPaymentCard;
+  netDisk?: ParentNetDisk;
+  contacts: DeviceContact[];
+  quietTimes: DeviceQuietTime[];
   latestLocation?: {
     address: string;
     receivedAt: string;
     mapProvider: '高德地图' | '百度地图';
     navigationText: string;
   };
-  tracks: Array<{ id: string; time: string; address: string; distanceMeters: number; x: number; y: number }>;
+  tracks: DeviceTrack[];
 };
 
 export type StudentTalentProfile = {
@@ -527,10 +606,24 @@ type ParentContextValue = {
   updateStudent: (studentId: string, input: StudentInput) => void;
   updateTalentInterest: (studentId: string, input: TalentInterestInput) => void;
   bindDevice: (studentId: string, input: DeviceInput) => void;
-  savePaymentCard: (studentId: string, account: string) => void;
-  saveNetDisk: (studentId: string, account: string) => void;
+  startAlipayFamilyPayBind: (studentId: string, input: PaymentCardInput) => void;
+  confirmAlipayFamilyPayBind: (studentId: string, input: PaymentCardInput) => void;
+  savePaymentCard: (studentId: string, input: PaymentCardInput | string) => void;
+  removePaymentCard: (studentId: string) => void;
+  addPaymentRecord: (studentId: string, input: PaymentRecordInput) => void;
+  startNetDiskQrBind: (studentId: string) => void;
+  confirmNetDiskQrBind: (studentId: string) => void;
+  saveNetDisk: (studentId: string, input: NetDiskInput | string) => void;
+  removeNetDisk: (studentId: string) => void;
+  syncNetDisk: (studentId: string) => void;
   addContact: (studentId: string, input: ContactInput) => void;
+  updateContact: (studentId: string, contactId: string, input: ContactInput) => void;
+  toggleContact: (studentId: string, contactId: string) => void;
+  deleteContact: (studentId: string, contactId: string) => void;
+  addQuietTime: (studentId: string, input: QuietTimeInput) => void;
+  updateQuietTime: (studentId: string, quietTimeId: string, input: QuietTimeInput) => void;
   toggleQuietTime: (studentId: string, quietTimeId: string) => void;
+  deleteQuietTime: (studentId: string, quietTimeId: string) => void;
   completeAssessment: (studentId: string, planeKey: CapabilityPlaneKey | 'all', answers: Record<string, number>) => void;
   createTasksFromTemplates: (input: QuickTaskInput) => string[];
   createCustomTask: (input: CustomTaskInput) => string;
@@ -576,10 +669,38 @@ export type DeviceInput = {
   mode: 'sale' | 'rental';
 };
 
+export type PaymentCardInput = {
+  account: string;
+  alias?: string;
+  limitAmount?: number;
+};
+
+export type PaymentRecordInput = {
+  title: string;
+  amount: number;
+  type: PaymentRecord['type'];
+};
+
+export type NetDiskInput = {
+  account: string;
+  alias?: string;
+};
+
 export type ContactInput = {
   name: string;
   relation: string;
   phone: string;
+  category?: DeviceContactCategory;
+  isEmergency?: boolean;
+  allowed?: boolean;
+};
+
+export type QuietTimeInput = {
+  label: string;
+  start: string;
+  end: string;
+  weekdays: number[];
+  enabled?: boolean;
 };
 
 export type QuickTaskInput = {
@@ -654,8 +775,9 @@ export type PortfolioMediaUpdateInput = {
   content?: string;
 };
 
-const STORE_KEY = 'yanxuebao_parent_h5_state_v8';
+const STORE_KEY = 'yanxuebao_parent_h5_state_v9';
 const LEGACY_STORE_KEYS = [
+  'yanxuebao_parent_h5_state_v8',
   'yanxuebao_parent_h5_state_v7',
   'yanxuebao_parent_h5_state_v6',
   'yanxuebao_parent_h5_state_v5',
@@ -663,7 +785,7 @@ const LEGACY_STORE_KEYS = [
   'yanxuebao_parent_h5_state_v3',
   'yanxuebao_parent_h5_state_v2',
 ];
-const STORE_VERSION = 8;
+const STORE_VERSION = 9;
 
 export const CAPABILITY_PLANES: Array<{
   key: CapabilityPlaneKey;
@@ -1156,35 +1278,62 @@ function buildDevice(deviceCode: string, mode?: 'sale' | 'rental'): ParentDevice
     mode: resolvedMode,
     boundAt: nowText(),
     paymentCard: {
+      id: 'payment_card_01',
+      provider: '支付宝亲子卡',
+      alias: '小宇日常支付卡',
       account: '支付宝亲子卡 6228',
+      accountTail: '6228',
+      status: '已绑定',
+      bindType: 'alipay_family_pay',
+      authStatus: '已授权',
+      limitAmount: 300,
+      boundAt: '2026-04-15 20:10',
+      updatedAt: '2026-04-15 20:10',
       balance: 128.5,
       records: [
-        { id: 'pay_01', title: '海洋馆纪念章', amount: -18, createdAt: '2026-04-16 15:20' },
-        { id: 'pay_02', title: '家长充值', amount: 100, createdAt: '2026-04-15 20:10' },
+        { id: 'pay_01', title: '海洋馆纪念章', amount: -18, createdAt: '2026-04-16 15:20', type: '消费', status: '成功' },
+        { id: 'pay_02', title: '家长充值', amount: 100, createdAt: '2026-04-15 20:10', type: '充值', status: '成功' },
       ],
     },
-    netDisk: { provider: '百度网盘', account: 'yxb-family-demo', status: '已绑定' },
+    netDisk: {
+      provider: '百度网盘',
+      alias: '家庭研学资料库',
+      account: 'yxb-family-demo',
+      status: '已绑定',
+      bindMethod: 'mock_qr',
+      authStatus: '已授权',
+      qrSessionId: 'qr_netdisk_demo_01',
+      boundAt: '2026-04-15 20:18',
+      capacityUsed: 6.8,
+      capacityTotal: 20,
+      lastSyncAt: '2026-04-16 18:20',
+      syncRecords: [
+        { id: 'sync_01', title: '海洋馆研学照片 18 张', fileType: '照片', syncedAt: '2026-04-16 18:20', status: '已同步' },
+        { id: 'sync_02', title: '海洋生态观察报告', fileType: '报告', syncedAt: '2026-04-16 17:50', status: '已同步' },
+      ],
+    },
     contacts: [
-      { id: 'contact_01', name: '妈妈', relation: '家长', phone: '13800000001', allowed: true },
-      { id: 'contact_02', name: '爸爸', relation: '家长', phone: '13800000002', allowed: true },
-      { id: 'contact_03', name: '研学导师王老师', relation: '导师', phone: '13900000003', allowed: true },
+      { id: 'contact_01', name: '妈妈', relation: '家长', phone: '13800000001', allowed: true, category: '家长', isEmergency: true, updatedAt: '2026-04-15 20:12' },
+      { id: 'contact_02', name: '爸爸', relation: '家长', phone: '13800000002', allowed: true, category: '家长', isEmergency: false, updatedAt: '2026-04-15 20:12' },
+      { id: 'contact_03', name: '研学导师王老师', relation: '导师', phone: '13900000003', allowed: true, category: '导师', isEmergency: false, updatedAt: '2026-04-16 09:00' },
     ],
     quietTimes: [
-      { id: 'quiet_01', label: '上课时间', start: '08:00', end: '12:00', weekdays: [1, 2, 3, 4, 5], enabled: true },
-      { id: 'quiet_02', label: '晚间休息', start: '21:30', end: '07:00', weekdays: [1, 2, 3, 4, 5], enabled: true },
-      { id: 'quiet_03', label: '周末开放前休息', start: '23:00', end: '08:00', weekdays: [6, 0], enabled: false },
+      { id: 'quiet_01', label: '上课时间', start: '08:00', end: '12:00', weekdays: [1, 2, 3, 4, 5], enabled: true, updatedAt: '2026-04-15 20:15', syncStatus: '已同步' },
+      { id: 'quiet_02', label: '晚间休息', start: '21:30', end: '07:00', weekdays: [1, 2, 3, 4, 5], enabled: true, updatedAt: '2026-04-15 20:15', syncStatus: '已同步' },
+      { id: 'quiet_03', label: '周末开放前休息', start: '23:00', end: '08:00', weekdays: [6, 0], enabled: false, updatedAt: '2026-04-15 20:15', syncStatus: '已同步' },
     ],
     latestLocation: {
-      address: '深圳海洋馆集合广场',
-      receivedAt: '2026-04-16 16:05',
+      address: '深圳市南山区科技园高新南一道附近',
+      receivedAt: '2026-04-16 20:10',
       mapProvider: '高德地图',
       navigationText: '已模拟拉起地图导航',
     },
     tracks: [
-      { id: 'track_01', time: '09:10', address: '深圳海洋馆入口', distanceMeters: 0, x: 18, y: 76 },
-      { id: 'track_02', time: '10:40', address: '海豚展区', distanceMeters: 160, x: 42, y: 42 },
-      { id: 'track_03', time: '13:20', address: '科普教室', distanceMeters: 240, x: 68, y: 58 },
-      { id: 'track_04', time: '16:05', address: '集合广场', distanceMeters: 80, x: 82, y: 28 },
+      { id: 'track_01', time: '08:12', title: '到达学校', address: '深圳市南山区科技园文华学校', distanceMeters: 0, x: 11, y: 54, type: 'home', stayDuration: '停留 7小时24分', status: '已到达' },
+      { id: 'track_02', time: '11:45', title: '校内活动', address: '深圳市南山区科技园文华学校', distanceMeters: 40, x: 30, y: 51, type: 'school', stayDuration: '校内研学', status: '已记录' },
+      { id: 'track_03', time: '14:20', title: '到达培训班', address: '深圳市南山区科技园培训中心', distanceMeters: 220, x: 52, y: 53, type: 'training', stayDuration: '停留 2小时34分', status: '已到达' },
+      { id: 'track_04', time: '17:36', title: '离开学校', address: '深圳市南山区科技园文华学校', distanceMeters: 120, x: 74, y: 55, type: 'school', stayDuration: '停留 2小时34分', status: '已离开' },
+      { id: 'track_05', time: '20:10', title: '到达当前位置', address: '深圳市南山区科技园高新南一道附近', distanceMeters: 80, x: 92, y: 62, type: 'current', stayDuration: '持续更新中', status: '当前位置' },
     ],
   };
 }
@@ -2423,9 +2572,59 @@ function normalizeState(state: ParentState): ParentState {
             device: student.device
               ? {
                   ...student.device,
-                  quietTimes: student.device.quietTimes.map((item, quietIndex) => ({
+                  paymentCard: student.device.paymentCard
+                    ? {
+                        id: student.device.paymentCard.id ?? 'payment_card_01',
+                        provider: student.device.paymentCard.provider ?? '支付宝亲子卡',
+                        alias: student.device.paymentCard.alias ?? '亲子支付卡',
+                        account: student.device.paymentCard.account,
+                        accountTail:
+                          student.device.paymentCard.accountTail ??
+                          student.device.paymentCard.account.replace(/\D/g, '').slice(-4) ??
+                          '----',
+                        status: student.device.paymentCard.status ?? '已绑定',
+                        bindType: student.device.paymentCard.bindType ?? 'alipay_family_pay',
+                        authStatus: student.device.paymentCard.authStatus ?? '已授权',
+                        limitAmount: student.device.paymentCard.limitAmount ?? 300,
+                        boundAt: student.device.paymentCard.boundAt ?? student.device.boundAt,
+                        updatedAt: student.device.paymentCard.updatedAt ?? student.device.boundAt,
+                        balance: student.device.paymentCard.balance ?? 0,
+                        records: Array.isArray(student.device.paymentCard.records)
+                          ? student.device.paymentCard.records.map((record) => ({
+                              ...record,
+                              type: record.type ?? (record.amount >= 0 ? '充值' : '消费'),
+                              status: record.status ?? '成功',
+                            }))
+                          : [],
+                      }
+                    : undefined,
+                  netDisk: student.device.netDisk
+                    ? {
+                        provider: '百度网盘',
+                        alias: student.device.netDisk.alias ?? '家庭研学资料库',
+                        account: student.device.netDisk.account,
+                        status: student.device.netDisk.status ?? '已绑定',
+                        bindMethod: student.device.netDisk.bindMethod ?? 'mock_qr',
+                        authStatus: student.device.netDisk.authStatus ?? '已授权',
+                        qrSessionId: student.device.netDisk.qrSessionId ?? makeId('netdisk_qr'),
+                        boundAt: student.device.netDisk.boundAt ?? student.device.boundAt,
+                        capacityUsed: student.device.netDisk.capacityUsed ?? 0,
+                        capacityTotal: student.device.netDisk.capacityTotal ?? 20,
+                        lastSyncAt: student.device.netDisk.lastSyncAt ?? student.device.boundAt,
+                        syncRecords: Array.isArray(student.device.netDisk.syncRecords) ? student.device.netDisk.syncRecords : [],
+                      }
+                    : undefined,
+                  contacts: (student.device.contacts ?? []).map((contact) => ({
+                    ...contact,
+                    category: contact.category ?? (contact.relation.includes('导师') ? '导师' : '家长'),
+                    isEmergency: contact.isEmergency ?? contact.relation.includes('家长'),
+                    updatedAt: contact.updatedAt ?? student.device?.boundAt ?? nowText(),
+                  })),
+                  quietTimes: (student.device.quietTimes ?? []).map((item, quietIndex) => ({
                     ...item,
                     weekdays: item.weekdays ?? (quietIndex === 2 ? [6, 0] : [1, 2, 3, 4, 5]),
+                    updatedAt: item.updatedAt ?? student.device?.boundAt ?? nowText(),
+                    syncStatus: item.syncStatus ?? '已同步',
                   })),
                   latestLocation:
                     student.device.latestLocation ?? {
@@ -2434,8 +2633,12 @@ function normalizeState(state: ParentState): ParentState {
                       mapProvider: '高德地图',
                       navigationText: '已模拟拉起地图导航',
                     },
-                  tracks: student.device.tracks.map((track, trackIndex) => ({
+                  tracks: (student.device.tracks ?? []).map((track, trackIndex) => ({
                     ...track,
+                    title: track.title ?? (trackIndex === 0 ? '到达学校' : trackIndex === (student.device?.tracks ?? []).length - 1 ? '到达当前位置' : '位置更新'),
+                    type: track.type ?? (trackIndex === (student.device?.tracks ?? []).length - 1 ? 'current' : 'study'),
+                    stayDuration: track.stayDuration ?? (trackIndex === (student.device?.tracks ?? []).length - 1 ? '持续更新中' : '已记录'),
+                    status: track.status ?? '已记录',
                     x: track.x ?? 18 + trackIndex * 18,
                     y: track.y ?? 72 - trackIndex * 12,
                   })),
@@ -3066,16 +3269,27 @@ export function ParentStoreProvider({ children }: { children: ReactNode }) {
           });
         });
       },
-      savePaymentCard(studentId, account) {
+      startAlipayFamilyPayBind(studentId, input) {
         setState((current) =>
           withStudent(current, studentId, (student) => {
             const device = student.device ?? buildDevice('YXB-DEV-NEW');
+            const accountTail = input.account.replace(/\D/g, '').slice(-4) || input.account.slice(-4) || '----';
             return {
               ...student,
               device: {
                 ...device,
                 paymentCard: {
-                  account,
+                  id: device.paymentCard?.id ?? makeId('payment_card'),
+                  provider: '支付宝亲子卡',
+                  alias: input.alias?.trim() || '支付宝亲密付',
+                  account: input.account,
+                  accountTail,
+                  status: '授权中',
+                  bindType: 'alipay_family_pay',
+                  authStatus: '授权中',
+                  limitAmount: input.limitAmount ?? 300,
+                  boundAt: device.paymentCard?.boundAt ?? nowText(),
+                  updatedAt: nowText(),
                   balance: device.paymentCard?.balance ?? 0,
                   records: device.paymentCard?.records ?? [],
                 },
@@ -3084,7 +3298,124 @@ export function ParentStoreProvider({ children }: { children: ReactNode }) {
           }),
         );
       },
-      saveNetDisk(studentId, account) {
+      confirmAlipayFamilyPayBind(studentId, input) {
+        setState((current) =>
+          withStudent(current, studentId, (student) => {
+            const device = student.device ?? buildDevice('YXB-DEV-NEW');
+            const accountTail = input.account.replace(/\D/g, '').slice(-4) || input.account.slice(-4) || '----';
+            return {
+              ...student,
+              device: {
+                ...device,
+                paymentCard: {
+                  id: device.paymentCard?.id ?? makeId('payment_card'),
+                  provider: '支付宝亲子卡',
+                  alias: input.alias?.trim() || device.paymentCard?.alias || '支付宝亲密付',
+                  account: input.account,
+                  accountTail,
+                  status: '已绑定',
+                  bindType: 'alipay_family_pay',
+                  authStatus: '已授权',
+                  limitAmount: input.limitAmount ?? device.paymentCard?.limitAmount ?? 300,
+                  boundAt: nowText(),
+                  updatedAt: nowText(),
+                  balance: device.paymentCard?.balance ?? 0,
+                  records: device.paymentCard?.records ?? [],
+                },
+              },
+            };
+          }),
+        );
+      },
+      savePaymentCard(studentId, input) {
+        setState((current) =>
+          withStudent(current, studentId, (student) => {
+            const device = student.device ?? buildDevice('YXB-DEV-NEW');
+            const cardInput = typeof input === 'string' ? { account: input } : input;
+            const accountTail = cardInput.account.replace(/\D/g, '').slice(-4) || cardInput.account.slice(-4);
+            return {
+              ...student,
+              device: {
+                ...device,
+                paymentCard: {
+                  id: device.paymentCard?.id ?? makeId('payment_card'),
+                  provider: '支付宝亲子卡',
+                  alias: cardInput.alias?.trim() || device.paymentCard?.alias || '亲子支付卡',
+                  account: cardInput.account,
+                  accountTail,
+                  status: '已绑定',
+                  bindType: 'alipay_family_pay',
+                  authStatus: '已授权',
+                  limitAmount: cardInput.limitAmount ?? device.paymentCard?.limitAmount ?? 300,
+                  boundAt: device.paymentCard?.boundAt ?? nowText(),
+                  updatedAt: nowText(),
+                  balance: device.paymentCard?.balance ?? 0,
+                  records: device.paymentCard?.records ?? [],
+                },
+              },
+            };
+          }),
+        );
+      },
+      removePaymentCard(studentId) {
+        setState((current) =>
+          withStudent(current, studentId, (student) => {
+            if (!student.device) {
+              return student;
+            }
+            return {
+              ...student,
+              device: {
+                ...student.device,
+                paymentCard: undefined,
+              },
+            };
+          }),
+        );
+      },
+      addPaymentRecord(studentId, input) {
+        setState((current) =>
+          withStudent(current, studentId, (student) => {
+            const device = student.device ?? buildDevice('YXB-DEV-NEW');
+            const currentCard = device.paymentCard ?? {
+              id: makeId('payment_card'),
+              provider: '支付宝亲子卡' as const,
+              alias: '亲子支付卡',
+              account: '待绑定账号',
+              accountTail: '----',
+              status: '已绑定' as const,
+              bindType: 'alipay_family_pay' as const,
+              authStatus: '已授权' as const,
+              limitAmount: 300,
+              boundAt: nowText(),
+              updatedAt: nowText(),
+              balance: 0,
+              records: [],
+            };
+            const record: PaymentRecord = {
+              id: makeId('pay'),
+              title: input.title,
+              amount: input.amount,
+              type: input.type,
+              status: '成功',
+              createdAt: nowText(),
+            };
+            return {
+              ...student,
+              device: {
+                ...device,
+                paymentCard: {
+                  ...currentCard,
+                  balance: Math.max(0, Number((currentCard.balance + input.amount).toFixed(2))),
+                  updatedAt: nowText(),
+                  records: [record, ...currentCard.records],
+                },
+              },
+            };
+          }),
+        );
+      },
+      startNetDiskQrBind(studentId) {
         setState((current) =>
           withStudent(current, studentId, (student) => {
             const device = student.device ?? buildDevice('YXB-DEV-NEW');
@@ -3092,7 +3423,142 @@ export function ParentStoreProvider({ children }: { children: ReactNode }) {
               ...student,
               device: {
                 ...device,
-                netDisk: { provider: '百度网盘', account, status: '已绑定' },
+                netDisk: {
+                  provider: '百度网盘',
+                  alias: '百度网盘扫码授权',
+                  account: '等待扫码授权',
+                  status: '授权中',
+                  bindMethod: 'mock_qr',
+                  authStatus: '授权中',
+                  qrSessionId: makeId('netdisk_qr'),
+                  boundAt: device.netDisk?.boundAt ?? nowText(),
+                  capacityUsed: device.netDisk?.capacityUsed ?? 0,
+                  capacityTotal: device.netDisk?.capacityTotal ?? 20,
+                  lastSyncAt: device.netDisk?.lastSyncAt ?? nowText(),
+                  syncRecords: device.netDisk?.syncRecords ?? [],
+                },
+              },
+            };
+          }),
+        );
+      },
+      confirmNetDiskQrBind(studentId) {
+        setState((current) =>
+          withStudent(current, studentId, (student) => {
+            const device = student.device ?? buildDevice('YXB-DEV-NEW');
+            return {
+              ...student,
+              device: {
+                ...device,
+                netDisk: {
+                  provider: '百度网盘',
+                  alias: '家庭研学资料库',
+                  account: 'yxb-family-demo',
+                  status: '已绑定',
+                  bindMethod: 'mock_qr',
+                  authStatus: '已授权',
+                  qrSessionId: device.netDisk?.qrSessionId ?? makeId('netdisk_qr'),
+                  boundAt: nowText(),
+                  capacityUsed: device.netDisk?.capacityUsed ?? 6.8,
+                  capacityTotal: device.netDisk?.capacityTotal ?? 20,
+                  lastSyncAt: nowText(),
+                  syncRecords: device.netDisk?.syncRecords?.length
+                    ? device.netDisk.syncRecords
+                    : [
+                        {
+                          id: makeId('sync'),
+                          title: '扫码绑定后同步研学资料',
+                          fileType: '照片',
+                          syncedAt: nowText(),
+                          status: '已同步',
+                        },
+                      ],
+                },
+              },
+            };
+          }),
+        );
+      },
+      saveNetDisk(studentId, input) {
+        setState((current) =>
+          withStudent(current, studentId, (student) => {
+            const device = student.device ?? buildDevice('YXB-DEV-NEW');
+            const diskInput = typeof input === 'string' ? { account: input } : input;
+            return {
+              ...student,
+              device: {
+                ...device,
+                netDisk: {
+                  provider: '百度网盘',
+                  alias: diskInput.alias?.trim() || device.netDisk?.alias || '家庭研学资料库',
+                  account: diskInput.account,
+                  status: '已绑定',
+                  bindMethod: 'mock_qr',
+                  authStatus: '已授权',
+                  qrSessionId: device.netDisk?.qrSessionId ?? makeId('netdisk_qr'),
+                  boundAt: device.netDisk?.boundAt ?? nowText(),
+                  capacityUsed: device.netDisk?.capacityUsed ?? 0,
+                  capacityTotal: device.netDisk?.capacityTotal ?? 20,
+                  lastSyncAt: device.netDisk?.lastSyncAt ?? nowText(),
+                  syncRecords: device.netDisk?.syncRecords ?? [],
+                },
+              },
+            };
+          }),
+        );
+      },
+      removeNetDisk(studentId) {
+        setState((current) =>
+          withStudent(current, studentId, (student) => {
+            if (!student.device) {
+              return student;
+            }
+            return {
+              ...student,
+              device: {
+                ...student.device,
+                netDisk: undefined,
+              },
+            };
+          }),
+        );
+      },
+      syncNetDisk(studentId) {
+        setState((current) =>
+          withStudent(current, studentId, (student) => {
+            const device = student.device ?? buildDevice('YXB-DEV-NEW');
+            const currentDisk = device.netDisk ?? {
+              provider: '百度网盘' as const,
+              alias: '家庭研学资料库',
+              account: '待绑定账号',
+              status: '已绑定' as const,
+              bindMethod: 'mock_qr' as const,
+              authStatus: '已授权' as const,
+              qrSessionId: makeId('netdisk_qr'),
+              boundAt: nowText(),
+              capacityUsed: 0,
+              capacityTotal: 20,
+              lastSyncAt: nowText(),
+              syncRecords: [],
+            };
+            const record: NetDiskSyncRecord = {
+              id: makeId('sync'),
+              title: '家庭研学照片与作品同步',
+              fileType: '照片',
+              syncedAt: nowText(),
+              status: '已同步',
+            };
+            return {
+              ...student,
+              device: {
+                ...device,
+                netDisk: {
+                  ...currentDisk,
+                  status: '已绑定',
+                  lastSyncAt: nowText(),
+                  capacityUsed: Math.min(currentDisk.capacityTotal, Number((currentDisk.capacityUsed + 0.3).toFixed(1))),
+                  syncRecords: [record, ...currentDisk.syncRecords],
+                },
               },
             };
           }),
@@ -3106,7 +3572,137 @@ export function ParentStoreProvider({ children }: { children: ReactNode }) {
               ...student,
               device: {
                 ...device,
-                contacts: [...device.contacts, { id: makeId('contact'), ...input, allowed: true }],
+                contacts: [
+                  ...device.contacts,
+                  {
+                    id: makeId('contact'),
+                    name: input.name,
+                    relation: input.relation,
+                    phone: input.phone,
+                    allowed: input.allowed ?? true,
+                    category: input.category ?? '其他',
+                    isEmergency: input.isEmergency ?? false,
+                    updatedAt: nowText(),
+                  },
+                ],
+              },
+            };
+          }),
+        );
+      },
+      updateContact(studentId, contactId, input) {
+        setState((current) =>
+          withStudent(current, studentId, (student) => {
+            if (!student.device) {
+              return student;
+            }
+            return {
+              ...student,
+              device: {
+                ...student.device,
+                contacts: student.device.contacts.map((contact) =>
+                  contact.id === contactId
+                    ? {
+                        ...contact,
+                        name: input.name,
+                        relation: input.relation,
+                        phone: input.phone,
+                        category: input.category ?? contact.category,
+                        isEmergency: input.isEmergency ?? contact.isEmergency,
+                        allowed: input.allowed ?? contact.allowed,
+                        updatedAt: nowText(),
+                      }
+                    : contact,
+                ),
+              },
+            };
+          }),
+        );
+      },
+      toggleContact(studentId, contactId) {
+        setState((current) =>
+          withStudent(current, studentId, (student) => {
+            if (!student.device) {
+              return student;
+            }
+            return {
+              ...student,
+              device: {
+                ...student.device,
+                contacts: student.device.contacts.map((contact) =>
+                  contact.id === contactId ? { ...contact, allowed: !contact.allowed, updatedAt: nowText() } : contact,
+                ),
+              },
+            };
+          }),
+        );
+      },
+      deleteContact(studentId, contactId) {
+        setState((current) =>
+          withStudent(current, studentId, (student) => {
+            if (!student.device) {
+              return student;
+            }
+            return {
+              ...student,
+              device: {
+                ...student.device,
+                contacts: student.device.contacts.filter((contact) => contact.id !== contactId),
+              },
+            };
+          }),
+        );
+      },
+      addQuietTime(studentId, input) {
+        setState((current) =>
+          withStudent(current, studentId, (student) => {
+            const device = student.device ?? buildDevice('YXB-DEV-NEW');
+            return {
+              ...student,
+              device: {
+                ...device,
+                quietTimes: [
+                  ...device.quietTimes,
+                  {
+                    id: makeId('quiet'),
+                    label: input.label,
+                    start: input.start,
+                    end: input.end,
+                    weekdays: input.weekdays,
+                    enabled: input.enabled ?? true,
+                    updatedAt: nowText(),
+                    syncStatus: '已同步',
+                  },
+                ],
+              },
+            };
+          }),
+        );
+      },
+      updateQuietTime(studentId, quietTimeId, input) {
+        setState((current) =>
+          withStudent(current, studentId, (student) => {
+            if (!student.device) {
+              return student;
+            }
+            return {
+              ...student,
+              device: {
+                ...student.device,
+                quietTimes: student.device.quietTimes.map((item) =>
+                  item.id === quietTimeId
+                    ? {
+                        ...item,
+                        label: input.label,
+                        start: input.start,
+                        end: input.end,
+                        weekdays: input.weekdays,
+                        enabled: input.enabled ?? item.enabled,
+                        updatedAt: nowText(),
+                        syncStatus: '已同步',
+                      }
+                    : item,
+                ),
               },
             };
           }),
@@ -3123,8 +3719,24 @@ export function ParentStoreProvider({ children }: { children: ReactNode }) {
               device: {
                 ...student.device,
                 quietTimes: student.device.quietTimes.map((item) =>
-                  item.id === quietTimeId ? { ...item, enabled: !item.enabled } : item,
+                  item.id === quietTimeId ? { ...item, enabled: !item.enabled, updatedAt: nowText(), syncStatus: '已同步' } : item,
                 ),
+              },
+            };
+          }),
+        );
+      },
+      deleteQuietTime(studentId, quietTimeId) {
+        setState((current) =>
+          withStudent(current, studentId, (student) => {
+            if (!student.device) {
+              return student;
+            }
+            return {
+              ...student,
+              device: {
+                ...student.device,
+                quietTimes: student.device.quietTimes.filter((item) => item.id !== quietTimeId),
               },
             };
           }),
