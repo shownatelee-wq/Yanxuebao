@@ -222,6 +222,7 @@ export type CapabilityAdjustmentRecord = {
   sourceType: '导师' | '家长' | '专家' | '系统';
   elementRecords: Array<{
     elementKey: string;
+    dimensionLabel?: string;
     beforeIndex: number;
     assessmentValue: number;
     afterIndex: number;
@@ -624,7 +625,7 @@ type ParentContextValue = {
   updateQuietTime: (studentId: string, quietTimeId: string, input: QuietTimeInput) => void;
   toggleQuietTime: (studentId: string, quietTimeId: string) => void;
   deleteQuietTime: (studentId: string, quietTimeId: string) => void;
-  completeAssessment: (studentId: string, planeKey: CapabilityPlaneKey | 'all', answers: Record<string, number>) => void;
+  completeAssessment: (studentId: string, planeKey: CapabilityPlaneKey | 'all', answers: Record<string, number>, capabilityId?: string) => void;
   createTasksFromTemplates: (input: QuickTaskInput) => string[];
   createCustomTask: (input: CustomTaskInput) => string;
   updateTask: (taskId: string, input: CustomTaskInput) => void;
@@ -775,8 +776,10 @@ export type PortfolioMediaUpdateInput = {
   content?: string;
 };
 
-const STORE_KEY = 'yanxuebao_parent_h5_state_v9';
+const STORE_KEY = 'yanxuebao_parent_h5_state_v11';
 const LEGACY_STORE_KEYS = [
+  'yanxuebao_parent_h5_state_v10',
+  'yanxuebao_parent_h5_state_v9',
   'yanxuebao_parent_h5_state_v8',
   'yanxuebao_parent_h5_state_v7',
   'yanxuebao_parent_h5_state_v6',
@@ -785,7 +788,7 @@ const LEGACY_STORE_KEYS = [
   'yanxuebao_parent_h5_state_v3',
   'yanxuebao_parent_h5_state_v2',
 ];
-const STORE_VERSION = 9;
+const STORE_VERSION = 11;
 
 export const CAPABILITY_PLANES: Array<{
   key: CapabilityPlaneKey;
@@ -794,10 +797,32 @@ export const CAPABILITY_PLANES: Array<{
   elements: string[];
 }> = [
   { key: 'self', title: '自主发展', summary: '身心、自我、问题与批判思维', elements: ['身心健康', '自我管理', '问题解决', '批判思维'] },
-  { key: 'learning', title: '科技素养', summary: '人文、沟通、科技与数字素养', elements: ['人文审美', '语言沟通', '科技应用', '数字素养'] },
-  { key: 'future', title: '创新发展', summary: '创新、融合、领导与商业思维', elements: ['创新思维', '跨学科融合', '领导能力', '商业思维'] },
+  { key: 'learning', title: '科技素养', summary: '审美、阅读、科技与智能素养', elements: ['审美鉴赏', '阅读表达', '科技素养', '智能素养'] },
+  { key: 'future', title: '创新发展', summary: '创新、规划、领导协作与商业思维', elements: ['创新能力', '规划能力', '领导协作', '商业思维'] },
   { key: 'social', title: '社会参与', summary: '道德、责任、国家与国际理解', elements: ['公民道德', '社会责任', '国家认同', '国际理解'] },
 ];
+
+const CAPABILITY_KEY_ALIASES: Record<string, string> = {
+  人文审美: '审美鉴赏',
+  语言沟通: '阅读表达',
+  科技应用: '科技素养',
+  数字素养: '智能素养',
+  创新思维: '创新能力',
+  跨学科融合: '规划能力',
+  领导能力: '领导协作',
+};
+
+const CAPABILITY_DIMENSION_LABEL_ALIASES: Record<string, string> = {
+  身体健康: '身体运动',
+  合作能力: '人际交往',
+  实践能力: '动手能力',
+  判断能力: '批判性思维',
+  数字表达: '数字素养',
+  信息素养: '提问能力',
+  创业思维: '法律意识',
+  公平正义: '同理心',
+  孝亲仁爱: '同理心',
+};
 
 export const TALENT_OPTIONS = ['语言智能', '逻辑-数理智能', '音乐智能', '空间智能', '身体-动觉智能', '自我认识智能', '人际交往智能', '自然观察智能'];
 
@@ -824,7 +849,7 @@ export const TASK_LIBRARY: TaskTemplate[] = [
     title: '海洋动物行为观察',
     points: 20,
     description: '观察一种海洋动物的行为，用照片和文字说明它的生活习性。',
-    capabilityTags: ['问题解决', '科技应用', '语言沟通'],
+    capabilityTags: ['问题解决', '探究能力', '表达能力'],
     requirements: [
       { id: 'req_tpl_museum_01_1', type: 'image', requirement: '拍摄 1 张观察对象照片' },
       { id: 'req_tpl_museum_01_2', type: 'text', requirement: '写下 80 字以上观察记录' },
@@ -837,7 +862,7 @@ export const TASK_LIBRARY: TaskTemplate[] = [
     title: '一件文物的故事',
     points: 18,
     description: '选择一件展品，说明它来自哪里、有什么用途、今天还能给我们什么启发。',
-    capabilityTags: ['人文审美', '语言沟通', '批判思维'],
+    capabilityTags: ['艺术鉴赏', '表达能力', '批判性思维'],
     requirements: [
       { id: 'req_tpl_museum_02_1', type: 'image', requirement: '拍摄展品或展牌照片' },
       { id: 'req_tpl_museum_02_2', type: 'text', requirement: '用自己的话讲述展品故事' },
@@ -850,7 +875,7 @@ export const TASK_LIBRARY: TaskTemplate[] = [
     title: '公园友好度调查',
     points: 16,
     description: '观察公园里儿童、老人和游客的使用情况，提出一个小改进建议。',
-    capabilityTags: ['社会责任', '问题解决', '创新思维'],
+    capabilityTags: ['环境意识', '问题解决', '创新思维'],
     requirements: [
       { id: 'req_tpl_park_01_1', type: 'choice', requirement: '选择你观察到的主要使用人群' },
       { id: 'req_tpl_park_01_2', type: 'text', requirement: '写下一个改进建议' },
@@ -863,7 +888,7 @@ export const TASK_LIBRARY: TaskTemplate[] = [
     title: '设计一份健康早餐',
     points: 15,
     description: '用身边食材设计一份早餐，说明营养搭配和制作步骤。',
-    capabilityTags: ['身心健康', '自我管理', '创新思维'],
+    capabilityTags: ['身体运动', '自主学习', '想象力'],
     requirements: [
       { id: 'req_tpl_home_01_1', type: 'image', requirement: '拍摄早餐设计草图或成品照片' },
       { id: 'req_tpl_home_01_2', type: 'text', requirement: '写下营养搭配说明' },
@@ -876,7 +901,7 @@ export const TASK_LIBRARY: TaskTemplate[] = [
     title: '一个小店如何运转',
     points: 20,
     description: '观察一家小店的商品、顾客和服务，画出它的简单商业模式。',
-    capabilityTags: ['商业思维', '语言沟通', '跨学科融合'],
+    capabilityTags: ['商业思维', '表达能力', '资源整合'],
     requirements: [
       { id: 'req_tpl_business_01_1', type: 'text', requirement: '写下小店的顾客和主要商品' },
       { id: 'req_tpl_business_01_2', type: 'image', requirement: '上传一张观察记录或手绘图' },
@@ -1016,125 +1041,156 @@ const CAPABILITY_DIMENSION_TEMPLATES: Record<
   身心健康: {
     baseScore: 8.4,
     dimensions: [
-      { label: '身体健康', score: 8.8, average: 7.9 },
-      { label: '心理健康', score: 8.1, average: 7.6 },
-      { label: '合作能力', score: 8.3, average: 7.8 },
-      { label: '适应能力', score: 8.4, average: 7.7 },
+      { label: '身体运动', score: 8.5, average: 8.0 },
+      { label: '心理健康', score: 7.8, average: 8.2 },
+      { label: '人际交往', score: 8.9, average: 8.3 },
     ],
   },
   自我管理: {
     baseScore: 8.1,
     dimensions: [
       { label: '自主学习', score: 8.3, average: 7.5 },
-      { label: '独立自主', score: 8.0, average: 7.4 },
-      { label: '勤于反思', score: 8.1, average: 7.6 },
-      { label: '情绪管理', score: 7.9, average: 7.3 },
-      { label: '生涯规划', score: 8.2, average: 7.7 },
+      { label: '独立自主', score: 7.7, average: 8.2 },
+      { label: '情绪管理', score: 8.3, average: 7.6 },
     ],
   },
   问题解决: {
     baseScore: 8.7,
     dimensions: [
-      { label: '发现问题', score: 8.9, average: 8.0 },
-      { label: '解决问题', score: 8.6, average: 7.8 },
-      { label: '实践能力', score: 8.5, average: 7.9 },
+      { label: '发现问题', score: 8.9, average: 8.2 },
+      { label: '动手能力', score: 8.4, average: 8.6 },
+      { label: '问题解决', score: 8.8, average: 8.5 },
     ],
   },
   批判思维: {
     baseScore: 7.6,
-    dimensions: [{ label: '判断能力', score: 7.6, average: 7.2 }],
+    dimensions: [
+      { label: '批判性思维', score: 7.9, average: 7.6 },
+      { label: '自我认知', score: 7.3, average: 7.8 },
+      { label: '逻辑推理', score: 7.6, average: 7.2 },
+    ],
   },
-  人文审美: {
+  审美鉴赏: {
     baseScore: 8.2,
     dimensions: [
-      { label: '人文修养', score: 8.1, average: 7.5 },
-      { label: '审美能力', score: 8.3, average: 7.7 },
+      { label: '人文修养', score: 8.4, average: 7.7 },
+      { label: '审美能力', score: 8.0, average: 8.3 },
+      { label: '艺术鉴赏', score: 8.2, average: 7.9 },
     ],
   },
-  语言沟通: {
+  阅读表达: {
     baseScore: 7.9,
     dimensions: [
-      { label: '语言基础', score: 7.8, average: 7.2 },
-      { label: '阅读理解', score: 7.9, average: 7.4 },
-      { label: '表达能力', score: 8.0, average: 7.3 },
+      { label: '语言基础', score: 7.8, average: 8.0 },
+      { label: '阅读理解', score: 8.1, average: 7.6 },
+      { label: '表达能力', score: 7.8, average: 8.2 },
     ],
   },
-  科技应用: {
+  科技素养: {
     baseScore: 8.3,
     dimensions: [
-      { label: '科学素养', score: 8.4, average: 7.6 },
-      { label: '探究能力', score: 8.2, average: 7.5 },
+      { label: '科学素养', score: 8.5, average: 7.9 },
+      { label: '好奇心', score: 8.0, average: 8.3 },
+      { label: '探究能力', score: 8.4, average: 8.0 },
     ],
   },
-  数字素养: {
+  智能素养: {
     baseScore: 8.0,
     dimensions: [
-      { label: '数字表达', score: 8.1, average: 7.4 },
-      { label: '信息素养', score: 7.9, average: 7.3 },
+      { label: '数字素养', score: 8.2, average: 7.7 },
+      { label: '提问能力', score: 7.6, average: 8.0 },
+      { label: 'AI协同', score: 8.2, average: 8.4 },
     ],
   },
-  创新思维: {
+  创新能力: {
     baseScore: 8.9,
-    dimensions: [{ label: '创新能力', score: 8.9, average: 7.8 }],
+    dimensions: [
+      { label: '创新思维', score: 9.1, average: 8.2 },
+      { label: '想象力', score: 8.7, average: 9.0 },
+      { label: '创新创业', score: 8.9, average: 8.4 },
+    ],
   },
-  跨学科融合: {
+  规划能力: {
     baseScore: 8.5,
-    dimensions: [{ label: '跨学科融合', score: 8.5, average: 7.7 }],
+    dimensions: [
+      { label: '跨学科融合', score: 8.7, average: 8.0 },
+      { label: '资源整合', score: 8.2, average: 8.6 },
+      { label: '生涯规划', score: 8.6, average: 8.3 },
+    ],
   },
-  领导能力: {
+  领导协作: {
     baseScore: 7.8,
     dimensions: [
-      { label: '领导能力', score: 7.7, average: 7.2 },
-      { label: '协作能力', score: 8.0, average: 7.4 },
-      { label: '资源整合', score: 7.8, average: 7.3 },
+      { label: '领导能力', score: 7.6, average: 7.9 },
+      { label: '协作能力', score: 8.2, average: 7.5 },
+      { label: '适应能力', score: 7.6, average: 8.0 },
     ],
   },
   商业思维: {
     baseScore: 8.2,
     dimensions: [
-      { label: '商业思维', score: 8.1, average: 7.6 },
-      { label: '财商思维', score: 8.3, average: 7.5 },
-      { label: '创业思维', score: 8.2, average: 7.7 },
+      { label: '商业思维', score: 8.4, average: 7.8 },
+      { label: '财商思维', score: 8.1, average: 8.4 },
+      { label: '法律意识', score: 8.1, average: 7.7 },
     ],
   },
   公民道德: {
     baseScore: 9.1,
     dimensions: [
-      { label: '尊重生命', score: 9.2, average: 8.0 },
-      { label: '公平正义', score: 8.9, average: 7.7 },
-      { label: '孝亲仁爱', score: 9.3, average: 8.1 },
-      { label: '诚信守信', score: 9.0, average: 7.8 },
+      { label: '尊重生命', score: 9.3, average: 8.6 },
+      { label: '同理心', score: 8.7, average: 9.0 },
+      { label: '诚信守信', score: 9.3, average: 8.7 },
     ],
   },
   社会责任: {
     baseScore: 7.8,
     dimensions: [
-      { label: '劳动意识', score: 7.7, average: 7.0 },
-      { label: '集体意识', score: 8.0, average: 7.2 },
-      { label: '环境意识', score: 7.8, average: 6.9 },
-      { label: '法律意识', score: 7.6, average: 6.8 },
+      { label: '劳动意识', score: 7.9, average: 7.2 },
+      { label: '集体意识', score: 7.5, average: 7.9 },
+      { label: '环境意识', score: 8.0, average: 8.2 },
     ],
   },
   国家认同: {
     baseScore: 8.4,
     dimensions: [
-      { label: '民族精神', score: 8.5, average: 7.6 },
-      { label: '政治觉悟', score: 8.2, average: 7.3 },
-      { label: '家国情怀', score: 8.6, average: 7.6 },
+      { label: '民族精神', score: 8.7, average: 8.0 },
+      { label: '政治觉悟', score: 8.1, average: 8.5 },
+      { label: '家国情怀', score: 8.4, average: 7.9 },
     ],
   },
   国际理解: {
     baseScore: 7.6,
     dimensions: [
-      { label: '国际视野', score: 7.5, average: 6.9 },
-      { label: '发展共存', score: 7.7, average: 7.0 },
-      { label: '尊重包容', score: 7.6, average: 7.1 },
+      { label: '国际视野', score: 7.9, average: 7.1 },
+      { label: '发展共存', score: 7.4, average: 7.8 },
+      { label: '尊重包容', score: 7.5, average: 7.9 },
     ],
   },
 };
 
+export const CAPABILITY_ELEMENT_OPTIONS = Array.from(
+  new Set(CAPABILITY_PLANES.flatMap((plane) => plane.elements.flatMap((elementKey) => CAPABILITY_DIMENSION_TEMPLATES[elementKey]?.dimensions.map((dimension) => dimension.label) ?? [elementKey]))),
+);
+
+function normalizeCapabilityKey(key: string) {
+  return CAPABILITY_KEY_ALIASES[key] ?? key;
+}
+
+function normalizeCapabilityDimensionLabel(label: string) {
+  return CAPABILITY_DIMENSION_LABEL_ALIASES[label] ?? label;
+}
+
+function normalizeCapabilityTargetLabel(label: string) {
+  const dimensionLabel = normalizeCapabilityDimensionLabel(label);
+  return CAPABILITY_ELEMENT_OPTIONS.includes(dimensionLabel) ? dimensionLabel : normalizeCapabilityKey(label);
+}
+
 function clampCapabilityScore(score: number) {
   return round1(Math.max(5.4, Math.min(9.6, score)));
+}
+
+function averageDimensions(dimensions: CapabilityIndicatorDimension[], field: 'score' | 'average' = 'score') {
+  return round1(dimensions.reduce((sum, dimension) => sum + dimension[field], 0) / Math.max(dimensions.length, 1));
 }
 
 function buildIndicatorDimensions(elementKey: string, score: number): CapabilityIndicatorDimension[] {
@@ -1153,33 +1209,74 @@ function buildIndicatorDimensions(elementKey: string, score: number): Capability
   }));
 }
 
+function normalizeIndicatorDimensions(
+  elementKey: string,
+  score: number,
+  dimensions?: CapabilityIndicatorDimension[],
+): CapabilityIndicatorDimension[] {
+  const template = CAPABILITY_DIMENSION_TEMPLATES[elementKey];
+  if (!template) {
+    return dimensions?.length
+      ? dimensions.map((dimension) => ({
+          label: normalizeCapabilityDimensionLabel(dimension.label),
+          score: round1(dimension.score),
+          average: round1(dimension.average),
+        }))
+      : buildIndicatorDimensions(elementKey, score);
+  }
+
+  const canonicalLabels = template.dimensions.map((dimension) => dimension.label);
+  const normalizedDimensions =
+    dimensions?.map((dimension) => ({
+      label: normalizeCapabilityDimensionLabel(dimension.label),
+      score: round1(dimension.score),
+      average: round1(dimension.average),
+    })) ?? [];
+  const hasCanonicalDimensions =
+    normalizedDimensions.length === canonicalLabels.length &&
+    canonicalLabels.every((label) => normalizedDimensions.some((dimension) => dimension.label === label));
+
+  if (!hasCanonicalDimensions) {
+    return buildIndicatorDimensions(elementKey, score);
+  }
+
+  return canonicalLabels.map((label) => {
+    const existing = normalizedDimensions.find((dimension) => dimension.label === label);
+    const fallback = template.dimensions.find((dimension) => dimension.label === label);
+    return {
+      label,
+      score: round1(existing?.score ?? fallback?.score ?? score),
+      average: round1(existing?.average ?? fallback?.average ?? Math.max(6, score - 0.6)),
+    };
+  });
+}
+
 function normalizeCapability(
   capability: Omit<CapabilityElement, 'level' | 'recordedAt' | 'sourceBreakdown' | 'indicatorDimensions'> &
     Partial<Pick<CapabilityElement, 'level' | 'recordedAt' | 'sourceBreakdown' | 'indicatorDimensions'>> &
     Partial<{ updatedAt: string }>,
+  forceTemplateDimensions = false,
 ): CapabilityElement {
+  const elementKey = normalizeCapabilityKey(capability.elementKey);
+  const indicatorDimensions = forceTemplateDimensions
+    ? buildIndicatorDimensions(elementKey, capability.score)
+    : normalizeIndicatorDimensions(elementKey, capability.score, capability.indicatorDimensions);
+  const score = indicatorDimensions.length ? averageDimensions(indicatorDimensions) : round1(capability.score);
   return {
     id: capability.id,
-    elementKey: capability.elementKey,
+    elementKey,
     planeKey: capability.planeKey,
     planeTitle: capability.planeTitle,
-    score: round1(capability.score),
-    averageScore: round1(capability.averageScore),
+    score,
+    averageScore: indicatorDimensions.length ? averageDimensions(indicatorDimensions, 'average') : round1(capability.averageScore),
     source: capability.source,
-    level: capability.level ?? getCapabilityLevel(capability.score),
+    level: getCapabilityLevel(score),
     recordedAt: capability.recordedAt ?? capability.updatedAt ?? nowIso(),
     sourceBreakdown:
       capability.sourceBreakdown?.length
         ? clone(capability.sourceBreakdown)
         : clone(DEFAULT_CAPABILITY_SOURCE_BREAKDOWN),
-    indicatorDimensions:
-      capability.indicatorDimensions?.length
-        ? capability.indicatorDimensions.map((item) => ({
-            label: item.label,
-            score: round1(item.score),
-            average: round1(item.average),
-          }))
-        : buildIndicatorDimensions(capability.elementKey, capability.score),
+    indicatorDimensions,
   };
 }
 
@@ -1717,7 +1814,7 @@ function buildDemoState(): ParentState {
     theme: '海洋生命与环保观察',
     location: '深圳海洋馆',
     studyDate: '2026-04-16',
-    goal: '通过观察、提问和作品表达，提升问题解决、科技应用和语言沟通。',
+    goal: '通过观察、提问和作品表达，提升问题解决、探究能力和表达能力。',
     studentIds: [studentA.id],
     inviteCode: 'OCEAN0416',
     createdAt: '2026-04-15 20:00',
@@ -1732,7 +1829,7 @@ function buildDemoState(): ParentState {
     studyDate: '2026-04-16',
     points: 20,
     description: '观察一种海洋动物的行为，用照片和文字说明它的生活习性。',
-    capabilityTags: ['问题解决', '科技应用', '语言沟通'],
+    capabilityTags: ['问题解决', '探究能力', '表达能力'],
     requirements: clone(TASK_LIBRARY[0].requirements),
     status: 'submitted',
     assignedStudentIds: [studentA.id],
@@ -1749,7 +1846,7 @@ function buildDemoState(): ParentState {
     studyDate: '2026-04-17',
     points: 15,
     description: '用身边食材设计一份早餐，说明营养搭配和制作步骤。',
-    capabilityTags: ['身心健康', '自我管理', '创新思维'],
+    capabilityTags: ['身体运动', '自主学习', '想象力'],
     requirements: clone(TASK_LIBRARY[3].requirements),
     status: 'draft',
     assignedStudentIds: [],
@@ -2174,9 +2271,9 @@ function buildDemoState(): ParentState {
       evaluatedAt: '2026-04-16 18:02',
       sourceType: '导师',
       elementRecords: [
-        { elementKey: '问题解决', beforeIndex: 8.1, assessmentValue: 9.1, afterIndex: 8.7 },
-        { elementKey: '科技应用', beforeIndex: 7.6, assessmentValue: 8.8, afterIndex: 8.3 },
-        { elementKey: '语言沟通', beforeIndex: 7.3, assessmentValue: 8.4, afterIndex: 7.9 },
+        { elementKey: '问题解决', dimensionLabel: '问题解决', beforeIndex: 8.1, assessmentValue: 9.1, afterIndex: 8.7 },
+        { elementKey: '科技素养', dimensionLabel: '探究能力', beforeIndex: 7.6, assessmentValue: 8.8, afterIndex: 8.3 },
+        { elementKey: '阅读表达', dimensionLabel: '表达能力', beforeIndex: 7.3, assessmentValue: 8.4, afterIndex: 7.9 },
       ],
     },
     {
@@ -2192,9 +2289,9 @@ function buildDemoState(): ParentState {
       evaluatedAt: '2026-04-30 19:18',
       sourceType: '家长',
       elementRecords: [
-        { elementKey: '自我管理', beforeIndex: 8.0, assessmentValue: 8.8, afterIndex: 8.4 },
-        { elementKey: '创新思维', beforeIndex: 8.5, assessmentValue: 9.0, afterIndex: 8.8 },
-        { elementKey: '语言沟通', beforeIndex: 7.7, assessmentValue: 8.6, afterIndex: 8.1 },
+        { elementKey: '自我管理', dimensionLabel: '自主学习', beforeIndex: 8.0, assessmentValue: 8.8, afterIndex: 8.4 },
+        { elementKey: '创新能力', dimensionLabel: '创新思维', beforeIndex: 8.5, assessmentValue: 9.0, afterIndex: 8.8 },
+        { elementKey: '阅读表达', dimensionLabel: '表达能力', beforeIndex: 7.7, assessmentValue: 8.6, afterIndex: 8.1 },
       ],
     },
     {
@@ -2210,9 +2307,9 @@ function buildDemoState(): ParentState {
       evaluatedAt: '2026-04-28 20:10',
       sourceType: '专家',
       elementRecords: [
-        { elementKey: '问题解决', beforeIndex: 8.4, assessmentValue: 9.3, afterIndex: 8.9 },
-        { elementKey: '社会责任', beforeIndex: 8.0, assessmentValue: 9.1, afterIndex: 8.6 },
-        { elementKey: '跨学科融合', beforeIndex: 8.1, assessmentValue: 8.9, afterIndex: 8.5 },
+        { elementKey: '问题解决', dimensionLabel: '问题解决', beforeIndex: 8.4, assessmentValue: 9.3, afterIndex: 8.9 },
+        { elementKey: '社会责任', dimensionLabel: '环境意识', beforeIndex: 8.0, assessmentValue: 9.1, afterIndex: 8.6 },
+        { elementKey: '规划能力', dimensionLabel: '跨学科融合', beforeIndex: 8.1, assessmentValue: 8.9, afterIndex: 8.5 },
       ],
     },
   ];
@@ -2247,11 +2344,11 @@ function buildDemoState(): ParentState {
         sourceType: '导师',
         recordType: '家庭研学',
         planeTitle: '综合研学',
-        summary: '在观察记录、表达分享和团队协作中表现稳定，问题解决与科技应用能力提升明显。',
+        summary: '在观察记录、表达分享和团队协作中表现稳定，问题解决、探究能力与表达能力提升明显。',
         rows: [
           { elementKey: '问题解决', score: 9.1, latestIndex: 8.7, average: 7.9 },
-          { elementKey: '科技应用', score: 8.8, latestIndex: 8.3, average: 7.6 },
-          { elementKey: '语言沟通', score: 8.4, latestIndex: 7.9, average: 7.3 },
+          { elementKey: '探究能力', score: 8.8, latestIndex: 8.3, average: 7.6 },
+          { elementKey: '表达能力', score: 8.4, latestIndex: 7.9, average: 7.3 },
         ],
       },
       {
@@ -2269,9 +2366,9 @@ function buildDemoState(): ParentState {
         planeTitle: '日常任务',
         summary: '孩子能在家庭观察中主动记录现象，并用闪记复盘自己的判断，日常任务完成度较高。',
         rows: [
-          { elementKey: '自我管理', score: 8.8, latestIndex: 8.4, average: 7.6 },
+          { elementKey: '自主学习', score: 8.8, latestIndex: 8.4, average: 7.6 },
           { elementKey: '创新思维', score: 9.0, latestIndex: 8.8, average: 7.7 },
-          { elementKey: '语言沟通', score: 8.6, latestIndex: 8.1, average: 7.3 },
+          { elementKey: '表达能力', score: 8.6, latestIndex: 8.1, average: 7.3 },
         ],
       },
       {
@@ -2290,7 +2387,7 @@ function buildDemoState(): ParentState {
         summary: '孩子能从污染来源、治理成本和公众参与三个角度提出方案，问题解决与社会责任表现突出。',
         rows: [
           { elementKey: '问题解决', score: 9.3, latestIndex: 8.9, average: 7.9 },
-          { elementKey: '社会责任', score: 9.1, latestIndex: 8.6, average: 7.8 },
+          { elementKey: '环境意识', score: 9.1, latestIndex: 8.6, average: 7.8 },
           { elementKey: '跨学科融合', score: 8.9, latestIndex: 8.5, average: 7.5 },
         ],
       },
@@ -2660,6 +2757,12 @@ function normalizeState(state: ParentState): ParentState {
           evaluatedAt: report.evaluatedAt ?? report.date,
           sourceType: report.sourceType ?? (report.type === 'parent_review' ? '家长' : report.type === 'student_self_test' ? '系统' : '导师'),
           recordType: report.recordType ?? (report.type === 'parent_review' ? '家长评测' : '家庭研学'),
+          rows: Array.isArray(report.rows)
+            ? report.rows.map((row) => ({
+                ...row,
+                elementKey: normalizeCapabilityTargetLabel(row.elementKey),
+              }))
+            : [],
         }))
       : base.reports,
     portfolioWorks: Array.isArray(state.portfolioWorks)
@@ -2682,6 +2785,13 @@ function normalizeState(state: ParentState): ParentState {
       ? state.capabilityAdjustmentRecords.map((record) => ({
           ...record,
           recordType: record.recordType ?? '家庭研学',
+          elementRecords: Array.isArray(record.elementRecords)
+            ? record.elementRecords.map((item) => ({
+                ...item,
+                elementKey: normalizeCapabilityKey(item.elementKey),
+                dimensionLabel: item.dimensionLabel ? normalizeCapabilityDimensionLabel(item.dimensionLabel) : undefined,
+              }))
+            : [],
           reportId:
             record.reportId ??
             (Array.isArray(state.reports)
@@ -2690,7 +2800,12 @@ function normalizeState(state: ParentState): ParentState {
         }))
       : base.capabilityAdjustmentRecords,
     diaryItems: Array.isArray(state.diaryItems) ? state.diaryItems : base.diaryItems,
-    familyTasks: Array.isArray(state.familyTasks) ? state.familyTasks : base.familyTasks,
+    familyTasks: Array.isArray(state.familyTasks)
+      ? state.familyTasks.map((task) => ({
+          ...task,
+          capabilityTags: Array.isArray(task.capabilityTags) ? task.capabilityTags.map((tag) => normalizeCapabilityTargetLabel(tag)) : [],
+        }))
+      : base.familyTasks,
     works: Array.isArray(state.works) ? state.works : base.works,
     messages: Array.isArray(state.messages) ? state.messages : base.messages,
     orders: Array.isArray(state.orders) ? state.orders : base.orders,
@@ -3078,6 +3193,43 @@ function getPlaneTitle(planeKey: CapabilityPlaneKey | 'all') {
     return '全面测试';
   }
   return CAPABILITY_PLANES.find((plane) => plane.key === planeKey)?.title ?? '能力评测';
+}
+
+export function getCapabilityAssessmentAnswerKey(capabilityId: string, dimensionLabel: string, questionIndex: number) {
+  return `${capabilityId}__${dimensionLabel}__${questionIndex}`;
+}
+
+function getAssessmentTargetCapabilities(student: ParentStudent, planeKey: CapabilityPlaneKey | 'all', capabilityId?: string) {
+  if (capabilityId) {
+    return student.capabilities.filter((capability) => capability.id === capabilityId);
+  }
+  const elementKeys = getPlaneElements(planeKey);
+  return student.capabilities.filter((capability) => elementKeys.includes(capability.elementKey));
+}
+
+function getDimensionReviewValues(answers: Record<string, number>, capabilityId: string, dimensionLabel: string) {
+  return ASSESSMENT_QUESTIONS.map((_, questionIndex) => {
+    const scopedKey = getCapabilityAssessmentAnswerKey(capabilityId, dimensionLabel, questionIndex);
+    return answers[scopedKey] ?? answers[`${dimensionLabel}_${questionIndex}`];
+  }).filter((value): value is number => typeof value === 'number');
+}
+
+function getMatchedCapabilityDimensions(capability: CapabilityElement, targets: string[]) {
+  const normalizedTargets = targets.map((target) => normalizeCapabilityTargetLabel(target));
+  const directDimensionMatches = capability.indicatorDimensions
+    .filter((dimension) => normalizedTargets.includes(dimension.label))
+    .map((dimension) => dimension.label);
+
+  if (directDimensionMatches.length) {
+    return Array.from(new Set(directDimensionMatches));
+  }
+
+  const canonicalTargets = targets.map((target) => normalizeCapabilityKey(target));
+  if (canonicalTargets.includes(capability.elementKey)) {
+    return capability.indicatorDimensions.map((dimension) => dimension.label);
+  }
+
+  return [];
 }
 
 function withStudent(state: ParentState, studentId: string, updater: (student: ParentStudent) => ParentStudent) {
@@ -3742,32 +3894,58 @@ export function ParentStoreProvider({ children }: { children: ReactNode }) {
           }),
         );
       },
-      completeAssessment(studentId, planeKey, answers) {
+      completeAssessment(studentId, planeKey, answers, capabilityId) {
         setState((current) => {
-          const elementKeys = getPlaneElements(planeKey);
+          const evaluatedAt = nowText();
+          const recordedAt = nowIso();
           let reportRows: CapabilityReport['rows'] = [];
+          let adjustmentElementRecords: CapabilityAdjustmentRecord['elementRecords'] = [];
+          let scopeTitle = getPlaneTitle(planeKey);
           const nextState = withStudent(current, studentId, (student) => {
+            const targetCapabilities = getAssessmentTargetCapabilities(student, planeKey, capabilityId);
+            scopeTitle = targetCapabilities.length === 1 ? targetCapabilities[0].elementKey : getPlaneTitle(planeKey);
+            const targetIds = new Set(targetCapabilities.map((capability) => capability.id));
             const nextCapabilities = student.capabilities.map((capability) => {
-              if (!elementKeys.includes(capability.elementKey)) {
+              if (!targetIds.has(capability.id)) {
                 return capability;
               }
-              const values = ASSESSMENT_QUESTIONS.map((_, questionIndex) => answers[`${capability.elementKey}_${questionIndex}`] ?? 6);
-              const reviewScore = round1(values.reduce((sum, value) => sum + value, 0) / values.length);
-              const latestIndex = round1(capability.score * 0.7 + reviewScore * 0.3);
-              reportRows = [
-                ...reportRows,
-                {
-                  elementKey: capability.elementKey,
-                  score: reviewScore,
-                  latestIndex,
-                  average: capability.averageScore,
-                },
-              ];
+              const nextDimensions = capability.indicatorDimensions.map((dimension) => {
+                const values = getDimensionReviewValues(answers, capability.id, dimension.label);
+                if (!values.length) {
+                  return dimension;
+                }
+                const reviewScore = round1(values.reduce((sum, value) => sum + value, 0) / values.length);
+                const latestIndex = round1(dimension.score * 0.7 + reviewScore * 0.3);
+                reportRows = [
+                  ...reportRows,
+                  {
+                    elementKey: dimension.label,
+                    score: reviewScore,
+                    latestIndex,
+                    average: dimension.average,
+                  },
+                ];
+                adjustmentElementRecords = [
+                  ...adjustmentElementRecords,
+                  {
+                    elementKey: capability.elementKey,
+                    dimensionLabel: dimension.label,
+                    beforeIndex: dimension.score,
+                    assessmentValue: reviewScore,
+                    afterIndex: latestIndex,
+                  },
+                ];
+                return {
+                  ...dimension,
+                  score: latestIndex,
+                };
+              });
               return normalizeCapability({
                 ...capability,
-                score: latestIndex,
+                score: averageDimensions(nextDimensions),
+                indicatorDimensions: nextDimensions,
                 source: 'parent_review' as const,
-                recordedAt: nowIso(),
+                recordedAt,
               });
             });
             return { ...student, capabilities: nextCapabilities };
@@ -3776,15 +3954,15 @@ export function ParentStoreProvider({ children }: { children: ReactNode }) {
             id: makeId('report'),
             studentId,
             type: 'parent_review',
-            title: `${getPlaneTitle(planeKey)}家长能力评测报告`,
+            title: `${scopeTitle}家长能力评测报告`,
             date: today(),
             organizationName: '家庭研学',
-            teamOrTaskName: getPlaneTitle(planeKey),
+            teamOrTaskName: scopeTitle,
             evaluator: current.parentProfile.name,
-            evaluatedAt: nowText(),
+            evaluatedAt,
             sourceType: '家长',
             recordType: '家长评测',
-            planeTitle: getPlaneTitle(planeKey),
+            planeTitle: scopeTitle,
             summary: `本次完成 ${reportRows.length} 个能力元素评测，已更新能力指数。`,
             rows: reportRows,
           };
@@ -3792,12 +3970,12 @@ export function ParentStoreProvider({ children }: { children: ReactNode }) {
             id: makeId('growth'),
             studentId,
             type: 'capability_update',
-            category: getPlaneTitle(planeKey),
+            category: scopeTitle,
             sourceType: 'parent_review',
-            title: `${getPlaneTitle(planeKey)}能力指数更新`,
+            title: `${scopeTitle}能力指数更新`,
             value: round1(reportRows.reduce((sum, row) => sum + row.latestIndex, 0) / Math.max(reportRows.length, 1)),
             delta: round1(reportRows.reduce((sum, row) => sum + (row.latestIndex - row.average), 0)),
-            occurredAt: nowText(),
+            occurredAt: evaluatedAt,
             summary: `已完成 ${reportRows.length} 个能力元素评测，能力指数与评测记录已同步更新。`,
             displaySource: '能力更新',
             relatedId: report.id,
@@ -3807,7 +3985,7 @@ export function ParentStoreProvider({ children }: { children: ReactNode }) {
             studentId,
             type: 'assessment',
             title: report.title,
-            date: nowText(),
+            date: evaluatedAt,
             source: '家长评测',
             summary: report.summary,
             relatedId: report.id,
@@ -3818,18 +3996,13 @@ export function ParentStoreProvider({ children }: { children: ReactNode }) {
             recordType: '家长评测',
             sourceTitle: report.title,
             organizationName: '家庭研学',
-            teamOrTaskName: getPlaneTitle(planeKey),
+            teamOrTaskName: scopeTitle,
             reportTitle: report.title,
             reportId: report.id,
             evaluator: current.parentProfile.name,
-            evaluatedAt: nowText(),
+            evaluatedAt,
             sourceType: '家长',
-            elementRecords: reportRows.map((row) => ({
-              elementKey: row.elementKey,
-              beforeIndex: round1((row.latestIndex - row.score * 0.3) / 0.7),
-              assessmentValue: row.score,
-              afterIndex: row.latestIndex,
-            })),
+            elementRecords: adjustmentElementRecords,
           };
           return {
             ...nextState,
@@ -4082,14 +4255,37 @@ export function ParentStoreProvider({ children }: { children: ReactNode }) {
             comment: input.comment,
             scoredAt: scoreRecordedAt,
           };
+          let adjustmentElementRecords: CapabilityAdjustmentRecord['elementRecords'] = [];
           const nextState = withStudent(current, work.studentId, (student) => {
             const nextCapabilities = student.capabilities.map((capability) => {
-              if (!task.capabilityTags.includes(capability.elementKey)) {
+              const matchedDimensions = getMatchedCapabilityDimensions(capability, task.capabilityTags);
+              if (!matchedDimensions.length) {
                 return capability;
               }
+              const nextDimensions = capability.indicatorDimensions.map((dimension) => {
+                if (!matchedDimensions.includes(dimension.label)) {
+                  return dimension;
+                }
+                const afterIndex = round1(dimension.score * 0.82 + normalizedScore * 0.18);
+                adjustmentElementRecords = [
+                  ...adjustmentElementRecords,
+                  {
+                    elementKey: capability.elementKey,
+                    dimensionLabel: dimension.label,
+                    beforeIndex: dimension.score,
+                    assessmentValue: normalizedScore,
+                    afterIndex,
+                  },
+                ];
+                return {
+                  ...dimension,
+                  score: afterIndex,
+                };
+              });
               return normalizeCapability({
                 ...capability,
-                score: round1(capability.score * 0.82 + normalizedScore * 0.18),
+                score: averageDimensions(nextDimensions),
+                indicatorDimensions: nextDimensions,
                 source: 'family_task' as const,
                 recordedAt: nowIso(),
               });
@@ -4163,16 +4359,7 @@ export function ParentStoreProvider({ children }: { children: ReactNode }) {
             evaluator: current.parentProfile.name,
             evaluatedAt: scoreRecordedAt,
             sourceType: '家长',
-            elementRecords: task.capabilityTags.map((elementKey) => {
-              const before = current.students.find((student) => student.id === work.studentId)?.capabilities.find((item) => item.elementKey === elementKey)?.score ?? normalizedScore;
-              const after = nextState.students.find((student) => student.id === work.studentId)?.capabilities.find((item) => item.elementKey === elementKey)?.score ?? normalizedScore;
-              return {
-                elementKey,
-                beforeIndex: before,
-                assessmentValue: normalizedScore,
-                afterIndex: after,
-              };
-            }),
+            elementRecords: adjustmentElementRecords,
           };
           const scoreReport: CapabilityReport = {
             id: scoreReportId,
@@ -4192,11 +4379,12 @@ export function ParentStoreProvider({ children }: { children: ReactNode }) {
               const capability = nextState.students
                 .find((student) => student.id === work.studentId)
                 ?.capabilities.find((capabilityItem) => capabilityItem.elementKey === item.elementKey);
+              const dimension = capability?.indicatorDimensions.find((dimensionItem) => dimensionItem.label === item.dimensionLabel);
               return {
-                elementKey: item.elementKey,
+                elementKey: item.dimensionLabel ?? item.elementKey,
                 score: item.assessmentValue,
                 latestIndex: item.afterIndex,
-                average: capability?.averageScore ?? round1((item.beforeIndex + item.afterIndex) / 2),
+                average: dimension?.average ?? capability?.averageScore ?? round1((item.beforeIndex + item.afterIndex) / 2),
               };
             }),
           };

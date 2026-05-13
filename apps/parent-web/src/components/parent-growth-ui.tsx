@@ -47,13 +47,12 @@ export function buildCapabilityImprovementRadarItems(
   record?: CapabilityAdjustmentRecord | null,
   limit = 6,
 ): CapabilityImprovementRadarItem[] {
-  const capabilityMap = new Map(capabilities.map((capability) => [capability.elementKey, capability]));
   const records = (record?.elementRecords ?? [])
     .map((item) => {
       const beforeIndex = roundRadarValue(item.beforeIndex);
       const afterIndex = roundRadarValue(item.afterIndex);
       return {
-        elementKey: item.elementKey,
+        elementKey: item.dimensionLabel ?? item.elementKey,
         beforeIndex,
         afterIndex,
         assessmentValue: roundRadarValue(item.assessmentValue),
@@ -76,17 +75,23 @@ export function buildCapabilityImprovementRadarItems(
   records.filter((item) => item.delta > 0).forEach(addItem);
 
   capabilities
-    .filter((capability) => !selectedKeys.has(capability.elementKey))
+    .flatMap((capability) =>
+      capability.indicatorDimensions.map((dimension) => ({
+        elementKey: dimension.label,
+        score: dimension.score,
+      })),
+    )
+    .filter((dimension) => !selectedKeys.has(dimension.elementKey))
     .sort((left, right) => right.score - left.score)
-    .forEach((capability) => {
-      const score = roundRadarValue(capability.score);
+    .forEach((dimension) => {
+      const score = roundRadarValue(dimension.score);
       addItem({
-        elementKey: capability.elementKey,
+        elementKey: dimension.elementKey,
         beforeIndex: score,
         afterIndex: score,
         assessmentValue: score,
         delta: 0,
-        source: capabilityMap.has(capability.elementKey) ? 'supplement' : 'growth',
+        source: 'supplement',
       });
     });
 
@@ -209,6 +214,23 @@ export function ParentCapabilityImprovementList({ items }: { items: CapabilityIm
   );
 }
 
+export function ParentCapabilityDimensionList({ dimensions }: { dimensions: CapabilityElement['indicatorDimensions'] }) {
+  return (
+    <div className="parent-improvement-list">
+      {dimensions.map((dimension) => (
+        <div key={dimension.label} className="parent-improvement-item">
+          <span>{dimension.label}</span>
+          <strong>{dimension.score.toFixed(1)}</strong>
+          <em className={dimension.score >= dimension.average ? 'up' : ''}>
+            {dimension.score >= dimension.average ? `高于平均 +${(dimension.score - dimension.average).toFixed(1)}` : `低于平均 ${(dimension.score - dimension.average).toFixed(1)}`}
+          </em>
+          <small>同龄平均 {dimension.average.toFixed(1)}</small>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function getAdjustmentTone(recordType: CapabilityAdjustmentRecord['recordType']) {
   const toneMap: Record<CapabilityAdjustmentRecord['recordType'], string> = {
     家庭研学: 'study',
@@ -268,9 +290,9 @@ export function ParentAssessmentRecordCard({
         </div>
       </div>
       <div className="parent-assessment-element-list">
-        {records.map((item) => (
-          <span key={item.elementKey}>
-            {item.elementKey}
+        {records.map((item, index) => (
+          <span key={`${item.elementKey}_${item.dimensionLabel ?? index}`}>
+            {item.dimensionLabel ?? item.elementKey}
             <em>
               {item.beforeIndex.toFixed(1)} → {item.afterIndex.toFixed(1)}
             </em>
@@ -326,7 +348,7 @@ export function ParentGrowthFrameworkChart({
     <section className="parent-section parent-framework-card">
       <div className="parent-section-head">
         <strong>能力框架图</strong>
-        <span>点击能力元素查看详情</span>
+        <span>点击能力指标查看详情</span>
       </div>
       <ParentGrowthLevelLegend />
       <div className="parent-growth-framework-grid">
@@ -433,7 +455,7 @@ export function ParentCapabilityList({
     <section className="parent-section">
       <div className="parent-section-head">
         <strong>16 项能力指标</strong>
-        <span>查看单项能力详情</span>
+        <span>查看单项指标详情</span>
       </div>
       <div className="parent-card-list">
         {capabilities.map((item) => (

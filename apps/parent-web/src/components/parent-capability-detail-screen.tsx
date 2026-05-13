@@ -6,10 +6,9 @@ import { useParams, useRouter } from 'next/navigation';
 import { ParentRouteFallback } from './parent-route-fallback';
 import {
   ParentAssessmentRecordCard,
-  ParentCapabilityImprovementList,
+  ParentCapabilityDimensionList,
   ParentGrowthSourceBreakdown,
   ParentRadarCard,
-  buildCapabilityImprovementRadarItems,
   formatParentDateTime,
   getCapabilitySourceDescription,
   getCapabilitySourceLabel,
@@ -60,16 +59,12 @@ export function ParentCapabilityDetailScreen() {
   }
 
   const accentColor = getCapabilityLevelColor(capability.level);
-  const studentAdjustmentRecords = store.state.capabilityAdjustmentRecords
-    .filter((record) => record.studentId === store.selectedStudent?.id)
-    .sort((left, right) => right.evaluatedAt.localeCompare(left.evaluatedAt));
-  const latestAdjustmentRecord = studentAdjustmentRecords[0] ?? null;
-  const improvementRadarItems = buildCapabilityImprovementRadarItems(store.selectedStudent.capabilities, latestAdjustmentRecord);
+  const capabilityDimensionLabels = capability.indicatorDimensions.map((dimension) => dimension.label);
   const adjustmentRecords = store.state.capabilityAdjustmentRecords
     .filter((record) => record.studentId === store.selectedStudent?.id)
     .flatMap((record) =>
       record.elementRecords
-        .filter((item) => item.elementKey === capability.elementKey)
+        .filter((item) => item.elementKey === capability.elementKey || (item.dimensionLabel ? capabilityDimensionLabels.includes(item.dimensionLabel) : false))
         .map((item) => ({ ...item, record })),
     );
 
@@ -97,7 +92,7 @@ export function ParentCapabilityDetailScreen() {
             boxShadow: `0 18px 40px ${accentColor}10`,
           }}
         >
-          <span className="parent-capability-hero-eyebrow">{capability.planeTitle}能力</span>
+          <span className="parent-capability-hero-eyebrow">{capability.planeTitle} · 能力指标</span>
           <strong>{capability.elementKey}</strong>
           <div className="parent-capability-hero-pills">
             <span>{capability.planeTitle}</span>
@@ -148,7 +143,7 @@ export function ParentCapabilityDetailScreen() {
             {adjustmentRecords.length ? (
               adjustmentRecords.map((item) => (
                 <ParentAssessmentRecordCard
-                  key={`${item.record.id}_${item.elementKey}`}
+                  key={`${item.record.id}_${item.elementKey}_${item.dimensionLabel ?? 'indicator'}`}
                   record={item.record}
                   elementRecords={[item]}
                   onOpenReport={(record) => record.reportId && router.push(`/portfolio/reports/${record.reportId}`)}
@@ -163,19 +158,15 @@ export function ParentCapabilityDetailScreen() {
         </section>
 
         <ParentRadarCard
-          title="能力提升雷达图"
-          labels={improvementRadarItems.map((item) => item.elementKey)}
-          values={improvementRadarItems.map((item) => item.afterIndex)}
-          compareValues={improvementRadarItems.map((item) => item.beforeIndex)}
-          valueLabel="最新指数"
-          compareLabel="更新前指数"
-          summary={
-            latestAdjustmentRecord
-              ? `${latestAdjustmentRecord.reportTitle}：按本次研学/评测增长最多的能力元素排序展示，不足 6 项时补充当前高分且无变化的能力元素。`
-              : '暂无本次研学/评测调整记录，先展示当前分值最高的 6 项能力元素作为待观察基线。'
-          }
+          title="能力元素雷达图"
+          labels={capability.indicatorDimensions.map((item) => item.label)}
+          values={capability.indicatorDimensions.map((item) => item.score)}
+          compareValues={capability.indicatorDimensions.map((item) => item.average)}
+          valueLabel="能力元素指数"
+          compareLabel="同龄平均"
+          summary={`${capability.elementKey} 由 ${capability.indicatorDimensions.map((item) => item.label).join('、')} 等能力元素构成；家长评测和研学评价会先更新能力元素，再同步汇总到该能力指标。`}
         >
-          <ParentCapabilityImprovementList items={improvementRadarItems} />
+          <ParentCapabilityDimensionList dimensions={capability.indicatorDimensions} />
         </ParentRadarCard>
       </ParentSubpageShell>
     </ParentPhoneFrame>

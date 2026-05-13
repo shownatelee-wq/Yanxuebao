@@ -7,10 +7,10 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { ParentRouteFallback } from './parent-route-fallback';
 import { ParentPhoneFrame, ParentSubpageShell, useParentSessionReady } from './parent-mobile-shell';
-import { CAPABILITY_PLANES, TASK_LIBRARY, useParentStore } from '../lib/parent-store';
+import { CAPABILITY_ELEMENT_OPTIONS, TASK_LIBRARY, useParentStore } from '../lib/parent-store';
 
 const TASK_TYPES = ['观察记录', '问答任务', '调查任务', '创作任务', '商业体验'];
-const CAPABILITY_OPTIONS = CAPABILITY_PLANES.flatMap((plane) => plane.elements);
+const CAPABILITY_OPTIONS = CAPABILITY_ELEMENT_OPTIONS;
 
 export function ParentQuickTaskScreen() {
   const router = useRouter();
@@ -18,8 +18,8 @@ export function ParentQuickTaskScreen() {
   const store = useParentStore();
   const [form] = Form.useForm();
   const [createdTaskIds, setCreatedTaskIds] = useState<string[]>([]);
-  const [aiPrompt, setAiPrompt] = useState('我想带孩子去深圳海洋馆做一次亲子研学，希望提升问题解决、科技应用和语言沟通。');
-  const [analysisText, setAnalysisText] = useState('已识别：地点/场景=深圳海洋馆；主题=海洋动物观察；能力目标=问题解决、科技应用、语言沟通。');
+  const [aiPrompt, setAiPrompt] = useState('我想带孩子去深圳海洋馆做一次亲子研学，希望提升问题解决、探究能力和表达能力。');
+  const [analysisText, setAnalysisText] = useState('已识别：地点/场景=深圳海洋馆；主题=海洋动物观察；能力目标=问题解决、探究能力、表达能力。');
 
   useEffect(() => {
     if (!store.hydrated) {
@@ -29,7 +29,7 @@ export function ParentQuickTaskScreen() {
       studyDate: new Date().toISOString().slice(0, 10),
       destination: '深圳海洋馆',
       taskTypes: ['观察记录'],
-      capabilityTags: ['问题解决', '科技应用'],
+      capabilityTags: ['问题解决', '探究能力'],
       templateIds: TASK_LIBRARY.slice(0, 2).map((item) => item.id),
     });
   }, [form, store.hydrated]);
@@ -53,7 +53,7 @@ export function ParentQuickTaskScreen() {
 
   function analyzePrompt() {
     const nextDestination = aiPrompt.includes('公园') ? '社区公园' : aiPrompt.includes('厨房') ? '家庭厨房' : '深圳海洋馆';
-    const nextCapabilities = aiPrompt.includes('表达') ? ['语言沟通', '人文审美'] : ['问题解决', '科技应用', '语言沟通'];
+    const nextCapabilities = aiPrompt.includes('表达') ? ['表达能力', '艺术鉴赏'] : ['问题解决', '探究能力', '表达能力'];
     form.setFieldsValue({
       destination: nextDestination,
       capabilityTags: nextCapabilities,

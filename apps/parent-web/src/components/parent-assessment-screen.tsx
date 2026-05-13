@@ -7,7 +7,13 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { ParentRouteFallback } from './parent-route-fallback';
 import { ParentPhoneFrame, ParentSubpageShell, useParentSessionReady } from './parent-mobile-shell';
-import { CAPABILITY_PLANES, getAssessmentQuestions, useParentStore, type CapabilityPlaneKey } from '../lib/parent-store';
+import {
+  CAPABILITY_PLANES,
+  getAssessmentQuestions,
+  getCapabilityAssessmentAnswerKey,
+  useParentStore,
+  type CapabilityPlaneKey,
+} from '../lib/parent-store';
 
 const ASSESSMENT_OPTIONS = [
   { label: '非常符合', value: 10 },
@@ -50,7 +56,7 @@ export function ParentAssessmentScreen() {
     if (!selectedStudent) {
       return;
     }
-    store.completeAssessment(selectedStudent.id, assessmentPlane, values);
+    store.completeAssessment(selectedStudent.id, assessmentPlane, values, capabilityIdParam ?? undefined);
     setSubmittedPlane(assessmentPlane);
   }
 
@@ -74,6 +80,8 @@ export function ParentAssessmentScreen() {
       </ParentPhoneFrame>
     );
   }
+
+  const selectedCapability = capabilityIdParam ? selectedStudent.capabilities.find((capability) => capability.id === capabilityIdParam) ?? null : null;
 
   if (submittedPlane) {
     return (
@@ -110,7 +118,7 @@ export function ParentAssessmentScreen() {
             <CheckCircleOutlined />
             <strong>评测报告已生成</strong>
             <span>
-              {selectedStudent.name} 的 {getPlaneTitle(submittedPlane)} 家长评测已经写入能力档案。
+              {selectedStudent.name} 的 {selectedCapability?.elementKey ?? getPlaneTitle(submittedPlane)} 家长评测已经写入能力档案。
             </span>
           </section>
         </ParentSubpageShell>
@@ -118,10 +126,12 @@ export function ParentAssessmentScreen() {
     );
   }
 
-  const elementOptions =
-    assessmentPlane === 'all'
-      ? CAPABILITY_PLANES.flatMap((plane) => plane.elements)
-      : CAPABILITY_PLANES.find((plane) => plane.key === assessmentPlane)?.elements ?? [];
+  const targetCapabilities = selectedCapability
+    ? [selectedCapability]
+    : selectedStudent.capabilities.filter((capability) =>
+        assessmentPlane === 'all' ? true : (CAPABILITY_PLANES.find((plane) => plane.key === assessmentPlane)?.elements ?? []).includes(capability.elementKey),
+      );
+  const targetElementCount = targetCapabilities.reduce((sum, capability) => sum + capability.indicatorDimensions.length, 0);
 
   return (
     <ParentPhoneFrame>
@@ -137,18 +147,19 @@ export function ParentAssessmentScreen() {
       >
         <section className="parent-editor-intro">
           <strong>为 {selectedStudent.name} 完成一次家长评测</strong>
-          <span>可选择单个能力平面，也可以直接完成一轮全面测试。</span>
+          <span>{selectedCapability ? '本次仅评测当前能力指标下的能力元素。' : '可选择单个能力平面，也可以直接完成一轮全面测试。'}</span>
         </section>
 
         <div className="parent-card-list">
           <section className="parent-section">
             <div className="parent-section-head">
               <strong>评测范围</strong>
-              <span>{elementOptions.length} 个能力元素</span>
+              <span>{targetElementCount} 个能力元素</span>
             </div>
             <Select
               value={assessmentPlane}
               onChange={setAssessmentPlane}
+              disabled={Boolean(selectedCapability)}
               options={[
                 { label: '全面测试', value: 'all' },
                 ...CAPABILITY_PLANES.map((plane) => ({ label: plane.title, value: plane.key })),
@@ -157,20 +168,25 @@ export function ParentAssessmentScreen() {
           </section>
 
           <Form form={form} layout="vertical" onFinish={submitAssessment} className="parent-editor-form">
-            {elementOptions.length ? (
-              elementOptions.map((element) => (
-                <section key={element} className="parent-assessment-group page">
-                  <strong>{element}</strong>
-                  {getAssessmentQuestions().map((question, index) => (
-                    <Form.Item
-                      key={`${element}_${index}`}
-                      name={`${element}_${index}`}
-                      label={question}
-                      initialValue={index % 2 === 0 ? 8 : 10}
-                      rules={[{ required: true, message: '请选择' }]}
-                    >
-                      <Radio.Group options={ASSESSMENT_OPTIONS} />
-                    </Form.Item>
+            {targetCapabilities.length ? (
+              targetCapabilities.map((capability) => (
+                <section key={capability.id} className="parent-assessment-group page">
+                  <strong>{capability.elementKey}</strong>
+                  {capability.indicatorDimensions.map((dimension) => (
+                    <div key={dimension.label} className="parent-assessment-dimension">
+                      <span>{dimension.label}</span>
+                      {getAssessmentQuestions().map((question, index) => (
+                        <Form.Item
+                          key={getCapabilityAssessmentAnswerKey(capability.id, dimension.label, index)}
+                          name={getCapabilityAssessmentAnswerKey(capability.id, dimension.label, index)}
+                          label={question}
+                          initialValue={index % 2 === 0 ? 8 : 10}
+                          rules={[{ required: true, message: '请选择' }]}
+                        >
+                          <Radio.Group options={ASSESSMENT_OPTIONS} />
+                        </Form.Item>
+                      ))}
+                    </div>
                   ))}
                 </section>
               ))

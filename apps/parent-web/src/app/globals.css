@@ -2210,6 +2210,20 @@ button.parent-list-card {
   color: var(--brand-strong);
 }
 
+.parent-assessment-dimension {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+
+.parent-assessment-dimension > span {
+  color: #2f4778;
+  font-size: 13px;
+  font-weight: 800;
+}
+
 .parent-assessment-record-card,
 .parent-report-record-card {
   display: grid;

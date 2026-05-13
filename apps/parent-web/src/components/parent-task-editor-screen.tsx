@@ -6,7 +6,7 @@ import { Button, Empty, Form, Input, InputNumber, Select, Spin } from 'antd';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo } from 'react';
 import {
-  CAPABILITY_PLANES,
+  CAPABILITY_ELEMENT_OPTIONS,
   useParentStore,
   type CustomTaskInput,
   type RequirementType,
@@ -22,7 +22,7 @@ const REQUIREMENT_OPTIONS: Array<{ label: string; value: RequirementType }> = [
   { label: '图片', value: 'image' },
 ];
 
-const CAPABILITY_OPTIONS = CAPABILITY_PLANES.flatMap((plane) => plane.elements);
+const CAPABILITY_OPTIONS = CAPABILITY_ELEMENT_OPTIONS;
 
 export function ParentTaskEditorScreen() {
   const router = useRouter();
