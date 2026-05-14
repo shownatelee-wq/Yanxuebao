@@ -1,17 +1,24 @@
 'use client';
 
 import { BellOutlined, DownOutlined, LogoutOutlined, ReloadOutlined, UserOutlined } from '@ant-design/icons';
-import { Avatar, Badge, Dropdown, Layout, Menu, Space, Typography } from 'antd';
+import { Avatar, Badge, Dropdown, Layout, Menu, Segmented, Space, Tag, Typography } from 'antd';
 import type { MenuProps } from 'antd';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef } from 'react';
 import { clearSession, type AdminRole, type AdminSession } from '../lib/admin-auth';
-import { useAdminStore } from '../lib/admin-store';
+import { useAdminStore, type DemoRole } from '../lib/admin-store';
 import { cityNavigation, operatorNavigation } from '../lib/navigation';
 
 const { Sider, Content } = Layout;
 const { Title, Text } = Typography;
+
+const demoRoleOptions: Array<{ label: string; value: DemoRole }> = [
+  { label: '运营总控', value: 'operator' },
+  { label: '销售人员', value: 'sales' },
+  { label: '财务人员', value: 'finance' },
+  { label: '库管人员', value: 'warehouse' },
+];
 
 type Props = {
   role: AdminRole;
@@ -44,7 +51,7 @@ export function AdminShell({ role, session, children }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const contentRef = useRef<HTMLElement | null>(null);
-  const { actions } = useAdminStore();
+  const { state, actions } = useAdminStore();
 
   const isCity = role === 'city_maintainer';
   const currentKey = isCity ? pathname.split('/')[2] ?? 'bases' : pathname.slice(1) || 'dashboard';
@@ -99,6 +106,17 @@ export function AdminShell({ role, session, children }: Props) {
         <header className="console-header">
           <div />
           <Space size={22} align="center">
+            {!isCity ? (
+              <Space className="demo-role-switch" size={8}>
+                <Tag color="blue">演示岗位视图</Tag>
+                <Segmented
+                  size="small"
+                  value={state.demoRole}
+                  options={demoRoleOptions}
+                  onChange={(value) => actions.setDemoRole(value as DemoRole)}
+                />
+              </Space>
+            ) : null}
             <Badge dot color="#155eef" offset={[-3, 4]}>
               <BellOutlined className="console-bell" />
             </Badge>

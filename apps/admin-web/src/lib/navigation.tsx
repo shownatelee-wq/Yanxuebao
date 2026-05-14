@@ -11,6 +11,7 @@ import {
   FileProtectOutlined,
   FundProjectionScreenOutlined,
   HistoryOutlined,
+  ProfileOutlined,
   MessageOutlined,
   NodeIndexOutlined,
   NotificationOutlined,
@@ -23,7 +24,9 @@ import {
   SolutionOutlined,
   TeamOutlined,
   ToolOutlined,
+  RobotOutlined,
   UserSwitchOutlined,
+  WalletOutlined,
 } from '@ant-design/icons';
 import type { ReactNode } from 'react';
 
@@ -45,6 +48,7 @@ export type OperatorPageKey =
   | 'audits'
   | 'performance'
   | 'rental-orders'
+  | 'finance-confirmations'
   | 'inventory'
   | 'devices'
   | 'sales-online'
@@ -54,10 +58,13 @@ export type OperatorPageKey =
   | 'knowledge'
   | 'agents'
   | 'capability-elements'
+  | 'capability-mappings'
   | 'question-bank'
   | 'growth-rules'
   | 'growth-goods'
-  | 'assessment-settings';
+  | 'assessment-settings'
+  | 'master-agent-settings'
+  | 'operation-logs';
 
 export type CityPageKey = 'bases' | 'tasks' | 'audits' | 'performance';
 
@@ -112,6 +119,7 @@ export const operatorNavigation: Array<{
     section: '设备与订单',
     items: [
       { key: 'rental-orders', title: '租赁订单', subtitle: '租赁、交付、回收与收款', icon: <ShoppingCartOutlined /> },
+      { key: 'finance-confirmations', title: '财务确认', subtitle: '企业与租赁收款到账确认', icon: <WalletOutlined /> },
       { key: 'inventory', title: '进销存总览', subtitle: '库存日报与状态汇总', icon: <DatabaseOutlined /> },
       { key: 'devices', title: '设备台账', subtitle: '序列号池与生命周期', icon: <DatabaseOutlined /> },
       { key: 'sales-online', title: '在线销售', subtitle: '商城订单与发货', icon: <ShopOutlined /> },
@@ -130,11 +138,14 @@ export const operatorNavigation: Array<{
   {
     section: '系统配置',
     items: [
-      { key: 'capability-elements', title: '能力元素', subtitle: '16 项能力与映射规则', icon: <RadarChartOutlined /> },
+      { key: 'capability-elements', title: '能力元素', subtitle: '4 维度、16 指标与 48 元素', icon: <RadarChartOutlined /> },
+      { key: 'capability-mappings', title: '能力映射', subtitle: '机构能力指标映射公式', icon: <ClusterOutlined /> },
       { key: 'question-bank', title: '能力题库', subtitle: '题库维护与批量导入', icon: <BookOutlined /> },
       { key: 'growth-rules', title: '成长值规则', subtitle: '场景积分与即时生效', icon: <BuildOutlined /> },
       { key: 'growth-goods', title: '成长值商品', subtitle: '兑换商品与库存', icon: <ShopOutlined /> },
       { key: 'assessment-settings', title: '评测设置', subtitle: '年龄段答题时长配置', icon: <ScheduleOutlined /> },
+      { key: 'master-agent-settings', title: '主控智能体', subtitle: '知识库、推送与新手引导', icon: <RobotOutlined /> },
+      { key: 'operation-logs', title: '操作记录', subtitle: '关键动作留痕查询', icon: <ProfileOutlined /> },
     ],
   },
 ];

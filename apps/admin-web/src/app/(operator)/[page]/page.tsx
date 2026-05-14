@@ -20,6 +20,7 @@ const operatorPageKeys = new Set<string>([
   'audits',
   'performance',
   'rental-orders',
+  'finance-confirmations',
   'inventory',
   'devices',
   'sales-online',
@@ -29,10 +30,13 @@ const operatorPageKeys = new Set<string>([
   'knowledge',
   'agents',
   'capability-elements',
+  'capability-mappings',
   'question-bank',
   'growth-rules',
   'growth-goods',
   'assessment-settings',
+  'master-agent-settings',
+  'operation-logs',
 ]);
 
 export default async function OperatorDynamicPage(props: { params: Promise<{ page: string }> }) {
