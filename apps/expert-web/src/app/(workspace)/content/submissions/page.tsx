@@ -1,5 +1,5 @@
-import { ExpertContentSubmissionsPage } from '../../../../components/expert-pages';
+import { redirect } from 'next/navigation';
 
 export default function ContentSubmissionsRoute() {
-  return <ExpertContentSubmissionsPage />;
+  redirect('/challenges?tab=works');
 }

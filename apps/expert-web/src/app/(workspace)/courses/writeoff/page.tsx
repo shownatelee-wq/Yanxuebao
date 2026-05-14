@@ -1,5 +1,5 @@
-import { ExpertCourseWriteOffPage } from '../../../../components/expert-pages';
+import { redirect } from 'next/navigation';
 
 export default function CourseWriteOffRoute() {
-  return <ExpertCourseWriteOffPage />;
+  redirect('/me/orders?tab=verify');
 }

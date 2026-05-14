@@ -1,5 +1,5 @@
-import { redirect } from 'next/navigation';
+import { ExpertChallengesPage } from '../../../components/expert-pages';
 
 export default function ChallengesPage() {
-  redirect('/content/challenges');
+  return <ExpertChallengesPage />;
 }

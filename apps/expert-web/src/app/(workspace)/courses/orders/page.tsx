@@ -1,5 +1,5 @@
-import { ExpertCourseOrdersPage } from '../../../../components/expert-pages';
+import { redirect } from 'next/navigation';
 
 export default function CourseOrdersRoute() {
-  return <ExpertCourseOrdersPage />;
+  redirect('/me/orders?tab=orders');
 }
