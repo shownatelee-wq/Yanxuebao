@@ -33,7 +33,7 @@ const NAV_ITEMS = [
     matches: ['/teams', '/groups', '/team-detail', '/team-switch', '/works', '/scores'],
   },
   { href: '/tasks', label: '任务', icon: ScheduleOutlined, matches: ['/tasks'] },
-  { href: '/me', label: '我的', icon: UserOutlined, matches: ['/me'] },
+  { href: '/me', label: '我的', icon: UserOutlined, matches: ['/me', '/common-classes'] },
 ];
 
 const TITLES: Record<string, { title: string; subtitle: string }> = {
@@ -48,9 +48,10 @@ const TITLES: Record<string, { title: string; subtitle: string }> = {
   '/reports': { title: '研学报告', subtitle: '生成、推送与成长值发放' },
   '/messages': { title: '消息', subtitle: 'SoS、问询、通知与群组消息' },
   '/broadcasts': { title: '消息', subtitle: '团队、小组、学员消息统一处理' },
-  '/photos': { title: '团队照片', subtitle: '照片上传与研学回顾素材' },
+  '/photos': { title: '团队照片', subtitle: '拍照、相册与研学回顾素材' },
   '/safety': { title: '安全中心', subtitle: '位置查看与 SoS 处理' },
   '/me': { title: '我的', subtitle: '导师信息与常用工具' },
+  '/common-classes': { title: '常用班级', subtitle: '维护班级与学生名单' },
   '/scores': { title: '评分入口', subtitle: '兼容旧链接，跳转到评分工作区' },
 };
 

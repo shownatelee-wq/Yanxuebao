@@ -2,6 +2,7 @@
 
 import {
   BellOutlined,
+  CameraOutlined,
   CheckCircleOutlined,
   CopyOutlined,
   EditOutlined,
@@ -9,7 +10,6 @@ import {
   EyeOutlined,
   FileTextOutlined,
   FileImageOutlined,
-  FilePdfOutlined,
   LogoutOutlined,
   PlusOutlined,
   RightOutlined,
@@ -24,11 +24,11 @@ import {
 } from '@ant-design/icons';
 import {
   Button,
+  Drawer,
   Form,
   Image,
   Input,
   InputNumber,
-  Modal,
   Progress,
   Rate,
   Segmented,
@@ -48,8 +48,10 @@ import {
   type EvaluationMode,
   type EvaluationEntry,
   type GroupRole,
+  type PaymentType,
   type ReportTemplate,
   type ScoreKind,
+  type StudyReport,
   type TaskAttachment,
   type TaskScope,
   type TaskStatus,
@@ -65,9 +67,11 @@ import {
   getGroupsByTeam,
   getLocationForStudent,
   getOwnerName,
+  getPaymentOrdersByTeam,
   getRewardPenaltyTotal,
   getSosForTeam,
   getStudentEvaluationSummary,
+  getStudentPaymentSummary,
   getStudentProgressSummary,
   getTrackForStudent,
   getStudentsByTeam,
@@ -195,6 +199,297 @@ function scoreKindLabel(kind: ScoreKind) {
   return kind === 'reward' ? '奖励分' : '处罚分';
 }
 
+function taskSourceLabel(source: 'manual' | 'history' | 'library' | 'ai' | 'file') {
+  if (source === 'manual') return '手动创建';
+  if (source === 'history') return '历史复制';
+  if (source === 'library') return '任务库';
+  if (source === 'ai') return 'AI 创建';
+  return '任务单识别';
+}
+
+type AiInputMode = 'voice' | 'text';
+
+type AiTaskDraft = {
+  localId: string;
+  selected: boolean;
+  scope: TaskScope;
+  source: 'ai';
+  base: string;
+  taskType: string;
+  title: string;
+  points: number;
+  description: string;
+  abilityTags: string[];
+  subjects: string[];
+  attachments: TaskAttachment[];
+  requirements: WorkRequirement[];
+  status: TaskStatus;
+  reason: string;
+  matchedFrom?: string;
+};
+
+function inferAiAbilityTags(text: string) {
+  const tags = [
+    text.includes('合作') || text.includes('小组') ? '协作力' : '',
+    text.includes('表达') || text.includes('讲解') || text.includes('汇报') ? '表达力' : '',
+    text.includes('观察') || text.includes('记录') ? '观察力' : '',
+    text.includes('探究') || text.includes('问题') || text.includes('实验') ? '科学探究' : '',
+    text.includes('反思') || text.includes('总结') ? '反思力' : '',
+  ].filter(Boolean);
+  return Array.from(new Set(tags.length ? tags : ['观察力', '表达力', '科学探究'])).slice(0, 4);
+}
+
+function buildAiTaskDrafts({
+  scope,
+  base,
+  keyword,
+  objective,
+  templates,
+}: {
+  scope: TaskScope;
+  base: string;
+  keyword: string;
+  objective: string;
+  templates: Array<{
+    title: string;
+    base: string;
+    taskType: string;
+    points: number;
+    abilityTags: string[];
+    subjects: string[];
+    requirements: WorkRequirement[];
+  }>;
+}): AiTaskDraft[] {
+  const normalizedBase = base.trim() || '研学基地';
+  const normalizedKeyword = keyword.trim() || '研学任务';
+  const normalizedObjective = objective.trim() || '围绕现场观察形成事实记录与表达';
+  const abilityTags = inferAiAbilityTags(`${normalizedKeyword} ${normalizedObjective}`);
+  const matchedTemplates = templates.slice(0, 3);
+  const studentBlueprints = [
+    {
+      taskType: '观察记录',
+      title: `${normalizedBase}现场观察记录`,
+      points: 20,
+      requirementType: 'observation' as WorkRequirement['type'],
+      requirement: '完成观察记录，并补充 1 张关键照片或文字说明',
+      subjects: ['科学', '语文'],
+      reason: '把现场事实转成可评价的个人作品',
+    },
+    {
+      taskType: '探究问答',
+      title: `${normalizedKeyword}探究三问`,
+      points: 15,
+      requirementType: 'text' as WorkRequirement['type'],
+      requirement: '回答 3 个探究问题，并写出依据',
+      subjects: ['科学', '综合实践'],
+      reason: '承接问问类 AI 结果，形成问题链',
+    },
+    {
+      taskType: '证据采集',
+      title: `${normalizedKeyword}证据卡`,
+      points: 20,
+      requirementType: 'image' as WorkRequirement['type'],
+      requirement: '提交 1 组现场图片，并说明证据指向',
+      subjects: ['科学', '信息科技'],
+      reason: '把识物、拍照和任务作品串起来',
+    },
+    {
+      taskType: '表达讲解',
+      title: `${normalizedKeyword}一分钟讲解`,
+      points: 15,
+      requirementType: 'audio' as WorkRequirement['type'],
+      requirement: '提交 1 段语音讲解，说明观察结论',
+      subjects: ['语文', '综合实践'],
+      reason: '参考语音闪记，降低现场输入成本',
+    },
+    {
+      taskType: '反思任务',
+      title: `${normalizedKeyword}研学反思`,
+      points: 10,
+      requirementType: 'text' as WorkRequirement['type'],
+      requirement: '写出 1 条新发现和 1 条后续问题',
+      subjects: ['语文', '科学'],
+      reason: '沉淀成长记录和报告素材',
+    },
+  ];
+  const groupBlueprints = [
+    {
+      taskType: '小组观察',
+      title: `${normalizedBase}小组分工观察`,
+      points: 25,
+      requirementType: 'observation' as WorkRequirement['type'],
+      requirement: '小组完成观察分工表，并汇总 3 条事实',
+      subjects: ['科学', '综合实践'],
+      reason: '适合小组岗位协作和过程评价',
+    },
+    {
+      taskType: '小组探究',
+      title: `${normalizedKeyword}小组问题板`,
+      points: 25,
+      requirementType: 'text' as WorkRequirement['type'],
+      requirement: '共同提出 2 个问题，并写出初步解释',
+      subjects: ['科学', '语文'],
+      reason: '让 AI 匹配的问题变成小组讨论材料',
+    },
+    {
+      taskType: '成果共创',
+      title: `${normalizedKeyword}路线海报`,
+      points: 30,
+      requirementType: 'image' as WorkRequirement['type'],
+      requirement: '提交 1 张小组海报，并标注路线与发现',
+      subjects: ['美术', '地理'],
+      reason: '适合汇报展示和作品墙',
+    },
+    {
+      taskType: '汇报讲解',
+      title: `${normalizedKeyword}成果讲解`,
+      points: 20,
+      requirementType: 'video' as WorkRequirement['type'],
+      requirement: '提交 1 段小组讲解视频或音频',
+      subjects: ['语文', '综合实践'],
+      reason: '形成可被导师评价的集体表达',
+    },
+    {
+      taskType: '团队复盘',
+      title: `${normalizedKeyword}团队复盘`,
+      points: 15,
+      requirementType: 'audio' as WorkRequirement['type'],
+      requirement: '提交 1 段小组复盘，说明分工与改进',
+      subjects: ['综合实践', '道德与法治'],
+      reason: '回写小组评价和研学报告',
+    },
+  ];
+  const blueprints = scope === 'student' ? studentBlueprints : groupBlueprints;
+
+  return blueprints.map((item, index) => {
+    const matched = matchedTemplates[index];
+    const tags = Array.from(new Set([...(matched?.abilityTags ?? []), ...abilityTags])).slice(0, 4);
+    return {
+      localId: `ai_draft_${index}`,
+      selected: true,
+      scope,
+      source: 'ai' as const,
+      base: matched?.base || normalizedBase,
+      taskType: matched?.taskType || item.taskType,
+      title: matched?.title ? `${matched.title} · AI优化` : item.title,
+      points: matched?.points ?? item.points,
+      description: `${normalizedObjective}。AI 已按${scope === 'student' ? '学员' : '小组'}任务拆解为“现场输入、作品提交、导师评价”闭环。`,
+      abilityTags: tags,
+      subjects: matched?.subjects ?? item.subjects,
+      attachments: [
+        {
+          id: `ai_attachment_${index}`,
+          name: `AI 任务线索：${normalizedKeyword}`,
+          kind: 'ai_link' as const,
+          url: '#',
+          keyword: `${normalizedBase} ${normalizedKeyword} ${normalizedObjective}`.trim(),
+        },
+      ],
+      requirements:
+        matched?.requirements?.length
+          ? matched.requirements
+          : [
+              {
+                id: `ai_req_${index}`,
+                type: item.requirementType,
+                requirement: item.requirement,
+              },
+            ],
+      status: 'ai_created',
+      reason: item.reason,
+      matchedFrom: matched?.title,
+    };
+  });
+}
+
+function getMobileDrawerContainer() {
+  return (document.querySelector('.tutor-phone') as HTMLElement | null) ?? document.body;
+}
+
+function Modal({
+  open,
+  title,
+  onCancel,
+  onOk,
+  okText = '确定',
+  cancelText = '取消',
+  footer,
+  children,
+  forceRender,
+}: {
+  open?: boolean;
+  title?: ReactNode;
+  onCancel?: () => void;
+  onOk?: () => void;
+  okText?: ReactNode;
+  cancelText?: ReactNode;
+  footer?: ReactNode | null;
+  children?: ReactNode;
+  forceRender?: boolean;
+  width?: number | string;
+}) {
+  const defaultFooter =
+    footer !== undefined ? (
+      footer
+    ) : onOk ? (
+      <div className="tutor-mobile-drawer-footer-actions">
+        <Button onClick={onCancel}>{cancelText}</Button>
+        <Button type="primary" onClick={onOk}>
+          {okText}
+        </Button>
+      </div>
+    ) : null;
+
+  return (
+    <Drawer
+      forceRender={forceRender}
+      open={open}
+      title={title}
+      placement="bottom"
+      height="86%"
+      getContainer={getMobileDrawerContainer}
+      rootClassName="tutor-mobile-drawer"
+      rootStyle={{ position: 'absolute' }}
+      onClose={onCancel}
+      footer={defaultFooter}
+    >
+      {children}
+    </Drawer>
+  );
+}
+
+function paymentTypeLabel(type: PaymentType) {
+  if (type === 'free') return '免费';
+  if (type === 'online') return '在线缴费';
+  return '线下缴费';
+}
+
+function paymentStatusColor(status: string) {
+  if (status === 'paid' || status === 'offline_confirmed' || status === 'free') return 'green';
+  return 'gold';
+}
+
+function formatMoney(value: number) {
+  return value > 0 ? `¥${value}` : '¥0';
+}
+
+function formatRating(value?: number) {
+  return typeof value === 'number' ? `${Number(value.toFixed(1))}/10` : '-';
+}
+
+function formatFinalScore(value?: number) {
+  return typeof value === 'number' ? `${Number(value.toFixed(1))} 分` : '-';
+}
+
+function attachmentKindLabel(kind: string) {
+  if (kind === 'image') return '图片';
+  if (kind === 'audio') return '音频';
+  if (kind === 'video') return '视频';
+  if (kind === 'ai_link') return 'AI 链接';
+  if (kind === 'pdf' || kind === 'file') return '资料';
+  return '文本';
+}
+
 function teamSourceOptions() {
   return [
     { label: '系统', value: 'system' },
@@ -235,6 +530,122 @@ function MobileSummaryGrid({
   );
 }
 
+function ReportFileCard({ report, onViewDetail }: { report: StudyReport; onViewDetail: () => void }) {
+  const reportFile = report.reportFile ?? {
+    name: report.fileName,
+    type: '研学报告' as const,
+    sizeLabel: '报告',
+    updatedAt: report.generatedAt,
+  };
+
+  return (
+    <div className="tutor-list-card tutor-report-file-card">
+      <div className="tutor-report-file-row">
+        <div className="tutor-report-file-icon">
+          <FileTextOutlined />
+        </div>
+        <div className="tutor-report-file-main">
+          <div className="tutor-list-title">报告文件</div>
+          <div className="tutor-list-subtitle">{reportFile.name}</div>
+          <div className="tutor-inline-list" style={{ marginTop: 8 }}>
+            <span className="tutor-pill">{reportFile.type}</span>
+            <span className="tutor-pill">{reportFile.sizeLabel}</span>
+            <span className="tutor-pill">更新于 {formatDate(reportFile.updatedAt)}</span>
+          </div>
+        </div>
+      </div>
+      <Button block icon={<EyeOutlined />} onClick={onViewDetail}>
+        查看报告详情
+      </Button>
+    </div>
+  );
+}
+
+function ReportContentSections({ report, compact = false }: { report: StudyReport; compact?: boolean }) {
+  const sections: Array<{ title: string; items: string[] }> = [
+    { title: '报告说明', items: [report.detail] },
+    { title: '研学证明', items: [report.proof] },
+    {
+      title: '任务成果',
+      items: report.taskOutcomes?.length ? report.taskOutcomes : ['暂无任务成果，待学员补充提交后可重新生成。'],
+    },
+    {
+      title: '能力提升',
+      items: report.abilityHighlights?.length ? report.abilityHighlights : ['暂无能力提升记录，待评价表完善后可重新生成。'],
+    },
+    { title: '导师评语', items: [report.tutorComment || '暂无导师评语。'] },
+  ];
+
+  return (
+    <div className="tutor-report-section-list">
+      {sections.map((section) => {
+        const visibleItems = compact ? section.items.slice(0, 2) : section.items;
+        return (
+          <div key={section.title} className="tutor-report-section">
+            <div className="tutor-report-section-title">{section.title}</div>
+            <div className="tutor-report-section-body">
+              {visibleItems.map((item) => (
+                <div key={item} className="tutor-report-line">
+                  {item}
+                </div>
+              ))}
+              {compact && section.items.length > visibleItems.length ? (
+                <div className="tutor-section-note">还有 {section.items.length - visibleItems.length} 条内容，可查看详情。</div>
+              ) : null}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function WorkAttachmentList({ work }: { work: { attachments?: Array<{ id: string; kind: string; title: string; url?: string; content?: string; duration?: string }> } }) {
+  const attachments = work.attachments ?? [];
+  if (attachments.length === 0) {
+    return <EmptyBlock text="该作品还没有实际提交素材。" />;
+  }
+
+  return (
+    <div className="tutor-list">
+      {attachments.map((attachment) => (
+        <div key={attachment.id} className="tutor-list-card">
+          <div className="tutor-section-head">
+            <div>
+              <div className="tutor-list-title">{attachment.title}</div>
+              <div className="tutor-list-subtitle">
+                {attachment.kind === 'image'
+                  ? '图片作品'
+                  : attachment.kind === 'audio'
+                    ? `音频作品${attachment.duration ? ` · ${attachment.duration}` : ''}`
+                    : attachment.kind === 'video'
+                      ? `视频作品${attachment.duration ? ` · ${attachment.duration}` : ''}`
+                      : attachment.kind === 'ai_link'
+                        ? 'AI 链接'
+                        : attachmentKindLabel(attachment.kind)}
+              </div>
+            </div>
+            <Tag>{attachmentKindLabel(attachment.kind)}</Tag>
+          </div>
+          {attachment.kind === 'image' && attachment.url ? (
+            <Image alt={attachment.title} src={attachment.url} style={{ borderRadius: 8, marginTop: 10 }} />
+          ) : null}
+          {attachment.content ? (
+            <div className="tutor-section-note" style={{ marginTop: 10 }}>
+              {attachment.content}
+            </div>
+          ) : null}
+          {attachment.url && attachment.kind !== 'image' ? (
+            <div className="tutor-section-note" style={{ marginTop: 10 }}>
+              {attachment.url}
+            </div>
+          ) : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function TaskEditor({
   open,
   initialValue,
@@ -245,7 +656,7 @@ function TaskEditor({
   initialValue?: {
     id?: string;
     scope: TaskScope;
-    source: 'manual' | 'history' | 'library' | 'ai';
+    source: 'manual' | 'history' | 'library' | 'ai' | 'file';
     base: string;
     taskType: string;
     title: string;
@@ -261,7 +672,7 @@ function TaskEditor({
   onSubmit: (value: {
     id?: string;
     scope: TaskScope;
-    source: 'manual' | 'history' | 'library' | 'ai';
+    source: 'manual' | 'history' | 'library' | 'ai' | 'file';
     base: string;
     taskType: string;
     title: string;
@@ -330,7 +741,7 @@ function TaskEditor({
               .map((line: string, index: number) => ({
                 id: `attachment_${index}`,
                 name: line,
-                kind: (line.includes('AI') || line.includes('关键字') ? 'ai_link' : line.endsWith('.pdf') ? 'pdf' : line.match(/\.(png|jpg|jpeg|webp)$/i) ? 'image' : 'file') as TaskAttachment['kind'],
+                kind: (line.includes('AI') || line.includes('关键字') ? 'ai_link' : line.match(/\.(png|jpg|jpeg|webp)$/i) ? 'image' : 'file') as TaskAttachment['kind'],
                 url: '#',
                 keyword: line.includes('AI') || line.includes('关键字') ? line.replace(/^AI[:：]?/, '') : undefined,
               })),
@@ -360,6 +771,7 @@ function TaskEditor({
               { label: '历史复制', value: 'history' },
               { label: '任务库', value: 'library' },
               { label: 'AI 创建', value: 'ai' },
+              { label: '任务单识别', value: 'file' },
             ]}
           />
         </Form.Item>
@@ -385,7 +797,7 @@ function TaskEditor({
           <Input placeholder="1-5 门学科，用 、 分隔，例如：科学、语文" />
         </Form.Item>
         <Form.Item name="attachmentText" label="任务参考资料">
-          <Input.TextArea rows={3} placeholder="每行一个资料，例如：任务说明.pdf&#10;观察示例图.jpg&#10;AI关键字：海洋馆 海龟 科普" />
+          <Input.TextArea rows={3} placeholder="每行一个资料，例如：任务说明图文资料&#10;观察示例图&#10;AI关键字：海洋馆 海龟 科普" />
         </Form.Item>
         <Form.List name="requirements">
           {(fields, { add, remove }) => (
@@ -423,7 +835,7 @@ function TaskEditor({
                         label="作品要求"
                         rules={[{ required: true }]}
                       >
-                        <Input placeholder="例如：上传 1 张图片并说明 50 字" />
+                        <Input placeholder="例如：拍照或从相册选择 1 张图片，并说明 50 字" />
                       </Form.Item>
                       {fields.length > 1 ? (
                         <Button danger onClick={() => remove(field.name)}>
@@ -496,11 +908,17 @@ function TeamEditorModal({
     bases: string[];
     studentSource: string;
     organizationName: string;
-    reportTemplateId: string;
-    evaluationMode: EvaluationMode;
-  }) => void;
+	    reportTemplateId: string;
+	    evaluationMode: EvaluationMode;
+	    paymentType: PaymentType;
+	    studyFee: number;
+	  }) => void;
 }) {
+  const { state } = useTutorStore();
   const [form] = Form.useForm();
+  const [classPickerOpen, setClassPickerOpen] = useState(false);
+  const [selectedClassId, setSelectedClassId] = useState(state.commonClasses[0]?.id ?? '');
+  const selectedClass = state.commonClasses.find((item) => item.id === selectedClassId) ?? state.commonClasses[0];
 
   useEffect(() => {
     if (open) {
@@ -517,6 +935,8 @@ function TeamEditorModal({
         organizationName: team?.organizationName ?? '南山实验学校研学中心',
         reportTemplateId: team?.reportTemplateId ?? 'tpl_report_ocean',
         evaluationMode: team?.evaluationMode ?? 'self_peer_tutor',
+        paymentType: team?.paymentType ?? 'free',
+        studyFee: team?.studyFee ?? 0,
       });
     } else {
       form.resetFields();
@@ -545,6 +965,8 @@ function TeamEditorModal({
             organizationName: values.organizationName,
             reportTemplateId: values.reportTemplateId,
             evaluationMode: values.evaluationMode,
+            paymentType: values.paymentType,
+            studyFee: values.paymentType === 'free' ? 0 : Number(values.studyFee) || 0,
           })
         }
       >
@@ -560,8 +982,43 @@ function TeamEditorModal({
         <Form.Item name="maxStudents" label="最大人数" rules={[{ required: true }]}>
           <InputNumber min={1} max={200} style={{ width: '100%' }} />
         </Form.Item>
-        <Form.Item name="organizationName" label="所属机构" rules={[{ required: true }]}>
+        <Form.Item
+          name="organizationName"
+          label={
+            <span style={{ display: 'flex', justifyContent: 'space-between', gap: 8, width: '100%', alignItems: 'center' }}>
+              <span>所属机构</span>
+              <Button size="small" type="link" onClick={() => setClassPickerOpen(true)}>
+                常用班级
+              </Button>
+            </span>
+          }
+          rules={[{ required: true }]}
+        >
           <Input placeholder="例如：南山实验学校" />
+        </Form.Item>
+        <Form.Item name="paymentType" label="缴费类型" rules={[{ required: true }]}>
+          <Select
+            options={[
+              { label: '免费', value: 'free' },
+              { label: '在线缴费', value: 'online' },
+              { label: '线下缴费', value: 'offline' },
+            ]}
+          />
+        </Form.Item>
+        <Form.Item noStyle shouldUpdate>
+          {({ getFieldValue }) => {
+            const paymentType = getFieldValue('paymentType') as PaymentType;
+            if (paymentType === 'free') return null;
+            return (
+              <Form.Item
+                name="studyFee"
+                label="研学费用"
+                rules={paymentType === 'online' ? [{ required: true, message: '请输入研学费用' }] : undefined}
+              >
+                <InputNumber min={0} style={{ width: '100%' }} prefix="¥" />
+              </Form.Item>
+            );
+          }}
         </Form.Item>
         <Form.Item name="reportTemplateId" label="研学报告模版" rules={[{ required: true }]}>
           <Select
@@ -597,6 +1054,41 @@ function TeamEditorModal({
           <Input />
         </Form.Item>
       </Form>
+      <Modal
+        open={classPickerOpen}
+        title="选择常用班级"
+        onCancel={() => setClassPickerOpen(false)}
+        onOk={() => {
+          if (!selectedClass) return;
+          form.setFieldsValue({
+            organizationName: selectedClass.organizationName,
+            studentSource: selectedClass.studentSource,
+          });
+          setClassPickerOpen(false);
+        }}
+        okText="带入"
+      >
+        <div className="tutor-stack">
+          <Select
+            value={selectedClass?.id}
+            onChange={setSelectedClassId}
+            options={state.commonClasses.map((item) => ({
+              label: `${item.organizationName} · ${item.name} · ${item.students.length} 人`,
+              value: item.id,
+            }))}
+          />
+          {selectedClass ? (
+            <div className="tutor-card tutor-card-soft">
+              <div className="tutor-list-title">{selectedClass.name}</div>
+              <div className="tutor-list-subtitle">
+                {selectedClass.organizationName} · {selectedClass.studentSource} · {selectedClass.students.length} 名学生
+              </div>
+            </div>
+          ) : (
+            <EmptyBlock text="暂无常用班级，可先到我的-常用班级维护。" />
+          )}
+        </div>
+      </Modal>
     </Modal>
   );
 }
@@ -771,7 +1263,7 @@ function StudentImportModal({
   return (
     <Modal
       open={open}
-      title="导入学生名单"
+      title="粘贴学生名单"
       onCancel={() => {
         setRawImport('');
         onCancel();
@@ -780,10 +1272,10 @@ function StudentImportModal({
         onSubmit(rawImport);
         setRawImport('');
       }}
-      okText="导入"
+      okText="添加名单"
     >
       <div className="tutor-stack">
-        <div className="tutor-section-note">每行 1 个学员，格式：学员姓名,年龄,证件号,家长姓名,家长手机号</div>
+        <div className="tutor-section-note">从微信、通讯录或表格中复制后粘贴；每行 1 个学员，格式：学员姓名,年龄,证件号,家长姓名,家长手机号</div>
         <Input.TextArea
           rows={6}
           value={rawImport}
@@ -1080,7 +1572,7 @@ export function DashboardPageContent() {
                 setBatchSelection([]);
               }}
             >
-              批量确认 AI 分
+              批量确认 AI 评分
             </Button>
           ) : undefined
         }
@@ -1165,12 +1657,12 @@ export function DashboardPageContent() {
                     </div>
                     <div className="tutor-kv-row">
                       <div>
-                        <div className="tutor-kv-label">AI 分</div>
-                        <div className="tutor-info-value">{work.aiScore ?? '-'}</div>
+                        <div className="tutor-kv-label">AI 评分</div>
+                        <div className="tutor-info-value">{formatRating(work.aiScore)}</div>
                       </div>
                       <div>
-                        <div className="tutor-kv-label">导师分</div>
-                        <div className="tutor-kv-value">{work.tutorScore ?? '-'}</div>
+                        <div className="tutor-kv-label">导师评分</div>
+                        <div className="tutor-kv-value">{formatRating(work.tutorScore)}</div>
                       </div>
                     </div>
                     <div className="tutor-section-note" style={{ marginTop: 8 }}>
@@ -1188,11 +1680,11 @@ export function DashboardPageContent() {
                           icon={<CheckCircleOutlined />}
                           onClick={() => {
                             actions.confirmAiScores([work.id]);
-                            messageApi.success('已确认该作品的 AI 分');
+                            messageApi.success('已确认该作品的 AI 评分');
                             setBatchSelection((current) => current.filter((id) => id !== work.id));
                           }}
                         >
-                          确认 AI 分
+                          确认 AI 评分
                         </Button>
                       ) : null}
                     </div>
@@ -1228,12 +1720,12 @@ export function DashboardPageContent() {
                     </div>
                     <div className="tutor-kv-row">
                       <div>
-                        <div className="tutor-kv-label">AI 分</div>
-                        <div className="tutor-info-value">{work.aiScore ?? '-'}</div>
+                        <div className="tutor-kv-label">AI 评分</div>
+                        <div className="tutor-info-value">{formatRating(work.aiScore)}</div>
                       </div>
                       <div>
-                        <div className="tutor-kv-label">导师分</div>
-                        <div className="tutor-kv-value">{work.tutorScore ?? '-'}</div>
+                        <div className="tutor-kv-label">导师评分</div>
+                        <div className="tutor-kv-value">{formatRating(work.tutorScore)}</div>
                       </div>
                     </div>
                     <div className="tutor-section-note" style={{ marginTop: 8 }}>
@@ -1251,11 +1743,11 @@ export function DashboardPageContent() {
                           icon={<CheckCircleOutlined />}
                           onClick={() => {
                             actions.confirmAiScores([work.id]);
-                            messageApi.success('已确认该作品的 AI 分');
+                            messageApi.success('已确认该作品的 AI 评分');
                             setBatchSelection((current) => current.filter((id) => id !== work.id));
                           }}
                         >
-                          确认 AI 分
+                          确认 AI 评分
                         </Button>
                       ) : null}
                     </div>
@@ -1311,7 +1803,7 @@ export function DashboardPageContent() {
                   </div>
                   <div className="tutor-progress-note">
                     <span>{work.preview}</span>
-                    <strong>{work.finalScore ?? work.aiScore ?? '-'}</strong>
+                    <strong>{formatFinalScore(work.finalScore)}</strong>
                   </div>
                   <Button style={{ marginTop: 10 }} onClick={() => setScoringWorkId(work.id)}>
                     评分该任务
@@ -1413,15 +1905,19 @@ export function DashboardPageContent() {
                     </div>
                   </div>
                   <MobileSummaryGrid
-                    items={[
-                      { label: 'AI 分', value: detailWork.aiScore ?? '-' },
-                      { label: '导师分', value: detailWork.tutorScore ?? '-' },
-                      { label: '最终分', value: detailWork.finalScore ?? '-' },
-                      { label: '星级', value: detailWork.rating ?? '-' },
-                    ]}
-                  />
-                  {task ? (
-                    <div className="tutor-list">
+	                    items={[
+	                      { label: 'AI 评分', value: formatRating(detailWork.aiScore) },
+	                      { label: '导师评分', value: formatRating(detailWork.tutorScore) },
+	                      { label: '最终得分', value: formatFinalScore(detailWork.finalScore) },
+	                      { label: '状态', value: formatWorkStatus(detailWork.status).label },
+	                    ]}
+	                  />
+	                  <div className="tutor-list">
+	                    <div className="tutor-section-title">实际作品</div>
+	                    <WorkAttachmentList work={detailWork} />
+	                  </div>
+	                  {task ? (
+	                    <div className="tutor-list">
                       <div className="tutor-section-title">作品要求</div>
                       {task.requirements.map((requirement) => (
                         <div key={requirement.id} className="tutor-list-card">
@@ -1473,10 +1969,10 @@ export function DashboardPageContent() {
           <Form
             form={scoreForm}
             layout="vertical"
-            initialValues={{
-              rating: Number((scoringWork.rating ?? 4).toFixed(1)),
-              comment: scoringWork.comment ?? '',
-            }}
+	            initialValues={{
+	              rating: Number((scoringWork.rating ?? scoringWork.aiScore ?? 8).toFixed(1)),
+	              comment: scoringWork.comment ?? '',
+	            }}
             onFinish={(values) => {
               actions.scoreWork(scoringWork.id, values);
               messageApi.success('评分已完成');
@@ -1489,16 +1985,29 @@ export function DashboardPageContent() {
               </div>
               <div className="tutor-list-subtitle">{scoringWork.preview}</div>
               <div className="tutor-inline-list" style={{ marginTop: 10 }}>
-                <span className="tutor-pill">AI 分：{scoringWork.aiScore ?? '-'}</span>
-                <span className="tutor-pill">当前导师分：{scoringWork.tutorScore ?? '-'}</span>
-              </div>
+	                <span className="tutor-pill">任务分值：{state.tasks.find((item) => item.id === scoringWork.taskId)?.points ?? 0} 分</span>
+	                <span className="tutor-pill">AI 评分：{formatRating(scoringWork.aiScore)}</span>
+	                <span className="tutor-pill">当前导师评分：{formatRating(scoringWork.tutorScore)}</span>
+	                <span className="tutor-pill">当前最终得分：{formatFinalScore(scoringWork.finalScore)}</span>
+	              </div>
               <Button size="small" style={{ marginTop: 10 }} onClick={() => setDetailWorkId(scoringWork.id)}>
                 查看作品详情
               </Button>
             </div>
-            <Form.Item name="rating" label="星级评分">
-              <Rate allowHalf />
-            </Form.Item>
+	            <Form.Item name="rating" label="导师评分（0-10 分）" rules={[{ required: true, message: '请输入评分' }]}>
+	              <InputNumber min={0} max={10} step={0.5} style={{ width: '100%' }} />
+	            </Form.Item>
+	            <Form.Item noStyle shouldUpdate>
+	              {({ getFieldValue }) => {
+	                const task = state.tasks.find((item) => item.id === scoringWork.taskId);
+	                const rating = Number(getFieldValue('rating') ?? 0);
+	                return (
+	                  <div className="tutor-card tutor-card-soft" style={{ marginBottom: 12 }}>
+	                    最终得分 = {task?.points ?? 0} x {rating || 0} / 10 = {formatFinalScore(((task?.points ?? 0) * (rating || 0)) / 10)}
+	                  </div>
+	                );
+	              }}
+	            </Form.Item>
             <Form.Item name="comment" label="导师评语">
               <Input.TextArea rows={3} />
             </Form.Item>
@@ -1635,9 +2144,24 @@ export function TeamDetailPageContent({ teamId }: { teamId?: string }) {
   const { state, actions } = useTutorStore();
   const [messageApi, contextHolder] = message.useMessage();
   const [editorOpen, setEditorOpen] = useState(false);
+  const [paymentOpen, setPaymentOpen] = useState(false);
+  const [paymentStudentId, setPaymentStudentId] = useState<string | null>(null);
+  const [paymentForm] = Form.useForm();
   const currentTeam = getCurrentTeam(state);
   const { team, students, groups } = buildTeamContext(state, teamId);
   const reportTemplate = team ? state.reportTemplates.find((template) => template.id === team.reportTemplateId) : null;
+  const paymentStudent = paymentStudentId ? students.find((student) => student.id === paymentStudentId) : null;
+  const paymentSummary = paymentStudent && team ? getStudentPaymentSummary(state, team.id, paymentStudent.id) : null;
+  const paymentOrders = team ? getPaymentOrdersByTeam(state, team.id) : [];
+
+  useEffect(() => {
+    if (paymentOpen && team) {
+      paymentForm.setFieldsValue({
+        paymentType: team.paymentType,
+        studyFee: team.studyFee,
+      });
+    }
+  }, [paymentForm, paymentOpen, team]);
 
   if (!team) {
     return (
@@ -1710,7 +2234,7 @@ export function TeamDetailPageContent({ teamId }: { teamId?: string }) {
           </div>
           <div className="tutor-list-card">
             <div className="tutor-list-title">招募中 & 名单导入</div>
-            <div className="tutor-list-subtitle">支持在线报名缴费、团队二维码报名、Excel 名单导入和常用班级添加。</div>
+            <div className="tutor-list-subtitle">支持在线报名缴费、团队二维码报名、粘贴名单和常用班级添加。</div>
           </div>
           <div className="tutor-list-card">
             <div className="tutor-section-head">
@@ -1723,6 +2247,80 @@ export function TeamDetailPageContent({ teamId }: { teamId?: string }) {
               </Button>
             </div>
           </div>
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="团队缴费设置"
+        note="在线缴费用于生成家长报名二维码，线下缴费用于登记收款状态"
+        extra={
+          <Button size="small" icon={<EditOutlined />} onClick={() => setPaymentOpen(true)}>
+            设置
+          </Button>
+        }
+      >
+        <MobileSummaryGrid
+          items={[
+            { label: '缴费类型', value: paymentTypeLabel(team.paymentType) },
+            { label: '研学费用', value: formatMoney(team.studyFee) },
+            {
+              label: '已收人数',
+              value: students.filter((student) => getStudentPaymentSummary(state, team.id, student.id).status !== 'unpaid').length,
+            },
+            { label: '订单数', value: paymentOrders.length || students.length },
+          ]}
+        />
+        <div className="tutor-card tutor-card-soft" style={{ textAlign: 'center', marginTop: 12 }}>
+          <div
+            style={{
+              width: 140,
+              height: 140,
+              margin: '0 auto 12px',
+              borderRadius: 8,
+              background:
+                'linear-gradient(90deg, #0f766e 0%, #0f766e 10%, #fff 10%, #fff 20%, #0f766e 20%, #0f766e 30%, #fff 30%, #fff 40%, #0f766e 40%, #0f766e 55%, #fff 55%, #fff 70%, #0f766e 70%, #0f766e 82%, #fff 82%, #fff 100%)',
+            }}
+          />
+          <div className="tutor-list-title">{team.joinCode}</div>
+          <div className="tutor-list-subtitle">
+            {team.paymentType === 'online' ? `家长扫码报名并支付 ${formatMoney(team.studyFee)}` : '家长扫码报名，导师登记缴费状态'}
+          </div>
+        </div>
+      </SectionCard>
+
+      <SectionCard title="报名缴费订单" note="按学员展示应收、已收和缴费状态，点击可查看订单详情">
+        <div className="tutor-list">
+          {students.map((student) => {
+            const summary = getStudentPaymentSummary(state, team.id, student.id);
+            return (
+              <button
+                key={student.id}
+                type="button"
+                className="tutor-list-card tutor-select-card tutor-card-clickable"
+                onClick={() => setPaymentStudentId(student.id)}
+              >
+                <div className="tutor-section-head">
+                  <div>
+                    <div className="tutor-list-title">{student.name}</div>
+                    <div className="tutor-list-subtitle">
+                      {student.parent.name} {student.parent.phone}
+                    </div>
+                  </div>
+                  <Tag color={paymentStatusColor(summary.status)}>{summary.label}</Tag>
+                </div>
+                <div className="tutor-info-grid">
+                  <div>
+                    <div className="tutor-info-label">应收金额</div>
+                    <div className="tutor-info-value">{formatMoney(summary.expectedAmount)}</div>
+                  </div>
+                  <div>
+                    <div className="tutor-info-label">已收金额</div>
+                    <div className="tutor-info-value">{formatMoney(summary.paidAmount)}</div>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
         </div>
       </SectionCard>
 
@@ -1770,6 +2368,90 @@ export function TeamDetailPageContent({ teamId }: { teamId?: string }) {
           setEditorOpen(false);
         }}
       />
+
+      <Modal
+        forceRender
+        open={paymentOpen}
+        title="团队缴费设置"
+        onCancel={() => setPaymentOpen(false)}
+        onOk={() => paymentForm.submit()}
+      >
+        <Form
+          form={paymentForm}
+          layout="vertical"
+          onFinish={(values) => {
+            actions.updateTeamPayment(team.id, {
+              paymentType: values.paymentType,
+              studyFee: values.paymentType === 'free' ? 0 : Number(values.studyFee) || 0,
+            });
+            messageApi.success('团队缴费设置已保存');
+            setPaymentOpen(false);
+          }}
+        >
+          <Form.Item name="paymentType" label="缴费类型" rules={[{ required: true }]}>
+            <Select
+              options={[
+                { label: '免费', value: 'free' },
+                { label: '在线缴费', value: 'online' },
+                { label: '线下缴费', value: 'offline' },
+              ]}
+            />
+          </Form.Item>
+          <Form.Item noStyle shouldUpdate>
+            {({ getFieldValue }) => {
+              const paymentType = getFieldValue('paymentType') as PaymentType;
+              if (paymentType === 'free') return null;
+              return (
+                <Form.Item
+                  name="studyFee"
+                  label="研学费用"
+                  rules={paymentType === 'online' ? [{ required: true, message: '请输入研学费用' }] : undefined}
+                >
+                  <InputNumber min={0} prefix="¥" style={{ width: '100%' }} />
+                </Form.Item>
+              );
+            }}
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        open={Boolean(paymentStudent)}
+        title="订单详情"
+        onCancel={() => setPaymentStudentId(null)}
+        footer={null}
+      >
+        {paymentStudent && paymentSummary ? (
+          <div className="tutor-stack">
+            <div className="tutor-card tutor-card-soft">
+              <div className="tutor-list-title">{paymentStudent.name}</div>
+              <div className="tutor-list-subtitle">
+                {paymentStudent.parent.name} {paymentStudent.parent.phone}
+              </div>
+            </div>
+            <MobileSummaryGrid
+              items={[
+                { label: '缴费状态', value: paymentSummary.label },
+                { label: '应收金额', value: formatMoney(paymentSummary.expectedAmount) },
+                { label: '已收金额', value: formatMoney(paymentSummary.paidAmount) },
+                { label: '订单号', value: paymentSummary.order?.orderNo ?? '扫码后生成' },
+              ]}
+            />
+            {paymentSummary.status === 'unpaid' ? (
+              <Button
+                type="primary"
+                onClick={() => {
+                  actions.markStudentPaymentPaid(team.id, paymentStudent.id);
+                  messageApi.success('已模拟确认收款');
+                  setPaymentStudentId(null);
+                }}
+              >
+                模拟标记已支付
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
+      </Modal>
     </div>
   );
 }
@@ -2124,6 +2806,10 @@ export function GroupsPageContent({ teamId }: { teamId?: string }) {
         onCancel={() => setAssignGroupId(null)}
         onOk={() => {
           if (!team || !assignGroupId || !assignStudentId) return;
+          if (assignRole === 'custom' && !customRole.trim()) {
+            messageApi.warning('请输入自定义岗位名称');
+            return;
+          }
           actions.assignStudentToGroup(team.id, assignStudentId, assignGroupId, assignRole, customRole);
           messageApi.success('成员岗位已更新');
           setAssignGroupId(null);
@@ -2182,21 +2868,23 @@ export function TeamStudentsPageContent({ teamId }: { teamId: string }) {
         {!team ? (
           <EmptyBlock text="未找到该团队，无法查看学员。" />
         ) : students.length === 0 ? (
-          <EmptyBlock text="当前团队暂无学员，可先添加学员或导入学生名单。" />
+          <EmptyBlock text="当前团队暂无学员，可先添加学员或粘贴名单。" />
         ) : (
           <div className="tutor-list">
-            {students.map((student) => (
-              <div key={student.id} className="tutor-list-card">
-                <div className="tutor-section-head">
-                  <div>
-                    <div className="tutor-list-title">{student.name}</div>
-                    <div className="tutor-list-subtitle">
-                      {student.groupId ? getOwnerName(state, 'group', student.groupId) : '未分组'}
+            {students.map((student) => {
+              const payment = team ? getStudentPaymentSummary(state, team.id, student.id) : null;
+              return (
+                <div key={student.id} className="tutor-list-card">
+                  <div className="tutor-section-head">
+                    <div>
+                      <div className="tutor-list-title">{student.name}</div>
+                      <div className="tutor-list-subtitle">
+                        {student.groupId ? getOwnerName(state, 'group', student.groupId) : '未分组'}
+                      </div>
                     </div>
+                    <Tag color={student.joined ? 'green' : 'default'}>{student.joined ? '已加入' : '未加入'}</Tag>
                   </div>
-                  <Tag color={student.joined ? 'green' : 'default'}>{student.joined ? '已加入' : '未加入'}</Tag>
-                </div>
-                <div className="tutor-info-grid">
+                  <div className="tutor-info-grid">
                   <div>
                     <div className="tutor-info-label">年龄</div>
                     <div className="tutor-info-value">{student.age} 岁</div>
@@ -2217,9 +2905,27 @@ export function TeamStudentsPageContent({ teamId }: { teamId: string }) {
                     <div className="tutor-info-label">在线状态</div>
                     <div className="tutor-info-value">{student.online ? '在线' : '离线'}</div>
                   </div>
+                  {payment ? (
+                    <>
+                      <div>
+                        <div className="tutor-info-label">应收金额</div>
+                        <div className="tutor-info-value">{formatMoney(payment.expectedAmount)}</div>
+                      </div>
+                      <div>
+                        <div className="tutor-info-label">已收金额</div>
+                        <div className="tutor-info-value">{formatMoney(payment.paidAmount)}</div>
+                      </div>
+                    </>
+                  ) : null}
                 </div>
+                {payment ? (
+                  <div className="tutor-inline-list" style={{ marginTop: 10 }}>
+                    <span className="tutor-pill">{payment.label}</span>
+                  </div>
+                ) : null}
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </SectionCard>
@@ -2249,7 +2955,7 @@ export function TeamStudentsPageContent({ teamId }: { teamId: string }) {
               setImportOpen(true);
             }}
           >
-            表格导入
+            粘贴名单
           </Button>
           <Button
             block
@@ -2463,27 +3169,146 @@ export function TasksPageContent() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [copyOpen, setCopyOpen] = useState(false);
-  const [copySource, setCopySource] = useState<'history' | 'library' | 'ai'>('history');
+  const [copySource, setCopySource] = useState<'history' | 'library' | 'ai' | 'file'>('history');
   const [sourceTeamId, setSourceTeamId] = useState('team_history');
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [taskKeyword, setTaskKeyword] = useState('');
   const [taskCity, setTaskCity] = useState('深圳');
   const [taskObjective, setTaskObjective] = useState('观察海洋生物，形成事实记录与表达');
+  const [aiInputMode, setAiInputMode] = useState<AiInputMode>('voice');
+  const [aiStageIndex, setAiStageIndex] = useState(0);
+  const [aiDrafts, setAiDrafts] = useState<AiTaskDraft[]>([]);
+  const [taskSheetMode, setTaskSheetMode] = useState<'photo' | 'paste'>('paste');
+  const [taskSheetText, setTaskSheetText] = useState('海洋动物观察记录,20\n小组路线海报,25\n研学反思语音,15');
+  const [evaluationTemplateOpen, setEvaluationTemplateOpen] = useState(false);
+  const [selectedEvaluationTemplateId, setSelectedEvaluationTemplateId] = useState(state.evaluationTemplates[0]?.id ?? '');
+  const [evaluationImportOpen, setEvaluationImportOpen] = useState(false);
+  const [evaluationImportText, setEvaluationImportText] = useState('过程性评价,任务参与度,能按时参与并完成任务\n成果性评价,作品完成质量,作品信息完整且表达清楚');
   const tasks = currentTeam ? getTasksByTeam(state, currentTeam.id, scope) : [];
   const historyTeams = state.teams.filter((team) => team.status === 'ended');
   const editingTask = currentTeam ? state.tasks.find((task) => task.id === editingTaskId) : null;
+  const aiStages = ['语音识别', '分析意图', '匹配任务', '生成草案'];
+  const aiAbilityTags = inferAiAbilityTags(`${taskKeyword} ${taskObjective}`);
+  const aiMatchedTemplates = state.taskTemplates
+    .filter(
+      (template) =>
+        template.scope === scope &&
+        (!taskKeyword ||
+          template.title.includes(taskKeyword) ||
+          template.base.includes(taskKeyword) ||
+          template.abilityTags.some((tag) => taskKeyword.includes(tag) || tag.includes(taskKeyword))) &&
+        (!taskCity || template.base.includes(taskCity) || taskCity.includes(template.base)),
+    )
+    .slice(0, 3);
+  const selectedAiDraftCount = aiDrafts.filter((draft) => draft.selected).length;
 
   const copyCandidates =
     copySource === 'history'
       ? state.tasks.filter((task) => task.teamId === sourceTeamId && task.scope === scope)
-      : state.taskTemplates.filter(
+      : copySource === 'library'
+        ? state.taskTemplates.filter(
           (template) =>
             template.scope === scope &&
             (!taskKeyword ||
               template.title.includes(taskKeyword) ||
               template.base.includes(taskKeyword) ||
               template.abilityTags.some((tag) => tag.includes(taskKeyword))),
-        );
+        )
+        : [];
+  const quickCreateActionText =
+    copySource === 'ai'
+      ? aiDrafts.length > 0
+        ? `加入当前团队（${selectedAiDraftCount}）`
+        : '生成任务草案'
+      : copySource === 'file'
+        ? '识别任务草案'
+        : '复制所选任务';
+
+  useEffect(() => {
+    setAiDrafts([]);
+    setAiStageIndex(0);
+  }, [scope]);
+
+  function resetAiDrafts() {
+    setAiDrafts([]);
+    setAiStageIndex(0);
+  }
+
+  function generateAiDrafts() {
+    if (!taskObjective.trim()) {
+      messageApi.warning('请先输入口述要求或文字描述');
+      return;
+    }
+    setAiStageIndex(3);
+    setAiDrafts(
+      buildAiTaskDrafts({
+        scope,
+        base: taskCity,
+        keyword: taskKeyword,
+        objective: taskObjective,
+        templates: aiMatchedTemplates,
+      }),
+    );
+    messageApi.success('AI 已生成 5 个任务草案');
+  }
+
+  function submitQuickCreate() {
+    if (!currentTeam) return;
+    if (copySource === 'ai') {
+      if (aiDrafts.length === 0) {
+        generateAiDrafts();
+        return;
+      }
+      const selectedDrafts = aiDrafts.filter((draft) => draft.selected);
+      if (selectedDrafts.length === 0) {
+        messageApi.warning('请先选择要加入团队的草案');
+        return;
+      }
+      selectedDrafts.forEach((draft) => {
+        actions.saveTask(currentTeam.id, {
+          scope: draft.scope,
+          source: draft.source,
+          base: draft.base,
+          taskType: draft.taskType,
+          title: draft.title,
+          points: draft.points,
+          description: draft.description,
+          abilityTags: draft.abilityTags,
+          subjects: draft.subjects,
+          attachments: draft.attachments,
+          requirements: draft.requirements,
+          status: draft.status,
+        });
+      });
+      messageApi.success(`已加入 ${selectedDrafts.length} 个 AI 任务草案`);
+      setAiDrafts([]);
+      setAiStageIndex(0);
+      setCopyOpen(false);
+      return;
+    }
+    if (copySource === 'file') {
+      const createdIds = actions.createTasksFromFile(currentTeam.id, {
+        scope,
+        sourceName: taskSheetMode === 'photo' ? '拍照识别任务单' : '粘贴任务单内容',
+        rawText: taskSheetText,
+      });
+      messageApi.success(`已识别生成 ${createdIds.length} 个任务草案`);
+      setCopyOpen(false);
+      return;
+    }
+    if (selectedTaskIds.length === 0) {
+      messageApi.warning('请先选择要复制的任务');
+      return;
+    }
+    if (copySource === 'history') {
+      actions.copyTasksFromHistory(currentTeam.id, sourceTeamId, selectedTaskIds);
+    } else {
+      actions.copyTasksFromLibrary(currentTeam.id, selectedTaskIds);
+    }
+    messageApi.success(`已复制 ${selectedTaskIds.length} 个任务`);
+    setSelectedTaskIds([]);
+    setCopyOpen(false);
+  }
 
   return (
     <div className="tutor-page">
@@ -2494,7 +3319,7 @@ export function TasksPageContent() {
         extra={
           <Space>
             <Button icon={<CopyOutlined />} onClick={() => setCopyOpen(true)} disabled={!currentTeam}>
-              任务库 / AI
+              快速创建
             </Button>
             <Button
               type="primary"
@@ -2562,11 +3387,11 @@ export function TasksPageContent() {
                 <div className="tutor-inline-list" style={{ marginTop: 10 }}>
                   {task.attachments.map((attachment) => (
                     <span key={attachment.id} className="tutor-pill">
-                      {attachment.kind === 'pdf' ? <FilePdfOutlined /> : attachment.kind === 'image' ? <FileImageOutlined /> : <FileTextOutlined />} {attachment.name}
+                      {attachment.kind === 'image' ? <FileImageOutlined /> : <FileTextOutlined />} {attachment.name}
                       {attachment.keyword ? ` · ${attachment.keyword}` : ''}
                     </span>
                   ))}
-                  <span className="tutor-pill">来源：{task.source === 'manual' ? '手动创建' : task.source === 'history' ? '历史复制' : task.source === 'ai' ? 'AI 创建' : '任务库'}</span>
+                  <span className="tutor-pill">来源：{taskSourceLabel(task.source)}</span>
                 </div>
                 <div className="tutor-actions" style={{ marginTop: 12 }}>
                   <Button
@@ -2604,12 +3429,19 @@ export function TasksPageContent() {
         )}
       </SectionCard>
 
-      <SectionCard title="评价表设置" note="可用常见评价模版、历史团队或表格导入快速生成项目评价表">
+      <SectionCard title="评价表设置" note="可用常见评价模版、历史团队或粘贴表格快速生成项目评价表">
         <div className="tutor-stack">
           <div className="tutor-actions">
-            <Button onClick={() => messageApi.success('已选择常见评价模版（原型）')}>选择评价模版</Button>
-            <Button onClick={() => messageApi.success('已从历史团队复制评价表（原型）')}>从历史团队导入</Button>
-            <Button onClick={() => messageApi.success('已下载导入表格模版（原型）')}>表格导入</Button>
+            <Button onClick={() => setEvaluationTemplateOpen(true)}>选择评价模版</Button>
+            <Button
+              onClick={() => {
+                actions.copyEvaluationItemsFromTeam(sourceTeamId);
+                messageApi.success('已从历史团队复制评价表');
+              }}
+            >
+              从历史团队导入
+            </Button>
+            <Button onClick={() => setEvaluationImportOpen(true)}>粘贴表格</Button>
           </div>
           <div className="tutor-inline-list">
             {state.evaluationItems.map((item) => (
@@ -2665,45 +3497,99 @@ export function TasksPageContent() {
       />
 
       <Modal
+        open={evaluationTemplateOpen}
+        title="选择评价模版"
+        onCancel={() => setEvaluationTemplateOpen(false)}
+        onOk={() => {
+          actions.applyEvaluationTemplate(selectedEvaluationTemplateId);
+          messageApi.success('评价表已按模板生成');
+          setEvaluationTemplateOpen(false);
+        }}
+        okText="生成评价表"
+      >
+        <div className="tutor-stack">
+          <Select
+            value={selectedEvaluationTemplateId}
+            onChange={setSelectedEvaluationTemplateId}
+            options={state.evaluationTemplates.map((template) => ({
+              label: template.name,
+              value: template.id,
+            }))}
+          />
+          {state.evaluationTemplates
+            .filter((template) => template.id === selectedEvaluationTemplateId)
+            .map((template) => (
+              <div key={template.id} className="tutor-card tutor-card-soft">
+                <div className="tutor-list-title">{template.name}</div>
+                <div className="tutor-list-subtitle">{template.description}</div>
+                <div className="tutor-inline-list" style={{ marginTop: 10 }}>
+                  {template.items.map((item) => (
+                    <span key={item.id} className="tutor-pill">
+                      {item.dimension} · {item.indicator}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+        </div>
+      </Modal>
+
+      <Modal
+        open={evaluationImportOpen}
+        title="粘贴表格评价项目"
+        onCancel={() => setEvaluationImportOpen(false)}
+        onOk={() => {
+          actions.importEvaluationItems(evaluationImportText);
+          messageApi.success('已模拟导入评价项目');
+          setEvaluationImportOpen(false);
+        }}
+        okText="生成"
+      >
+        <div className="tutor-stack">
+          <div className="tutor-section-note">从微信或表格中复制内容后粘贴；每行一个评价项，格式：评价维度,评价项目,说明</div>
+          <Input.TextArea rows={6} value={evaluationImportText} onChange={(event) => setEvaluationImportText(event.target.value)} />
+        </div>
+      </Modal>
+
+      <Drawer
         open={copyOpen}
         title="快速创建研学任务"
-        onCancel={() => setCopyOpen(false)}
-        onOk={() => {
-          if (!currentTeam) return;
-          if (copySource === 'ai') {
-            actions.createAiTasks(currentTeam.id, {
-              scope,
-              base: taskCity,
-              keyword: taskKeyword || '研学任务',
-              objective: taskObjective,
-            });
-            messageApi.success('AI 已生成 5 个任务草案并加入任务库');
-            setCopyOpen(false);
-            return;
-          }
-          if (selectedTaskIds.length === 0) return;
-          if (copySource === 'history') {
-            actions.copyTasksFromHistory(currentTeam.id, sourceTeamId, selectedTaskIds);
-          } else {
-            actions.copyTasksFromLibrary(currentTeam.id, selectedTaskIds);
-          }
-          messageApi.success(`已复制 ${selectedTaskIds.length} 个任务`);
-          setSelectedTaskIds([]);
-          setCopyOpen(false);
-        }}
+        placement="bottom"
+        height="82%"
+        getContainer={getMobileDrawerContainer}
+        rootClassName="tutor-mobile-drawer"
+        rootStyle={{ position: 'absolute' }}
+        onClose={() => setCopyOpen(false)}
+        footer={
+          copySource === 'ai' && aiDrafts.length > 0 ? (
+            <div className="tutor-mobile-drawer-footer-actions">
+              <Button onClick={generateAiDrafts}>重新生成</Button>
+              <Button block type="primary" disabled={selectedAiDraftCount === 0} onClick={submitQuickCreate}>
+                {quickCreateActionText}
+              </Button>
+            </div>
+          ) : (
+            <Button block type="primary" onClick={submitQuickCreate}>
+              {quickCreateActionText}
+            </Button>
+          )
+        }
       >
         <div className="tutor-stack">
           <Segmented
             block
             value={copySource}
             options={[
-              { label: '从历史团队复制', value: 'history' },
-              { label: '从任务库复制', value: 'library' },
-              { label: 'AI 搜索/创建', value: 'ai' },
+              { label: '历史复制', value: 'history' },
+              { label: '任务库', value: 'library' },
+              { label: 'AI 创建', value: 'ai' },
+              { label: '任务单', value: 'file' },
             ]}
             onChange={(value) => {
-              setCopySource(value as 'history' | 'library' | 'ai');
+              setCopySource(value as 'history' | 'library' | 'ai' | 'file');
               setSelectedTaskIds([]);
+              setAiDrafts([]);
+              setAiStageIndex(0);
             }}
           />
           {copySource === 'history' ? (
@@ -2716,23 +3602,264 @@ export function TasksPageContent() {
               options={historyTeams.map((team) => ({ label: team.name, value: team.id }))}
             />
           ) : null}
-          {copySource !== 'history' ? (
+          {copySource === 'library' ? (
             <div className="tutor-stack">
-              <Input placeholder="城市名称" value={taskCity} onChange={(event) => setTaskCity(event.target.value)} />
               <Input placeholder="任务名称 / 基地 / 能力元素模糊搜索" value={taskKeyword} onChange={(event) => setTaskKeyword(event.target.value)} />
-              <Input.TextArea rows={3} placeholder="课程目标或 AI 创建口述要求" value={taskObjective} onChange={(event) => setTaskObjective(event.target.value)} />
             </div>
           ) : null}
           {copySource === 'ai' ? (
+            <div className="tutor-stack">
+              <div className="tutor-ai-stage-card">
+                <div className="tutor-section-head" style={{ marginBottom: 10 }}>
+                  <div>
+                    <div className="tutor-list-title">AI 任务智能体</div>
+                    <div className="tutor-list-subtitle">{aiStages[aiStageIndex]}</div>
+                  </div>
+                  <div className="tutor-ai-wave" aria-hidden="true">
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                  </div>
+                </div>
+                <div className="tutor-ai-stage-list">
+                  {aiStages.map((stage, index) => (
+                    <span
+                      key={stage}
+                      className={`tutor-ai-stage-pill${index === aiStageIndex ? ' active' : ''}${index < aiStageIndex ? ' done' : ''}`}
+                    >
+                      {index < aiStageIndex ? <CheckCircleOutlined /> : null}
+                      {stage}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <Segmented
+                block
+                value={aiInputMode}
+                options={[
+                  { label: '语音口述', value: 'voice' },
+                  { label: '文字描述', value: 'text' },
+                ]}
+                onChange={(value) => {
+                  setAiInputMode(value as AiInputMode);
+                  resetAiDrafts();
+                }}
+              />
+
+              <Input
+                placeholder="研学地点或基地"
+                value={taskCity}
+                onChange={(event) => {
+                  setTaskCity(event.target.value);
+                  resetAiDrafts();
+                }}
+              />
+              <Input
+                placeholder="任务主题 / 能力元素"
+                value={taskKeyword}
+                onChange={(event) => {
+                  setTaskKeyword(event.target.value);
+                  resetAiDrafts();
+                }}
+              />
+              {aiInputMode === 'voice' ? (
+                <div className="tutor-ai-voice-card">
+                  <Button
+                    block
+                    type="primary"
+                    ghost
+                    icon={<SoundOutlined />}
+                    onClick={() => {
+                      setTaskObjective('带学生在海洋馆观察海洋生物，记录事实证据，最后用语音或图文表达自己的发现。');
+                      setTaskKeyword('海洋观察');
+                      setAiStageIndex(1);
+                      setAiDrafts([]);
+                      messageApi.success('已模拟识别导师口述');
+                    }}
+                  >
+                    按住说出任务想法
+                  </Button>
+                  <Input.TextArea
+                    rows={4}
+                    placeholder="语音识别文本"
+                    value={taskObjective}
+                    onChange={(event) => {
+                      setTaskObjective(event.target.value);
+                      resetAiDrafts();
+                    }}
+                  />
+                </div>
+              ) : (
+                <Input.TextArea
+                  rows={4}
+                  placeholder="描述研学目标、现场任务和希望学员提交的作品"
+                  value={taskObjective}
+                  onChange={(event) => {
+                    setTaskObjective(event.target.value);
+                    resetAiDrafts();
+                  }}
+                />
+              )}
+
+              <div className="tutor-ai-prompt-grid">
+                {[
+                  '观察事实记录',
+                  '提出探究问题',
+                  '小组协作展示',
+                  '语音讲解表达',
+                ].map((item) => (
+                  <Button
+                    key={item}
+                    onClick={() => {
+                      setTaskKeyword(item);
+                      setTaskObjective(`${taskObjective}；重点关注${item}。`);
+                      resetAiDrafts();
+                    }}
+                  >
+                    {item}
+                  </Button>
+                ))}
+              </div>
+
+              <div className="tutor-list-card tutor-card-soft">
+                <div className="tutor-section-head">
+                  <div>
+                    <div className="tutor-list-title">分析结果</div>
+                    <div className="tutor-list-subtitle">
+                      {currentTeam?.name ?? '当前团队'} · {taskScopeLabel(scope)}
+                    </div>
+                  </div>
+                  <Tag color={aiDrafts.length ? 'green' : 'blue'}>{aiDrafts.length ? '已生成' : '待生成'}</Tag>
+                </div>
+                <div className="tutor-inline-list">
+                  <span className="tutor-pill">地点：{taskCity || '待补充'}</span>
+                  {aiAbilityTags.map((tag) => (
+                    <span key={tag} className="tutor-pill">
+                      能力：{tag}
+                    </span>
+                  ))}
+                  <span className="tutor-pill">匹配任务 {aiMatchedTemplates.length} 个</span>
+                </div>
+              </div>
+
+              {aiMatchedTemplates.length > 0 ? (
+                <div className="tutor-list-card">
+                  <div className="tutor-list-title">匹配到的任务参考</div>
+                  <div className="tutor-inline-list" style={{ marginTop: 10 }}>
+                    {aiMatchedTemplates.map((template) => (
+                      <span key={template.id} className="tutor-pill">
+                        {template.title}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+          {copySource === 'file' ? (
+            <div className="tutor-stack">
+              <Segmented
+                block
+                value={taskSheetMode}
+                options={[
+                  { label: '拍照识别', value: 'photo' },
+                  { label: '粘贴内容', value: 'paste' },
+                ]}
+                onChange={(value) => setTaskSheetMode(value as 'photo' | 'paste')}
+              />
+              {taskSheetMode === 'photo' ? (
+                <div className="tutor-mobile-picker-grid">
+                  <Button
+                    type="primary"
+                    ghost
+                    icon={<CameraOutlined />}
+                    onClick={() => {
+                      setTaskSheetText('海洋动物观察记录,20\n小组路线海报,25\n研学反思语音,15');
+                      messageApi.success('已模拟拍照识别任务单内容');
+                    }}
+                  >
+                    拍照识别任务单
+                  </Button>
+                  <Button
+                    icon={<PicCenterOutlined />}
+                    onClick={() => {
+                      setTaskSheetText('基地安全打卡,10\n自然笔记整理,20\n小组成果展示,30');
+                      messageApi.success('已模拟从相册识别任务单');
+                    }}
+                  >
+                    从相册选图识别
+                  </Button>
+                </div>
+              ) : null}
+              <Input.TextArea
+                rows={5}
+                placeholder="粘贴或识别出的任务单内容；每行一个任务，可写：任务名称,分值"
+                value={taskSheetText}
+                onChange={(event) => setTaskSheetText(event.target.value)}
+              />
+            </div>
+          ) : null}
+          {copySource === 'file' ? (
             <div className="tutor-card tutor-card-soft">
-              <div className="tutor-list-title">AI 创建说明</div>
+              <div className="tutor-list-title">手机端识别说明</div>
               <div className="tutor-section-note" style={{ marginTop: 8 }}>
-                点击确认后，系统会模拟语音识别与任务智能体生成，默认返回 5 个研学任务并自动加入当前团队与任务库。
+                导师可拍照任务单、从相册选图，或粘贴微信里的任务内容；系统按行识别任务名称和分值，生成可编辑草案并同步创建作品待提交记录。
               </div>
             </div>
           ) : null}
           <div className="tutor-list">
-            {copySource === 'ai' ? null : copyCandidates.length === 0 ? (
+            {copySource === 'ai' ? (
+              aiDrafts.length === 0 ? (
+                <EmptyBlock text="输入任务想法后点击生成，AI 会返回可选择的任务草案。" />
+              ) : (
+                aiDrafts.map((draft) => (
+                  <label
+                    key={draft.localId}
+                    className={`tutor-list-card tutor-ai-draft-card${draft.selected ? ' selected' : ''}`}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <div className="tutor-section-head">
+                      <div>
+                        <div className="tutor-list-title">{draft.title}</div>
+                        <div className="tutor-list-subtitle">
+                          {draft.taskType} · {draft.base} · {draft.points} 分
+                        </div>
+                      </div>
+                      <input
+                        checked={draft.selected}
+                        type="checkbox"
+                        onChange={(event) => {
+                          setAiDrafts((current) =>
+                            current.map((item) =>
+                              item.localId === draft.localId ? { ...item, selected: event.target.checked } : item,
+                            ),
+                          );
+                        }}
+                      />
+                    </div>
+                    <div className="tutor-section-note">{draft.description}</div>
+                    <div className="tutor-inline-list" style={{ marginTop: 10 }}>
+                      {draft.abilityTags.map((tag) => (
+                        <span key={tag} className="tutor-pill">
+                          能力：{tag}
+                        </span>
+                      ))}
+                      {draft.requirements.map((requirement) => (
+                        <span key={requirement.id} className="tutor-pill">
+                          {requirementTypeLabel(requirement.type)} · {requirement.requirement}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="tutor-section-note" style={{ marginTop: 10 }}>
+                      {draft.reason}
+                      {draft.matchedFrom ? ` · 参考：${draft.matchedFrom}` : ''}
+                    </div>
+                  </label>
+                ))
+              )
+            ) : copySource === 'file' ? null : copyCandidates.length === 0 ? (
               <EmptyBlock text="当前没有可复制的任务" />
             ) : (
               copyCandidates.map((item) => {
@@ -2763,7 +3890,7 @@ export function TasksPageContent() {
             )}
           </div>
         </div>
-      </Modal>
+      </Drawer>
     </div>
   );
 }
@@ -2905,7 +4032,7 @@ export function WorksPageContent({ teamId }: { teamId?: string }) {
                 setBatchSelection([]);
               }}
             >
-              批量确认 AI 分
+              批量确认 AI 评分
             </Button>
           </Space>
         }
@@ -3001,7 +4128,7 @@ export function WorksPageContent({ teamId }: { teamId?: string }) {
                     </div>
                     <div className="tutor-progress-note">
                       <span>提交时间 {formatDate(work.submittedAt)}</span>
-                      <strong>{work.finalScore ?? work.aiScore ?? '-'} 分</strong>
+                      <strong>{formatFinalScore(work.finalScore)}</strong>
                     </div>
                     <div className="tutor-section-note" style={{ marginTop: 8 }}>
                       {work.preview}
@@ -3055,12 +4182,12 @@ export function WorksPageContent({ teamId }: { teamId?: string }) {
                     </div>
                     <div className="tutor-kv-row">
                       <div>
-                        <div className="tutor-kv-label">AI 分</div>
-                        <div className="tutor-info-value">{work.aiScore ?? '-'}</div>
+                        <div className="tutor-kv-label">AI 评分</div>
+                        <div className="tutor-info-value">{formatRating(work.aiScore)}</div>
                       </div>
                       <div>
-                        <div className="tutor-kv-label">导师分</div>
-                        <div className="tutor-kv-value">{work.tutorScore ?? '-'}</div>
+                        <div className="tutor-kv-label">导师评分</div>
+                        <div className="tutor-kv-value">{formatRating(work.tutorScore)}</div>
                       </div>
                     </div>
                     <div className="tutor-section-note" style={{ marginTop: 8 }}>
@@ -3078,10 +4205,10 @@ export function WorksPageContent({ teamId }: { teamId?: string }) {
                           icon={<CheckCircleOutlined />}
                           onClick={() => {
                             actions.confirmAiScores([work.id]);
-                            messageApi.success('已确认该作品的 AI 分');
+                            messageApi.success('已确认该作品的 AI 评分');
                           }}
                         >
-                          确认 AI 分
+                          确认 AI 评分
                         </Button>
                       ) : null}
                     </div>
@@ -3133,7 +4260,7 @@ export function WorksPageContent({ teamId }: { teamId?: string }) {
                   </div>
                   <div className="tutor-progress-note">
                     <span>{work.preview}</span>
-                    <strong>{work.finalScore ?? work.aiScore ?? '-'} 分</strong>
+                    <strong>{formatFinalScore(work.finalScore)}</strong>
                   </div>
                   <Button style={{ marginTop: 10 }} onClick={() => setScoringWorkId(work.id)}>
                     评分该任务
@@ -3228,9 +4355,10 @@ export function WorksPageContent({ teamId }: { teamId?: string }) {
                       {detailWork.preview}
                     </div>
                   </div>
-                  {task ? (
-                    <div className="tutor-list">
-                      {task.requirements.map((requirement) => (
+	                  {task ? (
+	                    <div className="tutor-list">
+	                      <div className="tutor-section-title">作品要求</div>
+	                      {task.requirements.map((requirement) => (
                         <div key={requirement.id} className="tutor-list-card">
                           <Tag>{requirementTypeLabel(requirement.type)}</Tag>
                           <div className="tutor-section-note" style={{ marginTop: 8 }}>
@@ -3238,14 +4366,18 @@ export function WorksPageContent({ teamId }: { teamId?: string }) {
                           </div>
                         </div>
                       ))}
-                    </div>
-                  ) : null}
-                  <MobileSummaryGrid
-                    items={[
-                      { label: 'AI 分', value: detailWork.aiScore ?? '-' },
-                      { label: '导师分', value: detailWork.tutorScore ?? '-' },
-                      { label: '最终分', value: detailWork.finalScore ?? '-' },
-                      { label: '状态', value: formatWorkStatus(detailWork.status).label },
+	                    </div>
+	                  ) : null}
+	                  <div className="tutor-list">
+	                    <div className="tutor-section-title">实际作品</div>
+	                    <WorkAttachmentList work={detailWork} />
+	                  </div>
+	                  <MobileSummaryGrid
+	                    items={[
+	                      { label: 'AI 评分', value: formatRating(detailWork.aiScore) },
+	                      { label: '导师评分', value: formatRating(detailWork.tutorScore) },
+	                      { label: '最终得分', value: formatFinalScore(detailWork.finalScore) },
+	                      { label: '状态', value: formatWorkStatus(detailWork.status).label },
                     ]}
                   />
                   <Button type="primary" onClick={() => setScoringWorkId(detailWork.id)}>
@@ -3279,7 +4411,7 @@ export function WorksPageContent({ teamId }: { teamId?: string }) {
                   </div>
                   <div className="tutor-progress-note">
                     <span>{work.preview}</span>
-                    <strong>{work.finalScore ?? work.aiScore ?? '-'} 分</strong>
+                    <strong>{formatFinalScore(work.finalScore)}</strong>
                   </div>
                   <Button style={{ marginTop: 10 }} onClick={() => setScoringWorkId(work.id)}>
                     评分该小组任务
@@ -3303,7 +4435,7 @@ export function WorksPageContent({ teamId }: { teamId?: string }) {
             form={scoreForm}
             layout="vertical"
             initialValues={{
-              rating: Number((scoringWork.rating ?? 4).toFixed(1)),
+              rating: Number((scoringWork.rating ?? scoringWork.aiScore ?? 8).toFixed(1)),
               comment: scoringWork.comment ?? '',
             }}
             onFinish={(values) => {
@@ -3318,15 +4450,28 @@ export function WorksPageContent({ teamId }: { teamId?: string }) {
               </div>
               <div className="tutor-list-subtitle">{scoringWork.preview}</div>
               <div className="tutor-inline-list" style={{ marginTop: 10 }}>
-                <span className="tutor-pill">AI 分：{scoringWork.aiScore ?? '-'}</span>
-                <span className="tutor-pill">当前导师分：{scoringWork.tutorScore ?? '-'}</span>
+                <span className="tutor-pill">任务分值：{state.tasks.find((item) => item.id === scoringWork.taskId)?.points ?? 0} 分</span>
+                <span className="tutor-pill">AI 评分：{formatRating(scoringWork.aiScore)}</span>
+                <span className="tutor-pill">当前导师评分：{formatRating(scoringWork.tutorScore)}</span>
+                <span className="tutor-pill">当前最终得分：{formatFinalScore(scoringWork.finalScore)}</span>
               </div>
               <Button size="small" style={{ marginTop: 10 }} onClick={() => setDetailWorkId(scoringWork.id)}>
                 查看作品详情
               </Button>
             </div>
-            <Form.Item name="rating" label="星级评分">
-              <Rate allowHalf />
+            <Form.Item name="rating" label="导师评分（0-10 分）" rules={[{ required: true, message: '请输入评分' }]}>
+              <InputNumber min={0} max={10} step={0.5} style={{ width: '100%' }} />
+            </Form.Item>
+            <Form.Item noStyle shouldUpdate>
+              {({ getFieldValue }) => {
+                const task = state.tasks.find((item) => item.id === scoringWork.taskId);
+                const rating = Number(getFieldValue('rating') ?? 0);
+                return (
+                  <div className="tutor-card tutor-card-soft" style={{ marginBottom: 12 }}>
+                    最终得分 = {task?.points ?? 0} x {rating || 0} / 10 = {formatFinalScore(((task?.points ?? 0) * (rating || 0)) / 10)}
+                  </div>
+                );
+              }}
             </Form.Item>
             <Form.Item name="comment" label="导师评语">
               <Input.TextArea rows={3} />
@@ -3512,6 +4657,7 @@ export function ReportsPageContent() {
   const students = currentTeam ? getStudentsByTeam(state, currentTeam.id) : [];
   const [selectedReportIds, setSelectedReportIds] = useState<string[]>([]);
   const [previewReportId, setPreviewReportId] = useState<string | null>(null);
+  const [reportDetailId, setReportDetailId] = useState<string | null>(null);
   const [templateEditor, setTemplateEditor] = useState<ReportTemplate | null>(null);
   const [templateForm] = Form.useForm();
   const reports = currentTeam
@@ -3520,6 +4666,18 @@ export function ReportsPageContent() {
         .sort((left, right) => right.generatedAt.localeCompare(left.generatedAt))
     : [];
   const previewReport = previewReportId ? reports.find((report) => report.id === previewReportId) : null;
+  const detailReport = reportDetailId ? reports.find((report) => report.id === reportDetailId) : null;
+  const selectedReports = reports.filter((report) => selectedReportIds.includes(report.id));
+  const allReportsSelected = reports.length > 0 && selectedReports.length === reports.length;
+  const toggleAllReports = () => {
+    setSelectedReportIds(allReportsSelected ? [] : reports.map((report) => report.id));
+  };
+  const pushSelectedReports = () => {
+    if (selectedReports.length === 0) return;
+    actions.pushReports(selectedReports.map((report) => report.id));
+    messageApi.success(`已批量推送 ${selectedReports.length} 份报告`);
+    setSelectedReportIds([]);
+  };
 
   return (
     <div className="tutor-page">
@@ -3537,17 +4695,6 @@ export function ReportsPageContent() {
               }}
             >
               重新生成
-            </Button>
-            <Button
-              type="primary"
-              disabled={selectedReportIds.length === 0}
-              onClick={() => {
-                actions.pushReports(selectedReportIds);
-                messageApi.success(`已批量推送 ${selectedReportIds.length} 份报告`);
-                setSelectedReportIds([]);
-              }}
-            >
-              批量推送
             </Button>
           </Space>
         }
@@ -3569,25 +4716,28 @@ export function ReportsPageContent() {
       <SectionCard
         title="报告列表"
         note="需查看确认无误后再发给学生与家长，支持全选和批量推送"
-        extra={
-          reports.length > 0 ? (
-            <Button
-              size="small"
-              onClick={() =>
-                setSelectedReportIds((current) =>
-                  current.length === reports.length ? [] : reports.map((report) => report.id),
-                )
-              }
-            >
-              {selectedReportIds.length === reports.length ? '取消全选' : '全选'}
-            </Button>
-          ) : undefined
-        }
       >
         {reports.length === 0 ? (
           <EmptyBlock text="当前团队还没有生成报告，可先点击上方按钮批量生成。" />
         ) : (
           <div className="tutor-list">
+            <div className="tutor-list-card tutor-card-soft">
+              <div className="tutor-section-head">
+                <label className="tutor-select-all-row">
+                  <input checked={allReportsSelected} type="checkbox" onChange={toggleAllReports} />
+                  <div>
+                    <div className="tutor-list-title">全选报告</div>
+                    <div className="tutor-list-subtitle">
+                      已选择 {selectedReports.length}/{reports.length} 份
+                    </div>
+                  </div>
+                </label>
+                <Button type="primary" disabled={selectedReports.length === 0} onClick={pushSelectedReports}>
+                  批量推送
+                </Button>
+              </div>
+              <div className="tutor-section-note">可先全选，再按单份取消不需要推送的报告。</div>
+            </div>
             {reports.map((report) => {
               const student = state.students.find((item) => item.id === report.studentId);
               return (
@@ -3603,10 +4753,10 @@ export function ReportsPageContent() {
                           )
                         }
                       />
-                      <span style={{ minWidth: 0 }}>
-                      <div className="tutor-list-title">{student?.name ?? '未知学员'}</div>
-                      <div className="tutor-list-subtitle">{report.title}</div>
-                      </span>
+                      <div style={{ minWidth: 0 }}>
+                        <div className="tutor-list-title">{student?.name ?? '未知学员'}</div>
+                        <div className="tutor-list-subtitle">{report.title}</div>
+                      </div>
                     </label>
                     <Tag color={report.status === 'pushed' ? 'green' : 'gold'}>
                       {report.status === 'pushed' ? '已推送' : '待推送'}
@@ -3718,7 +4868,31 @@ export function ReportsPageContent() {
         </div>
       </SectionCard>
 
-      <Modal open={Boolean(previewReport)} title="报告确认" onCancel={() => setPreviewReportId(null)} footer={null}>
+      <Drawer
+        open={Boolean(previewReport)}
+        title="确认研学报告"
+        placement="bottom"
+        height="80%"
+        getContainer={getMobileDrawerContainer}
+        rootClassName="tutor-mobile-drawer"
+        rootStyle={{ position: 'absolute' }}
+        onClose={() => setPreviewReportId(null)}
+        footer={
+          previewReport ? (
+            <Button
+              block
+              type="primary"
+              onClick={() => {
+                actions.confirmReport(previewReport.id);
+                messageApi.success('报告已确认');
+                setPreviewReportId(null);
+              }}
+            >
+              确认无误
+            </Button>
+          ) : null
+        }
+      >
         {previewReport ? (
           <div className="tutor-stack">
             <div className="tutor-card tutor-card-soft">
@@ -3730,6 +4904,7 @@ export function ReportsPageContent() {
                 {previewReport.summary}
               </div>
             </div>
+            <ReportFileCard report={previewReport} onViewDetail={() => setReportDetailId(previewReport.id)} />
             <MobileSummaryGrid
               items={[
                 { label: '综合评级', value: previewReport.grade },
@@ -3738,9 +4913,67 @@ export function ReportsPageContent() {
                 { label: '状态', value: previewReport.status === 'pushed' ? '已推送' : '待推送' },
               ]}
             />
+            <div className="tutor-list-card">
+              <div className="tutor-section-head">
+                <div>
+                  <div className="tutor-list-title">报告内容</div>
+                  <div className="tutor-list-subtitle">面向家长端和学生端展示</div>
+                </div>
+                <EyeOutlined />
+              </div>
+              <ReportContentSections report={previewReport} compact />
+            </div>
           </div>
         ) : null}
-      </Modal>
+      </Drawer>
+
+      <Drawer
+        open={Boolean(detailReport)}
+        title="报告详情"
+        placement="bottom"
+        height="86%"
+        getContainer={getMobileDrawerContainer}
+        rootClassName="tutor-mobile-drawer"
+        rootStyle={{ position: 'absolute' }}
+        onClose={() => setReportDetailId(null)}
+      >
+        {detailReport ? (
+          <div className="tutor-stack">
+            <div className="tutor-card tutor-card-soft">
+              <div className="tutor-list-title">{detailReport.title}</div>
+              <div className="tutor-list-subtitle">
+                家长端报告预览 · 生成于 {formatDate(detailReport.generatedAt)}
+              </div>
+              <div className="tutor-section-note" style={{ marginTop: 10 }}>
+                {detailReport.summary}
+              </div>
+            </div>
+            <div className="tutor-list-card tutor-report-file-card">
+              <div className="tutor-report-file-row">
+                <div className="tutor-report-file-icon">
+                  <FileTextOutlined />
+                </div>
+                <div className="tutor-report-file-main">
+                  <div className="tutor-list-title">{detailReport.reportFile?.name ?? detailReport.fileName}</div>
+                  <div className="tutor-list-subtitle">
+                    {detailReport.reportFile?.type ?? '研学报告'} · {detailReport.reportFile?.sizeLabel ?? '报告'} · 更新于{' '}
+                    {formatDate(detailReport.reportFile?.updatedAt ?? detailReport.generatedAt)}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <MobileSummaryGrid
+              items={[
+                { label: '综合评级', value: detailReport.grade },
+                { label: '综合分', value: detailReport.score },
+                { label: '成长值', value: detailReport.growthValue },
+                { label: '确认时间', value: formatDate(detailReport.confirmedAt) },
+              ]}
+            />
+            <ReportContentSections report={detailReport} />
+          </div>
+        ) : null}
+      </Drawer>
 
       <Modal
         forceRender
@@ -3956,7 +5189,7 @@ export function MessagesPageContent() {
               />
             </Form.Item>
             <Form.Item name="content" label="广播内容" rules={[{ required: true }]}>
-              <Input.TextArea rows={4} placeholder="请输入广播内容或上传说明" />
+              <Input.TextArea rows={4} placeholder="请输入广播内容或图片说明" />
             </Form.Item>
             <Button htmlType="submit" type="primary" icon={<SendOutlined />}>
               发送
@@ -4005,6 +5238,9 @@ export function PhotosPageContent() {
   const students = currentTeam ? getStudentsByTeam(state, currentTeam.id) : [];
   const groups = currentTeam ? getGroupsByTeam(state, currentTeam.id) : [];
   const [form] = Form.useForm();
+  const [photoMode, setPhotoMode] = useState<'single' | 'batch'>('single');
+  const [captureSource, setCaptureSource] = useState<'camera' | 'album'>('camera');
+  const [batchCount, setBatchCount] = useState(6);
   const photos = currentTeam
     ? state.photos.filter((photo) => photo.teamId === currentTeam.id)
     : [];
@@ -4012,7 +5248,7 @@ export function PhotosPageContent() {
   return (
     <div className="tutor-page">
       {contextHolder}
-      <SectionCard title="照片上传" note="团队、小组、学员三种归类方式">
+      <SectionCard title="团队照片" note="单张照片可补充标题/说明，批量相册选择只归类不填表">
         {!currentTeam ? (
           <EmptyBlock text="请先选择当前团队" />
         ) : (
@@ -4021,38 +5257,40 @@ export function PhotosPageContent() {
             layout="vertical"
             initialValues={{ scope: 'team' }}
             onFinish={(values) => {
-              const batchTitles = String(values.batchTitles ?? '')
-                .split('\n')
-                .map((line) => line.trim())
-                .filter(Boolean);
-              if (batchTitles.length > 0) {
+              const scopeValue = values.scope as 'team' | 'group' | 'student';
+              if (photoMode === 'batch') {
                 actions.addPhotosBatch({
                   teamId: currentTeam.id,
-                  scope: values.scope,
+                  scope: scopeValue,
                   targetId: values.targetId,
-                  titles: batchTitles,
-                  description: values.description,
+                  count: batchCount,
                 });
-                form.resetFields(['title', 'batchTitles', 'description', 'imageUrl', 'targetId']);
-                messageApi.success(`已批量添加 ${batchTitles.length} 张团队照片`);
+                form.resetFields(['targetId']);
+                messageApi.success(`已从相册批量添加 ${batchCount} 张照片`);
                 return;
               }
-              if (!values.title) {
-                messageApi.warning('请输入照片标题，或在批量照片标题中每行填写一个标题');
-                return;
-              }
+              const fallbackTitle = captureSource === 'camera' ? '现场拍照' : '相册照片';
               actions.addPhoto({
                 teamId: currentTeam.id,
-                scope: values.scope,
+                scope: scopeValue,
                 targetId: values.targetId,
-                title: values.title,
-                description: values.description,
-                imageUrl: values.imageUrl,
+                title: String(values.title ?? '').trim() || fallbackTitle,
+                description: String(values.description ?? '').trim(),
               });
-              form.resetFields(['title', 'description', 'imageUrl', 'targetId']);
-              messageApi.success('已添加团队照片记录');
+              form.resetFields(['title', 'description', 'targetId']);
+              messageApi.success('已保存照片');
             }}
           >
+            <Segmented
+              block
+              value={photoMode}
+              options={[
+                { label: '单张照片', value: 'single' },
+                { label: '批量照片', value: 'batch' },
+              ]}
+              onChange={(value) => setPhotoMode(value as 'single' | 'batch')}
+              style={{ marginBottom: 12 }}
+            />
             <Form.Item name="scope" label="归属范围" rules={[{ required: true }]}>
               <Select
                 options={[
@@ -4079,28 +5317,66 @@ export function PhotosPageContent() {
                 );
               }}
             </Form.Item>
-            <Form.Item name="title" label="照片标题">
-              <Input />
-            </Form.Item>
-            <Form.Item name="batchTitles" label="批量照片标题（可选）">
-              <Input.TextArea rows={3} placeholder="每行一个照片标题；填写后将批量上传生成多张照片记录" />
-            </Form.Item>
-            <Form.Item name="description" label="照片说明" rules={[{ required: true }]}>
-              <Input.TextArea rows={3} />
-            </Form.Item>
-            <Form.Item name="imageUrl" label="图片地址（可选）">
-              <Input placeholder="为空则自动使用示例图片" />
-            </Form.Item>
-            <Button type="primary" htmlType="submit" icon={<PlusOutlined />}>
-              添加照片
-            </Button>
+            {photoMode === 'single' ? (
+              <div className="tutor-stack">
+                <div className="tutor-mobile-picker-grid">
+                  <button
+                    type="button"
+                    className={`tutor-mobile-picker-card${captureSource === 'camera' ? ' active' : ''}`}
+                    onClick={() => setCaptureSource('camera')}
+                  >
+                    <CameraOutlined />
+                    <span>拍照</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`tutor-mobile-picker-card${captureSource === 'album' ? ' active' : ''}`}
+                    onClick={() => setCaptureSource('album')}
+                  >
+                    <PicCenterOutlined />
+                    <span>从相册选择</span>
+                  </button>
+                </div>
+                <Form.Item name="title" label="照片标题（可选）">
+                  <Input placeholder="可不填，系统自动生成标题" />
+                </Form.Item>
+                <Form.Item name="description" label="照片说明（可选）">
+                  <Input.TextArea rows={3} placeholder="可补充拍摄地点、活动环节或学员表现" />
+                </Form.Item>
+                <Button block type="primary" htmlType="submit" icon={<PlusOutlined />}>
+                  保存照片
+                </Button>
+              </div>
+            ) : (
+              <div className="tutor-stack">
+                <div className="tutor-card tutor-card-soft">
+                  <div className="tutor-list-title">从相册批量选择</div>
+                  <div className="tutor-section-note" style={{ marginTop: 8 }}>
+                    批量照片只选择照片和归属，不填写标题、说明；系统会按“现场照片 1”自动生成展示名。
+                  </div>
+                </div>
+                <Segmented
+                  block
+                  value={batchCount}
+                  options={[
+                    { label: '3 张', value: 3 },
+                    { label: '6 张', value: 6 },
+                    { label: '9 张', value: 9 },
+                  ]}
+                  onChange={(value) => setBatchCount(Number(value))}
+                />
+                <Button block type="primary" htmlType="submit" icon={<PicCenterOutlined />}>
+                  批量添加 {batchCount} 张
+                </Button>
+              </div>
+            )}
           </Form>
         )}
       </SectionCard>
 
       <SectionCard title="照片流" note="团队照片将作为研学回顾素材">
         {photos.length === 0 ? (
-          <EmptyBlock text="还没有照片，可先上传示例图。" />
+          <EmptyBlock text="还没有照片，可先拍照或从相册选择。" />
         ) : (
           <div className="tutor-photo-grid">
             {photos.map((photo) => (
@@ -4109,7 +5385,7 @@ export function PhotosPageContent() {
                 <div className="tutor-list-title" style={{ marginTop: 10 }}>
                   {photo.title}
                 </div>
-                <div className="tutor-list-subtitle">{photo.description}</div>
+                {photo.description ? <div className="tutor-list-subtitle">{photo.description}</div> : null}
                 <div className="tutor-inline-list" style={{ marginTop: 8 }}>
                   <span className="tutor-pill">{photo.scope === 'team' ? '团队' : photo.scope === 'group' ? '小组' : '学员'}</span>
                   {photo.targetId ? (
@@ -4211,6 +5487,161 @@ export function SafetyPageContent() {
           </div>
         )}
       </SectionCard>
+    </div>
+  );
+}
+
+export function CommonClassesPageContent() {
+  const { state, actions } = useTutorStore();
+  const [messageApi, contextHolder] = message.useMessage();
+  const [selectedClassId, setSelectedClassId] = useState(state.commonClasses[0]?.id ?? '');
+  const [classOpen, setClassOpen] = useState(false);
+  const [studentOpen, setStudentOpen] = useState(false);
+  const [classForm] = Form.useForm();
+  const [studentForm] = Form.useForm();
+  const selectedClass = state.commonClasses.find((item) => item.id === selectedClassId) ?? state.commonClasses[0];
+
+  return (
+    <div className="tutor-page">
+      {contextHolder}
+      <SectionCard
+        title="常用班级"
+        note="先维护机构、班级和学生名单，创建团队时可一键带入"
+        extra={
+          <Button size="small" type="primary" icon={<PlusOutlined />} onClick={() => setClassOpen(true)}>
+            创建班级
+          </Button>
+        }
+      >
+        <div className="tutor-list">
+          {state.commonClasses.map((commonClass) => (
+            <button
+              key={commonClass.id}
+              type="button"
+              className="tutor-list-card tutor-select-card tutor-card-clickable"
+              onClick={() => setSelectedClassId(commonClass.id)}
+            >
+              <div className="tutor-section-head">
+                <div>
+                  <div className="tutor-list-title">{commonClass.name}</div>
+                  <div className="tutor-list-subtitle">
+                    {commonClass.organizationName} · {commonClass.studentSource}
+                  </div>
+                </div>
+                <Tag color={selectedClass?.id === commonClass.id ? 'green' : 'default'}>{commonClass.students.length} 人</Tag>
+              </div>
+            </button>
+          ))}
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title={selectedClass ? `${selectedClass.name} 学员列表` : '班级学员列表'}
+        note={selectedClass ? `${selectedClass.organizationName} · ${selectedClass.studentSource}` : '请选择一个常用班级'}
+        extra={
+          <Button size="small" icon={<PlusOutlined />} disabled={!selectedClass} onClick={() => setStudentOpen(true)}>
+            添加学生
+          </Button>
+        }
+      >
+        {!selectedClass ? (
+          <EmptyBlock text="暂无常用班级，可先创建班级。" />
+        ) : selectedClass.students.length === 0 ? (
+          <EmptyBlock text="该班级还没有学生。" />
+        ) : (
+          <div className="tutor-list">
+            {selectedClass.students.map((student) => (
+              <div key={student.id} className="tutor-list-card">
+                <div className="tutor-section-head">
+                  <div>
+                    <div className="tutor-list-title">{student.name}</div>
+                    <div className="tutor-list-subtitle">{student.idNumber}</div>
+                  </div>
+                  <Tag>{student.age} 岁</Tag>
+                </div>
+                <div className="tutor-info-grid">
+                  <div>
+                    <div className="tutor-info-label">家长</div>
+                    <div className="tutor-info-value">{student.parentName}</div>
+                  </div>
+                  <div>
+                    <div className="tutor-info-label">手机号</div>
+                    <div className="tutor-info-value">{student.parentPhone}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </SectionCard>
+
+      <Modal
+        forceRender
+        open={classOpen}
+        title="创建常用班级"
+        onCancel={() => setClassOpen(false)}
+        onOk={() => classForm.submit()}
+      >
+        <Form
+          form={classForm}
+          layout="vertical"
+          initialValues={{ organizationName: '南山实验学校', studentSource: '学校班级名单' }}
+          onFinish={(values) => {
+            const classId = actions.addCommonClass(values);
+            setSelectedClassId(classId);
+            classForm.resetFields();
+            setClassOpen(false);
+            messageApi.success('常用班级已创建');
+          }}
+        >
+          <Form.Item name="organizationName" label="机构" rules={[{ required: true }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="name" label="班级" rules={[{ required: true }]}>
+            <Input placeholder="例如：五年级 6 班" />
+          </Form.Item>
+          <Form.Item name="studentSource" label="学员来源" rules={[{ required: true }]}>
+            <Input />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        forceRender
+        open={studentOpen}
+        title="添加班级学生"
+        onCancel={() => setStudentOpen(false)}
+        onOk={() => studentForm.submit()}
+      >
+        <Form
+          form={studentForm}
+          layout="vertical"
+          initialValues={{ age: 10 }}
+          onFinish={(values) => {
+            if (!selectedClass) return;
+            actions.addCommonStudent(selectedClass.id, values);
+            studentForm.resetFields();
+            setStudentOpen(false);
+            messageApi.success('班级学生已添加');
+          }}
+        >
+          <Form.Item name="name" label="姓名" rules={[{ required: true }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="age" label="年龄" rules={[{ required: true }]}>
+            <InputNumber min={3} max={18} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="idNumber" label="学生证件号" rules={[{ required: true }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="parentName" label="家长姓名" rules={[{ required: true }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="parentPhone" label="家长手机号" rules={[{ required: true }]}>
+            <Input />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 }
@@ -4343,7 +5774,7 @@ export function MePageContent() {
           value: `${state.partnerOrganizations.length} 个`,
         },
         {
-          href: currentTeam ? `/teams/${currentTeam.id}/students` : '/teams',
+          href: '/common-classes',
           icon: <TeamOutlined />,
           label: '常用班级',
           note: '维护班级和学生名单，创建团队时快速带入',
