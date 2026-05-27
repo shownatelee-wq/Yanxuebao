@@ -20,6 +20,11 @@ async function exportSheet(filename: string, sheetName: string, rows: Record<str
   downloadBlob(new Blob([blob], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), filename);
 }
 
+export async function exportExcelTemplate(filename: string, sheetName: string, headers: string[], sample?: Record<string, unknown>) {
+  const row = sample ?? Object.fromEntries(headers.map((header) => [header, '']));
+  await exportSheet(filename, sheetName, [row]);
+}
+
 export async function exportOrganizations(records: Organization[]) {
   await exportSheet(
     '合作机构台账.xlsx',

@@ -14,7 +14,7 @@ import {
   UserOutlined,
   WalletOutlined,
 } from '@ant-design/icons';
-import { Alert, App, Button, Card, Col, Descriptions, Divider, Drawer, Empty, Form, Input, InputNumber, List, Modal, QRCode, Row, Segmented, Select, Space, Statistic, Steps, Table, Tabs, Tag, Timeline, Typography, Upload } from 'antd';
+import { Alert, App, Button, Card, Checkbox, Col, Descriptions, Divider, Drawer, Empty, Form, Input, InputNumber, List, Modal, QRCode, Row, Segmented, Select, Space, Statistic, Steps, Table, Tabs, Tag, Timeline, Typography, Upload } from 'antd';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getStoredSession } from '../lib/admin-auth';
@@ -22,15 +22,23 @@ import type {
   AdminRole,
 } from '../lib/admin-auth';
 import type {
+  AuditHistoryRecord,
   AuditRecord,
+  CapabilityElement,
   CapabilityMapping,
+  CourseOrderRecord,
+  CourseStructureNode,
   DemoRole,
+  ExcellentTaskCard,
+  ExpertEntryAuditRecord,
   Mentor,
   Organization,
   OperationDailyRecord,
   OperationLog,
   PaymentRecord,
+  PaymentCenterRecord,
   PhotoRecognitionStatus,
+  QuestionBankItem,
   RentalOrderStatus,
   StudentProfile,
   StudyBase,
@@ -40,10 +48,12 @@ import type {
   Team,
   TeamTask,
   TeamTaskWork,
+  WarehousePermissionRecord,
+  WarehouseRecord,
   WorkRequirement,
 } from '../lib/admin-store';
 import { useAdminStore } from '../lib/admin-store';
-import { exportAuditPerformance, exportInventory, exportMentors, exportOrganizations, exportStudentCapabilitySummary, exportStudentReport, exportStudents } from '../lib/exporters';
+import { exportAuditPerformance, exportExcelTemplate, exportInventory, exportMentors, exportOrganizations, exportStudentCapabilitySummary, exportStudentReport, exportStudents } from '../lib/exporters';
 import type { CityPageKey, OperatorPageKey } from '../lib/navigation';
 
 const { Title, Paragraph, Text } = Typography;
@@ -102,20 +112,24 @@ function UploadMockModal(props: {
   accept?: string;
   description: string;
   resultName: string;
+  template?: { filename: string; sheetName: string; headers: string[]; sample?: Record<string, unknown> };
   onCancel: () => void;
   onConfirm: (fileName: string) => void;
 }) {
   const [fileList, setFileList] = useState<any[]>([]);
+  const [templateDownloaded, setTemplateDownloaded] = useState(false);
   const [result, setResult] = useState<{ batchNo: string; successCount: number; failedCount: number; failedFields: string[] } | null>(null);
 
   useEffect(() => {
     if (!props.open) {
       setFileList([]);
+      setTemplateDownloaded(false);
       setResult(null);
     }
   }, [props.open]);
 
   const fileName = fileList[0]?.name as string | undefined;
+  const needTemplateFirst = Boolean(props.template) && !templateDownloaded;
 
   return (
     <Modal
@@ -129,10 +143,10 @@ function UploadMockModal(props: {
         <Button
           key="confirm"
           type="primary"
-          disabled={!fileName}
+          disabled={!fileName || needTemplateFirst}
           onClick={() => {
             const batchNo = `${props.resultName}-${Date.now().toString().slice(-6)}`;
-            props.onConfirm(fileName ?? '演示文件.xlsx');
+            props.onConfirm(fileName ?? '业务文件.xlsx');
             setResult({ batchNo, successCount: 12, failedCount: 1, failedFields: ['设备ID', '金额', '手机号'].slice(0, props.accept?.includes('image') ? 0 : 2) });
           }}
         >
@@ -142,6 +156,16 @@ function UploadMockModal(props: {
     >
       <Space direction="vertical" size={12} style={{ width: '100%' }}>
         <Text type="secondary">{props.description}</Text>
+        {props.template ? (
+          <Button
+            onClick={() => {
+              exportExcelTemplate(props.template!.filename, props.template!.sheetName, props.template!.headers, props.template!.sample);
+              setTemplateDownloaded(true);
+            }}
+          >
+            下载 Excel 模版
+          </Button>
+        ) : null}
         <Upload
           accept={props.accept}
           maxCount={1}
@@ -149,13 +173,14 @@ function UploadMockModal(props: {
           fileList={fileList}
           onChange={({ fileList: nextFileList }) => setFileList(nextFileList)}
         >
-          <Button icon={<UploadOutlined />}>选择文件</Button>
+          <Button icon={<UploadOutlined />} disabled={needTemplateFirst}>选择文件</Button>
         </Upload>
+        {needTemplateFirst ? <Text type="secondary">请先下载 Excel 模版，按模版整理数据后再上传。</Text> : null}
         {result ? (
           <Alert
             showIcon
             type="success"
-            message="模拟解析完成"
+            message="文件处理完成"
             description={`批次号：${result.batchNo}；成功 ${result.successCount} 条；失败 ${result.failedCount} 条${result.failedFields.length ? `；失败字段：${result.failedFields.join('、')}` : ''}`}
           />
         ) : null}
@@ -835,7 +860,17 @@ function OrganizationsPage() {
               <List dataSource={detailContracts} locale={{ emptyText: '暂无合同记录' }} renderItem={(item) => <List.Item>{item.uploadedAt} · {item.title} · {item.fileName} · {item.status}</List.Item>} />
             </Card>
             <Card title="租赁记录">
-              <List dataSource={detailRentals} locale={{ emptyText: '暂无租赁记录' }} renderItem={(item) => <List.Item>{item.rentalDate} · {item.teamName} · {item.status} · {item.totalAmount} 元</List.Item>} />
+              <List
+                dataSource={detailRentals}
+                locale={{ emptyText: '暂无租赁记录' }}
+                renderItem={(item) => (
+                  <List.Item
+                    actions={[<Button key="detail" type="link" onClick={() => router.push(`/rental-orders?orderId=${item.id}`)}>打开详情</Button>]}
+                  >
+                    {item.rentalDate} · {item.teamName} · {item.status} · {item.totalAmount} 元
+                  </List.Item>
+                )}
+              />
             </Card>
             <Card title="关联导师">
               <List dataSource={detailMentors} locale={{ emptyText: '暂无导师' }} renderItem={(item) => <List.Item>{item.name} · {item.status} · 带队 {item.teamsLed} 次</List.Item>} />
@@ -853,12 +888,21 @@ function OrganizationsPage() {
 function MentorsPage() {
   const { state, selectors, actions } = useAdminStore();
   const { message } = App.useApp();
+  const searchParams = useSearchParams();
   const [open, setOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [mentorTemplateReady, setMentorTemplateReady] = useState(false);
   const [detail, setDetail] = useState<Mentor | null>(null);
   const [editing, setEditing] = useState<Mentor | null>(null);
   const [form] = Form.useForm();
   const [importForm] = Form.useForm();
+  const mentorIdParam = searchParams.get('mentorId');
+
+  useEffect(() => {
+    if (!mentorIdParam) return;
+    const nextDetail = state.mentors.find((item) => item.id === mentorIdParam);
+    if (nextDetail) setDetail(nextDetail);
+  }, [mentorIdParam, state.mentors]);
 
   function openEditor(record?: Mentor) {
     setEditing(record ?? null);
@@ -884,7 +928,7 @@ function MentorsPage() {
     ],
     <>
       <Button onClick={() => exportMentors(state.mentors, (organizationId) => selectors.getOrganizationById(organizationId)?.name ?? '-')}>导出导师台账</Button>
-      <Button icon={<UploadOutlined />} onClick={() => setImportOpen(true)}>批量导入</Button>
+      <Button icon={<UploadOutlined />} onClick={() => { setImportOpen(true); setMentorTemplateReady(false); }}>批量导入</Button>
       <Button type="primary" onClick={() => openEditor()}>新增导师</Button>
     </>,
   );
@@ -976,9 +1020,18 @@ function MentorsPage() {
             rules={[{ required: true, message: '请上传 Excel 文件' }]}
           >
             <Upload beforeUpload={() => false} maxCount={1} accept=".xls,.xlsx">
-              <Button icon={<UploadOutlined />}>选择 Excel 文件</Button>
+              <Button icon={<UploadOutlined />} disabled={!mentorTemplateReady}>选择 Excel 文件</Button>
             </Upload>
           </Form.Item>
+          <Button
+            onClick={() => {
+              exportExcelTemplate('研学导师批量导入模版.xlsx', '导师导入', ['所属机构', '导师姓名', '手机号', '账号状态'], { 所属机构: '南山实验学校', 导师姓名: '王老师', 手机号: '13900000000', 账号状态: '未激活' });
+              setMentorTemplateReady(true);
+            }}
+          >
+            下载 Excel 模版
+          </Button>
+          <Text type="secondary" style={{ marginLeft: 12 }}>请先下载模版，按模版编辑后再上传。</Text>
         </Form>
       </Modal>
       <Drawer open={Boolean(detail)} title={detail?.name} onClose={() => setDetail(null)} width={560}>
@@ -1012,8 +1065,21 @@ function TeamAssignmentsPage() {
   const { state, selectors, actions } = useAdminStore();
   const { message } = App.useApp();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [team, setTeam] = useState<Team | null>(null);
   const [form] = Form.useForm();
+  const teamIdParam = searchParams.get('teamId');
+
+  useEffect(() => {
+    if (!teamIdParam) return;
+    const nextTeam = state.teams.find((item) => item.id === teamIdParam);
+    if (!nextTeam) return;
+    setTeam(nextTeam);
+    form.setFieldsValue({
+      mentorId: nextTeam.mentorId,
+      assistantPhones: nextTeam.assistantPhones.join(','),
+    });
+  }, [form, teamIdParam, state.teams]);
 
   function openEditor(record: Team) {
     setTeam(record);
@@ -1376,6 +1442,8 @@ function TeamTasksPage() {
 function RentalOrdersPage() {
   const { state, actions } = useAdminStore();
   const { message } = App.useApp();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [creating, setCreating] = useState(false);
   const [rentalDetail, setRentalDetail] = useState<any>(null);
   const [orgPickerOpen, setOrgPickerOpen] = useState(false);
@@ -1384,17 +1452,36 @@ function RentalOrdersPage() {
   const [rentalAttachmentOrder, setRentalAttachmentOrder] = useState<any>(null);
   const [createForm] = Form.useForm();
   const [statusForm] = Form.useForm();
-  const [paymentForm] = Form.useForm();
   const [adjustForm] = Form.useForm();
   const [damageForm] = Form.useForm();
+  const orderIdParam = searchParams.get('orderId');
 
   const freeDevices = state.devices.filter((item) => item.status === '库存' || item.status === '库存-租赁');
   const salesAllowed = canUse(state.demoRole, ['sales']);
   const warehouseAllowed = canUse(state.demoRole, ['warehouse']);
+  const defaultWarehouseId = useMemo(() => {
+    const subjectNameByRole: Record<DemoRole, string> = {
+      operator: '深圳库管部',
+      sales: '销售-唐瑞',
+      finance: '深圳库管部',
+      warehouse: '深圳库管部',
+    };
+    const subjectName = subjectNameByRole[state.demoRole];
+    const permission = state.warehousePermissions.find((item) =>
+      item.status === '启用' && (item.subjectName === subjectName || item.departmentName === subjectName),
+    );
+    return permission?.warehouseIds[0] ?? state.warehouses[0]?.id;
+  }, [state.demoRole, state.warehousePermissions, state.warehouses]);
   const orgPickerResults = state.organizations.filter((item) => {
     if (!orgKeyword) return false;
     return [item.name, item.contactName, item.contactPhone].some((value) => toText(value).includes(toText(orgKeyword)));
   });
+
+  useEffect(() => {
+    if (!orderIdParam) return;
+    const nextDetail = state.rentalOrders.find((item) => item.id === orderIdParam);
+    if (nextDetail) setRentalDetail(nextDetail);
+  }, [orderIdParam, state.rentalOrders]);
 
   function submitCreate(values: any) {
     actions.createRentalOrder({
@@ -1415,11 +1502,6 @@ function RentalOrdersPage() {
     setRentalDetail(null);
   }
 
-  function submitPayment(values: { amount: number; method: '转账' | '扫码' | '现金'; note: string }) {
-    actions.addRentalPayment(rentalDetail.id, values);
-    message.success('收款已录入');
-    paymentForm.resetFields();
-  }
   const { filteredRecords: filteredRentalOrders, toolbar } = useListFilters<any>(
     state.rentalOrders,
     [
@@ -1432,7 +1514,7 @@ function RentalOrdersPage() {
     ],
     <>
       <Button disabled={!warehouseAllowed || state.rentalOrders.length === 0} onClick={() => setBatchUploadOrder(state.rentalOrders[0])}>设备 ID 导入</Button>
-      <Button type="primary" disabled={!salesAllowed} onClick={() => setCreating(true)}>创建租赁订单</Button>
+      <Button type="primary" disabled={!salesAllowed} onClick={() => { createForm.setFieldsValue({ warehouseId: defaultWarehouseId }); setCreating(true); }}>创建租赁订单</Button>
     </>,
   );
 
@@ -1448,6 +1530,7 @@ function RentalOrdersPage() {
           columns={[
             { title: '订单号', dataIndex: 'id' },
             { title: '机构', render: (_, record: any) => state.organizations.find((item) => item.id === record.organizationId)?.name ?? '-' },
+            { title: '申请分仓', render: (_, record: any) => state.warehouses.find((item) => item.id === record.warehouseId)?.name ?? record.warehouseName ?? '-' },
             { title: '联系人', dataIndex: 'contactName' },
             { title: '订单时间', dataIndex: 'createdAt' },
             { title: '研学日期', dataIndex: 'rentalDate' },
@@ -1485,6 +1568,9 @@ function RentalOrdersPage() {
               onClick={() => setOrgPickerOpen(true)}
             />
           </Form.Item>
+          <Form.Item label="申请分仓" name="warehouseId" initialValue={defaultWarehouseId} extra="默认按当前岗位绑定部门的分仓带出，可根据实际申请手动调整。" rules={[{ required: true, message: '请选择申请分仓' }]}>
+            <Select options={state.warehouses.filter((item) => item.status !== '停用').map((item) => ({ label: `${item.name} / ${item.departmentName ?? item.city}`, value: item.id }))} />
+          </Form.Item>
           <Form.Item label="班级/团队名称" name="teamName" rules={[{ required: true, message: '请输入团队名称' }]}>
             <Input />
           </Form.Item>
@@ -1515,6 +1601,7 @@ function RentalOrdersPage() {
               { key: '0', label: '订单时间', children: rentalDetail.createdAt },
               { key: '2', label: '租赁日期', children: rentalDetail.rentalDate },
               { key: '3', label: '订单状态', children: <Tag color={statusColor(rentalDetail.status)}>{rentalDetail.status}</Tag> },
+              { key: 'warehouse', label: '申请分仓', children: state.warehouses.find((item) => item.id === rentalDetail.warehouseId)?.name ?? rentalDetail.warehouseName ?? '-' },
               { key: '4', label: '已分配设备', children: rentalDetail.deviceSerials.join('、') || '尚未分配' },
               { key: '5', label: '账单金额', children: `￥${rentalDetail.totalAmount}，已收 ￥${rentalDetail.paidAmount}` },
             ]} />
@@ -1573,12 +1660,7 @@ function RentalOrdersPage() {
                 renderItem={(item: any) => <List.Item>{item.createdAt} · {item.method} · {item.amount} 元 · {item.note} · <Tag color={statusColor(item.confirmationStatus)}>{item.confirmationStatus}</Tag>{item.voucherFile ? ` · ${item.voucherFile}` : ' · 待补传凭证'}</List.Item>}
               />
               <Divider />
-              <Form form={paymentForm} layout="inline" onFinish={submitPayment}>
-                <Form.Item name="amount" rules={[{ required: true, message: '请输入金额' }]}><InputNumber placeholder="金额" min={1} /></Form.Item>
-                <Form.Item name="method" initialValue="转账"><Select style={{ width: 120 }} options={['转账', '扫码', '现金'].map((value) => ({ label: value, value }))} /></Form.Item>
-                <Form.Item name="note" rules={[{ required: true, message: '请输入摘要' }]}><Input placeholder="收款摘要" /></Form.Item>
-                <Button disabled={!salesAllowed} type="primary" htmlType="submit">录入收款</Button>
-              </Form>
+              <Button disabled={!salesAllowed} type="primary" onClick={() => router.push(`/payment-center?sourceType=租赁订单&orderId=${rentalDetail.id}`)}>去收款中心</Button>
             </Card>
             <Card title="订单附件">
               <List
@@ -1610,8 +1692,9 @@ function RentalOrdersPage() {
         open={Boolean(batchUploadOrder)}
         title="导入租赁设备 ID Excel"
         accept=".xls,.xlsx"
-        description="上传库管准备的设备 ID 清单，系统模拟生成出仓批次号与明细记录。"
+        description="上传库管准备的设备 ID 清单，系统将生成出仓批次号与明细记录。"
         resultName="CK"
+        template={{ filename: '租赁设备ID导入模版.xlsx', sheetName: '设备ID', headers: ['订单号', '申请分仓', '设备ID'], sample: { 订单号: batchUploadOrder?.id ?? 'rent-1', 申请分仓: batchUploadOrder?.warehouseName ?? '深圳南山分仓', 设备ID: 'YXB-SZ-2026-0001' } }}
         onCancel={() => setBatchUploadOrder(null)}
         onConfirm={(fileName) => {
           if (!batchUploadOrder) return;
@@ -1654,6 +1737,7 @@ function InventoryPage() {
     [
       { name: 'keyword', label: '设备关键词', placeholder: '序列号 / 批次 / 型号', match: textMatcher((item) => item.serialNumber, (item) => item.batch, (item) => item.model) },
       { name: 'batch', label: '设备批次', type: 'select', options: makeOptions(state.devices.map((item) => item.batch)), match: equalsMatcher((item) => item.batch) },
+      { name: 'warehouseId', label: '所在分仓', type: 'select', options: state.warehouses.map((item) => ({ label: item.name, value: item.id })), match: equalsMatcher((item) => item.warehouseId) },
       { name: 'status', label: '设备状态', type: 'select', options: makeOptions(state.devices.map((item) => item.status)), match: equalsMatcher((item) => item.status) },
     ],
     <>
@@ -1700,6 +1784,7 @@ function InventoryPage() {
           { title: '序列号', dataIndex: 'serialNumber' },
           { title: '批次', dataIndex: 'batch' },
           { title: '型号', dataIndex: 'model' },
+          { title: '所在分仓', render: (_, record: any) => state.warehouses.find((item) => item.id === record.warehouseId)?.name ?? '-' },
           { title: '当前状态', dataIndex: 'status', render: (value: string) => <Tag color={statusColor(value)}>{value}</Tag> },
           { title: '最近动作', dataIndex: 'lastAction' },
         ]} />
@@ -1708,8 +1793,11 @@ function InventoryPage() {
         open={Boolean(uploadKind)}
         title={uploadKind === 'transfer' ? '上传分仓调拨 Excel' : '上传设备入库 Excel'}
         accept=".xls,.xlsx"
-        description={uploadKind === 'transfer' ? '上传分仓调拨表后，系统模拟移动设备并刷新分仓库存。' : '上传采购设备入库表后，系统模拟生成设备数据与进销存日报。'}
+        description={uploadKind === 'transfer' ? '上传分仓调拨表后，系统将自动移动设备并刷新分仓库存。' : '上传采购设备入库表后，系统将自动生成设备数据与进销存日报。'}
         resultName={uploadKind === 'transfer' ? 'DB' : 'RK'}
+        template={uploadKind === 'transfer'
+          ? { filename: '分仓调拨导入模版.xlsx', sheetName: '调拨明细', headers: ['来源分仓', '目标分仓', '设备ID'], sample: { 来源分仓: '深圳南山分仓', 目标分仓: '广州天河分仓', 设备ID: 'YXB-SZ-2026-0021' } }
+          : { filename: '设备入库导入模版.xlsx', sheetName: '入库明细', headers: ['入库分仓', '设备型号', '设备ID', '采购批次'], sample: { 入库分仓: '深圳南山分仓', 设备型号: 'YXB-A1', 设备ID: 'YXB-SZ-2026-0100', 采购批次: '2026C' } }}
         onCancel={() => setUploadKind(null)}
         onConfirm={(fileName) => {
           if (uploadKind === 'transfer') {
@@ -1726,6 +1814,7 @@ function InventoryPage() {
 }
 
 function StudentDetailTabs({ student, elements }: { student: StudentProfile; elements: Array<{ id: string; plane: string; indicator?: string; name: string }> }) {
+  const [detail, setDetail] = useState<{ title: string; rows: Array<{ label: string; value: React.ReactNode }> } | null>(null);
   const elementScores = studentElementScores(student, elements);
   const strongest = [...elementScores].sort((a, b) => b.score - a.score).slice(0, 6);
   const weakest = [...elementScores].sort((a, b) => a.score - b.score).slice(0, 6);
@@ -1760,18 +1849,21 @@ function StudentDetailTabs({ student, elements }: { student: StudentProfile; ele
     ...diaryItems.map((item) => ({ ...item, id: `growth-${item.id}`, title: item.title.replace('研学日记', '成长日记') })),
   ].sort((a, b) => (a.date < b.date ? 1 : -1));
 
+  const showDetail = (title: string, rows: Array<{ label: string; value: React.ReactNode }>) => setDetail({ title, rows });
+
   return (
+    <>
     <Tabs
       items={[
         {
           key: 'study',
           label: '研学团队',
-          children: <List dataSource={student.studyRecords} renderItem={(item) => <List.Item>{item.date} · {item.type} · {item.teamName} · {item.score} 分</List.Item>} />,
+          children: <List dataSource={student.studyRecords} renderItem={(item) => <List.Item actions={[<Button key="detail" type="link" onClick={() => showDetail(`${item.teamName}详情`, [{ label: '研学日期', value: item.date }, { label: '研学类型', value: item.type }, { label: '完成任务', value: item.completedTasks }, { label: '综合评分', value: `${item.score} 分` }])}>详情</Button>]}>{item.date} · {item.type} · {item.teamName} · {item.score} 分</List.Item>} />,
         },
         {
           key: 'task',
           label: '研学任务',
-          children: <List dataSource={student.taskRecords} renderItem={(item) => <List.Item>{item.date} · {item.taskName} · {item.rating}</List.Item>} />,
+          children: <List dataSource={student.taskRecords} renderItem={(item) => <List.Item actions={[<Button key="detail" type="link" onClick={() => showDetail(item.taskName, [{ label: '完成日期', value: item.date }, { label: '任务评分', value: item.score }, { label: '评价等级', value: item.rating }])}>详情</Button>]}>{item.date} · {item.taskName} · {item.rating}</List.Item>} />,
         },
         {
           key: 'growth',
@@ -1808,7 +1900,7 @@ function StudentDetailTabs({ student, elements }: { student: StudentProfile; ele
         {
           key: 'assessment',
           label: '能力评测',
-          children: <List dataSource={student.assessments} renderItem={(item) => <List.Item>{item.createdAt} · {item.type} · {item.score} 分</List.Item>} />,
+          children: <List dataSource={student.assessments} renderItem={(item) => <List.Item actions={[<Button key="detail" type="link" onClick={() => showDetail(`${item.type}详情`, [{ label: '评测时间', value: item.createdAt }, { label: '评测得分', value: `${item.score} 分` }, { label: '评测总结', value: item.summary }])}>详情</Button>]}>{item.createdAt} · {item.type} · {item.score} 分</List.Item>} />,
         },
         {
           key: 'reports',
@@ -1817,7 +1909,7 @@ function StudentDetailTabs({ student, elements }: { student: StudentProfile; ele
             <List
               dataSource={reportItems}
               renderItem={(item) => (
-                <List.Item>
+                  <List.Item actions={[<Button key="detail" type="link" onClick={() => showDetail(item.title, [{ label: '生成日期', value: item.date }, { label: '报告摘要', value: item.summary }, { label: '同步状态', value: '已同步家长端与设备端' }])}>详情</Button>]}>
                   <List.Item.Meta title={item.title} description={`${item.date} · ${item.summary} · 已同步家长端与设备端`} />
                 </List.Item>
               )}
@@ -1827,31 +1919,44 @@ function StudentDetailTabs({ student, elements }: { student: StudentProfile; ele
         {
           key: 'orders',
           label: '订单',
-          children: <List dataSource={orderItems} renderItem={(item) => <List.Item>{item.title} · ￥{item.amount.toFixed(2)} · {item.status}</List.Item>} />,
+          children: <List dataSource={orderItems} renderItem={(item) => <List.Item actions={[<Button key="detail" type="link" onClick={() => showDetail(item.title, [{ label: '订单编号', value: item.id }, { label: '订单金额', value: `￥${item.amount.toFixed(2)}` }, { label: '订单状态', value: item.status }])}>详情</Button>]}>{item.title} · ￥{item.amount.toFixed(2)} · {item.status}</List.Item>} />,
         },
         {
           key: 'courses',
           label: '课程',
-          children: <List dataSource={courseItems} renderItem={(item) => <List.Item>{item.title} · 学习进度 {item.progress}%</List.Item>} />,
+          children: <List dataSource={courseItems} renderItem={(item) => <List.Item actions={[<Button key="detail" type="link" onClick={() => showDetail(item.title, [{ label: '课程进度', value: `${item.progress}%` }, { label: '关联评测', value: item.id }])}>详情</Button>]}>{item.title} · 学习进度 {item.progress}%</List.Item>} />,
         },
         {
           key: 'diary',
           label: '研学日记',
-          children: <Timeline items={diaryItems.map((item) => ({ children: <Space direction="vertical" size={2}><Text strong>{item.date} · {item.title}</Text><Text type="secondary">{item.content}</Text></Space> }))} />,
+          children: <Timeline items={diaryItems.map((item) => ({ children: <Space direction="vertical" size={2}><Button type="link" style={{ padding: 0 }} onClick={() => showDetail(item.title, [{ label: '日期', value: item.date }, { label: '内容', value: item.content }])}>{item.date} · {item.title}</Button><Text type="secondary">{item.content}</Text></Space> }))} />,
         },
         {
           key: 'growth-diary',
           label: '成长日记',
-          children: <Timeline items={growthDiaryItems.map((item) => ({ children: <Space direction="vertical" size={2}><Text strong>{item.date} · {item.title}</Text><Text type="secondary">{item.content}</Text></Space> }))} />,
+          children: <Timeline items={growthDiaryItems.map((item) => ({ children: <Space direction="vertical" size={2}><Button type="link" style={{ padding: 0 }} onClick={() => showDetail(item.title, [{ label: '日期', value: item.date }, { label: '内容', value: item.content }])}>{item.date} · {item.title}</Button><Text type="secondary">{item.content}</Text></Space> }))} />,
         },
       ]}
     />
+    <Drawer open={Boolean(detail)} title={detail?.title} onClose={() => setDetail(null)} width={520}>
+      {detail ? <Descriptions bordered column={1} size="small" items={detail.rows.map((item, index) => ({ key: String(index), label: item.label, children: item.value }))} /> : null}
+    </Drawer>
+    </>
   );
 }
 
 function StudentsPage() {
   const { state } = useAdminStore();
+  const searchParams = useSearchParams();
   const [detail, setDetail] = useState<StudentProfile | null>(null);
+  const studentIdParam = searchParams.get('studentId');
+
+  useEffect(() => {
+    if (!studentIdParam) return;
+    const nextDetail = state.students.find((item) => item.id === studentIdParam);
+    if (nextDetail) setDetail(nextDetail);
+  }, [studentIdParam, state.students]);
+
   const studyRanges = {
     '0': (value: number) => value === 0,
     '1': (value: number) => value === 1,
@@ -1946,6 +2051,7 @@ function StudentsPage() {
 function BasesPage({ mode }: { mode: AdminRole }) {
   const { state, actions } = useAdminStore();
   const { message } = App.useApp();
+  const router = useRouter();
   const { editorId, cityIds } = useCityScope();
   const [editing, setEditing] = useState<StudyBase | null>(null);
   const [open, setOpen] = useState(false);
@@ -2007,7 +2113,7 @@ function BasesPage({ mode }: { mode: AdminRole }) {
             render: (_, record: StudyBase) => (
               <Space>
                 <Button type="link" onClick={() => openEditor(record)}>编辑</Button>
-                <Button type="link" onClick={() => window.location.assign(`/task-library?baseId=${record.id}`)}>任务管理</Button>
+                <Button type="link" onClick={() => router.push(`/task-library?baseId=${record.id}`)}>任务管理</Button>
               </Space>
             ),
           },
@@ -2053,8 +2159,11 @@ function TaskLibraryPage({ mode }: { mode: AdminRole }) {
   const [editing, setEditing] = useState<TaskLibraryItem | null>(null);
   const [teamUsageTask, setTeamUsageTask] = useState<TaskLibraryItem | null>(null);
   const [studentUsageTask, setStudentUsageTask] = useState<TaskLibraryItem | null>(null);
+  const [copyCardOpen, setCopyCardOpen] = useState(false);
+  const [copyCard, setCopyCard] = useState<ExcellentTaskCard | null>(null);
   const [open, setOpen] = useState(false);
   const [form] = Form.useForm();
+  const [copyForm] = Form.useForm();
 
   const records = mode === 'city_maintainer' ? state.taskLibrary.filter((item) => cityIds.includes(item.city)) : state.taskLibrary;
 
@@ -2106,6 +2215,7 @@ function TaskLibraryPage({ mode }: { mode: AdminRole }) {
       <Button onClick={() => { actions.writeOperationLog({ role: '运营管理员', operatorName: '运营总控台', feature: '任务库', target: '机构文档导入', content: '导入 Word 文档并生成任务列表', result: '待确认' }); message.success('已解析文档：成功导入 8 条，待补充 2 条'); }}>机构文档导入</Button>
       <Button onClick={() => { actions.writeOperationLog({ role: '运营管理员', operatorName: '运营总控台', feature: '任务库', target: '异构文档导入', content: '调用智能解析生成任务字段', result: '待确认' }); message.success('已生成异构文档解析结果，等待人工确认'); }}>异构文档导入</Button>
       <Button onClick={() => { actions.writeOperationLog({ role: '运营管理员', operatorName: '运营总控台', feature: '任务库', target: '从研学团队复制', content: '检索团队任务并复制到任务库', result: '成功' }); message.success('已从团队复制 4 条任务到任务库'); }}>从团队复制</Button>
+      <Button onClick={() => setCopyCardOpen(true)}>从任务卡片复制</Button>
       <Button type="primary" onClick={() => openEditor()}>新增任务</Button>
     </>,
   );
@@ -2183,6 +2293,46 @@ function TaskLibraryPage({ mode }: { mode: AdminRole }) {
           ]}
         />
       </Drawer>
+      <Drawer open={copyCardOpen} title="从优秀任务卡片复制" onClose={() => { setCopyCardOpen(false); setCopyCard(null); }} width={760}>
+        <Space direction="vertical" size={16} style={{ width: '100%' }}>
+          <Alert showIcon type="info" message="可检索导师/家长创建的优秀任务卡片，修订后保存到任务库。" />
+          <Table
+            rowKey="id"
+            dataSource={state.excellentTaskCards}
+            pagination={false}
+            columns={[
+              { title: '来源', render: (_, record: ExcellentTaskCard) => `${record.creatorRole} · ${record.creatorName}` },
+              { title: '任务卡片', dataIndex: 'title' },
+              { title: '城市', dataIndex: 'city' },
+              { title: '评分', dataIndex: 'rating' },
+              { title: '使用次数', dataIndex: 'useCount' },
+              { title: '操作', render: (_, record: ExcellentTaskCard) => <Button type="link" onClick={() => { setCopyCard(record); copyForm.setFieldsValue({ name: record.title, city: record.city, baseId: record.baseId, typeId: record.taskTypeId, description: record.description, abilityTags: record.abilityTags, subjectTags: record.subjectTags, stageTags: record.stageTags, applyTo: ['团体研学'], workRequirements: record.workRequirements.map((item) => `${item.requirement}；数量：${item.quantity ?? 1}；评分参考：${item.scoringReference ?? '-'}`) }); }}>复制并修订</Button> },
+            ]}
+          />
+          {copyCard ? (
+            <Card title={`${copyCard.title} · 修订入库`}>
+              <Form form={copyForm} layout="vertical" onFinish={(values) => { actions.copyExcellentTaskCardToLibrary(copyCard.id, values); message.success('任务卡片已复制到任务库'); setCopyCardOpen(false); setCopyCard(null); }}>
+                <Row gutter={12}>
+                  <Col span={12}><Form.Item label="任务名称" name="name" rules={[{ required: true }]}><Input /></Form.Item></Col>
+                  <Col span={12}><Form.Item label="所在城市" name="city" rules={[{ required: true }]}><Input /></Form.Item></Col>
+                </Row>
+                <Row gutter={12}>
+                  <Col span={12}><Form.Item label="关联基地" name="baseId"><Select allowClear showSearch optionFilterProp="label" options={state.bases.map((item) => ({ label: item.name, value: item.id }))} /></Form.Item></Col>
+                  <Col span={12}><Form.Item label="任务类型" name="typeId"><Select showSearch optionFilterProp="label" options={state.taskTypes.map((item) => ({ label: item.name, value: item.id }))} /></Form.Item></Col>
+                </Row>
+                <Form.Item label="任务说明" name="description"><Input.TextArea rows={3} /></Form.Item>
+                <Form.Item label="作品要求（可多个）" name="workRequirements"><Select mode="tags" /></Form.Item>
+                <Form.Item label="能力方案" name="abilityTags"><Select mode="tags" /></Form.Item>
+                <Row gutter={12}>
+                  <Col span={12}><Form.Item label="参考答案" name="answer" initialValue={copyCard.answer}><Input.TextArea rows={2} /></Form.Item></Col>
+                  <Col span={12}><Form.Item label="评分标准" name="scoringStandard" initialValue={copyCard.scoringStandard}><Input.TextArea rows={2} /></Form.Item></Col>
+                </Row>
+                <Button type="primary" htmlType="submit">保存到任务库</Button>
+              </Form>
+            </Card>
+          ) : null}
+        </Space>
+      </Drawer>
     </Space>
   );
 }
@@ -2190,6 +2340,7 @@ function TaskLibraryPage({ mode }: { mode: AdminRole }) {
 function AuditsPage({ mode }: { mode: AdminRole }) {
   const { state, actions } = useAdminStore();
   const { message } = App.useApp();
+  const router = useRouter();
   const { editorId } = useCityScope();
   const [current, setCurrent] = useState<AuditRecord | null>(null);
   const [detail, setDetail] = useState<AuditRecord | null>(null);
@@ -2222,6 +2373,7 @@ function AuditsPage({ mode }: { mode: AdminRole }) {
       <SectionHeader
         title={mode === 'city_maintainer' ? '审核记录' : '数据审核'}
         subtitle={mode === 'city_maintainer' ? '查看本人提交后的审核结果与反馈。' : '审核兼职维护员提交的基地和任务记录。'}
+        actions={mode === 'operator' ? <Button onClick={() => router.push('/audit-records')}>查看审核记录</Button> : undefined}
       />
       {toolbar}
       {mode === 'city_maintainer' && returnedRecords.length > 0 ? (
@@ -2295,6 +2447,371 @@ function AuditsPage({ mode }: { mode: AdminRole }) {
           </Space>
         ) : null}
       </Drawer>
+    </Space>
+  );
+}
+
+type AuditHistoryWithContext = AuditHistoryRecord & {
+  city: string;
+  maintainerName: string;
+  maintainerPhone: string;
+  currentStatus: string;
+};
+
+function AuditRecordsPage() {
+  const { state, actions } = useAdminStore();
+  const { message } = App.useApp();
+  const [detail, setDetail] = useState<AuditHistoryWithContext | null>(null);
+
+  const historyRows = useMemo<AuditHistoryWithContext[]>(() => {
+    return state.auditHistories.map((record) => {
+      const audit = state.audits.find((item) => item.id === record.auditId);
+      const maintainer = state.partTimers.find((item) => item.name === audit?.maintainerName);
+      return {
+        ...record,
+        city: audit?.city ?? '-',
+        maintainerName: audit?.maintainerName ?? record.operatorName,
+        maintainerPhone: maintainer?.phone ?? '-',
+        currentStatus: audit?.status ?? record.status,
+      };
+    });
+  }, [state.auditHistories, state.audits, state.partTimers]);
+
+  const { filteredRecords: filteredAuditHistories, toolbar } = useListFilters<AuditHistoryWithContext>(
+    historyRows,
+    [
+      { name: 'keyword', label: '关键词', placeholder: '标题 / 审核说明 / 操作人', match: textMatcher((item) => item.title, (item) => item.note, (item) => item.operatorName) },
+      { name: 'targetType', label: '数据类型', type: 'select', options: makeOptions(historyRows.map((item) => item.targetType)), match: equalsMatcher((item) => item.targetType) },
+      { name: 'status', label: '当前状态', type: 'select', options: makeOptions(historyRows.map((item) => item.currentStatus)), match: equalsMatcher((item) => item.currentStatus) },
+      { name: 'action', label: '动作类型', type: 'select', options: makeOptions(historyRows.map((item) => item.action)), match: equalsMatcher((item) => item.action) },
+      { name: 'maintainerPhone', label: '维护员手机号', placeholder: '例如 1380000', match: textMatcher((item) => item.maintainerPhone) },
+      { name: 'city', label: '城市', type: 'select', options: makeOptions(historyRows.map((item) => item.city)), match: equalsMatcher((item) => item.city) },
+    ],
+  );
+
+  return (
+    <Space direction="vertical" size={16} style={{ width: '100%' }}>
+      <SectionHeader title="审核记录" subtitle="查询基地与任务的审核流转记录，支持查看退回原因与重新提交轨迹。" />
+      {toolbar}
+      <Card>
+        <Table<AuditHistoryWithContext>
+          rowKey="id"
+          dataSource={filteredAuditHistories}
+          columns={[
+            { title: '数据类型', dataIndex: 'targetType' },
+            { title: '标题', dataIndex: 'title' },
+            { title: '省份', render: () => '广东省' },
+            { title: '城市', dataIndex: 'city' },
+            { title: '维护员', dataIndex: 'maintainerName' },
+            { title: '手机号', dataIndex: 'maintainerPhone' },
+            { title: '操作动作', dataIndex: 'action' },
+            { title: '当前状态', dataIndex: 'currentStatus', render: (value: string) => <Tag color={statusColor(value)}>{value}</Tag> },
+            { title: '时间', dataIndex: 'operatedAt' },
+            { title: '说明', dataIndex: 'note' },
+            {
+              title: '操作',
+              render: (_, record) => (
+                <Space>
+                  <Button type="link" onClick={() => setDetail(record)}>详情</Button>
+                  <Button
+                    type="link"
+                    disabled={record.currentStatus !== '退回修改'}
+                    onClick={() => {
+                      actions.resubmitAudit(record.auditId);
+                      message.success('已按退回意见重新提交审核');
+                    }}
+                  >
+                    重新提交
+                  </Button>
+                </Space>
+              ),
+            },
+          ]}
+        />
+      </Card>
+      <Drawer open={Boolean(detail)} title={detail ? `${detail.title} · 审核详情` : '审核详情'} onClose={() => setDetail(null)} width={700}>
+        {detail ? (
+          <Space direction="vertical" size={16} style={{ width: '100%' }}>
+            <Descriptions bordered column={1} size="small" items={[
+              { key: '1', label: '数据类型', children: detail.targetType },
+              { key: '2', label: '审核对象', children: detail.title },
+              { key: '3', label: '城市', children: `广东省 / ${detail.city}` },
+              { key: '4', label: '维护员', children: `${detail.maintainerName} / ${detail.maintainerPhone}` },
+              { key: '5', label: '当前状态', children: <Tag color={statusColor(detail.currentStatus)}>{detail.currentStatus}</Tag> },
+            ]} />
+            <Card title="流转时间线">
+              <Timeline
+                items={state.auditHistories
+                  .filter((item) => item.auditId === detail.auditId)
+                  .sort((a, b) => b.operatedAt.localeCompare(a.operatedAt))
+                  .map((item) => ({
+                    children: `${item.operatedAt} · ${item.operatorName} · ${item.action} · ${item.note}`,
+                  }))}
+              />
+            </Card>
+          </Space>
+        ) : null}
+      </Drawer>
+    </Space>
+  );
+}
+
+function ExpertEntryAuditsPage() {
+  const { state, actions } = useAdminStore();
+  const { message } = App.useApp();
+  const [detail, setDetail] = useState<ExpertEntryAuditRecord | null>(null);
+  const [reviewTarget, setReviewTarget] = useState<ExpertEntryAuditRecord | null>(null);
+  const [reviewForm] = Form.useForm();
+
+  const { filteredRecords: filteredExpertEntryAudits, toolbar } = useListFilters<ExpertEntryAuditRecord>(
+    state.expertEntryAudits,
+    [
+      { name: 'keyword', label: '专家关键词', placeholder: '姓名 / 手机号 / 机构 / 方向', match: textMatcher((item) => item.expertName, (item) => item.phone, (item) => item.organizationName, (item) => item.specialty) },
+      { name: 'status', label: '审核状态', type: 'select', options: makeOptions(state.expertEntryAudits.map((item) => item.status)), match: equalsMatcher((item) => item.status) },
+      { name: 'submittedAt', label: '提交日期', placeholder: '例如 2026-04', match: textMatcher((item) => item.submittedAt) },
+    ],
+  );
+
+  function submit(values: { status: '退回修改' | '已确认'; note: string }) {
+    if (!reviewTarget) return;
+    actions.reviewExpertEntryAudit(reviewTarget.id, values.status, values.note);
+    message.success('入驻审核结果已保存');
+    setReviewTarget(null);
+  }
+
+  return (
+    <Space direction="vertical" size={16} style={{ width: '100%' }}>
+      <SectionHeader title="专家入驻审核" subtitle="审核专家资质、课程方向与运营资料，支持通过和退回修改。" />
+      {toolbar}
+      <Card>
+        <Table<ExpertEntryAuditRecord>
+          rowKey="id"
+          dataSource={filteredExpertEntryAudits}
+          columns={[
+            { title: '专家姓名', dataIndex: 'expertName' },
+            { title: '手机号', dataIndex: 'phone' },
+            { title: '机构名称', dataIndex: 'organizationName' },
+            { title: '专业方向', dataIndex: 'specialty' },
+            { title: '提交时间', dataIndex: 'submittedAt' },
+            { title: '状态', dataIndex: 'status', render: (value: string) => <Tag color={statusColor(value)}>{value}</Tag> },
+            { title: '审核信息', dataIndex: 'note' },
+            {
+              title: '操作',
+              render: (_, record) => (
+                <Space>
+                  <Button type="link" onClick={() => setDetail(record)}>详情</Button>
+                  <Button
+                    type="link"
+                    disabled={record.status !== '待审核'}
+                    onClick={() => {
+                      setReviewTarget(record);
+                      reviewForm.setFieldsValue({ status: '已确认', note: record.note || '资质与课程方向审核通过' });
+                    }}
+                  >
+                    审核
+                  </Button>
+                </Space>
+              ),
+            },
+          ]}
+        />
+      </Card>
+      <Drawer open={Boolean(detail)} title={detail ? `${detail.expertName} · 入驻资料` : '入驻资料'} onClose={() => setDetail(null)} width={560}>
+        {detail ? (
+          <Descriptions bordered column={1} size="small" items={[
+            { key: '1', label: '专家姓名', children: detail.expertName },
+            { key: '2', label: '手机号', children: detail.phone },
+            { key: '3', label: '机构名称', children: detail.organizationName },
+            { key: '4', label: '专业方向', children: detail.specialty },
+            { key: '5', label: '提交时间', children: detail.submittedAt },
+            { key: '6', label: '审核状态', children: <Tag color={statusColor(detail.status)}>{detail.status}</Tag> },
+            { key: '7', label: '审核信息', children: detail.note || '-' },
+          ]} />
+        ) : null}
+      </Drawer>
+      <Modal open={Boolean(reviewTarget)} title={reviewTarget ? `${reviewTarget.expertName} · 审核处理` : '审核处理'} onCancel={() => setReviewTarget(null)} onOk={() => reviewForm.submit()}>
+        <Form form={reviewForm} layout="vertical" onFinish={submit}>
+          <Form.Item label="审核结果" name="status" rules={[{ required: true, message: '请选择审核结果' }]}>
+            <Select options={['已确认', '退回修改'].map((value) => ({ label: value, value }))} />
+          </Form.Item>
+          <Form.Item label="审核说明" name="note" rules={[{ required: true, message: '请输入审核说明' }]}>
+            <Input.TextArea rows={4} />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </Space>
+  );
+}
+
+function CourseStructurePage() {
+  const { state, actions } = useAdminStore();
+  const { message } = App.useApp();
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<CourseStructureNode | null>(null);
+  const [form] = Form.useForm();
+
+  function openEditor(record?: CourseStructureNode) {
+    setEditing(record ?? null);
+    setOpen(true);
+    form.setFieldsValue(record ?? { courseId: state.courses[0]?.id, nodeType: '章', durationMinutes: 0, status: '启用' });
+  }
+
+  function submit(values: Omit<CourseStructureNode, 'id'>) {
+    actions.saveCourseStructureNode(values, editing?.id);
+    message.success(editing ? '课程节点已更新' : '课程节点已新增');
+    setOpen(false);
+  }
+
+  const { filteredRecords: filteredCourseStructures, toolbar } = useListFilters<CourseStructureNode>(
+    state.courseStructures,
+    [
+      { name: 'keyword', label: '架构关键词', placeholder: '章节名称 / 课程名称', match: textMatcher((item) => item.title, (item) => state.courses.find((course) => course.id === item.courseId)?.title) },
+      { name: 'courseId', label: '课程名称', type: 'select', options: state.courses.map((item) => ({ label: item.title, value: item.id })), match: equalsMatcher((item) => item.courseId) },
+      { name: 'nodeType', label: '节点类型', type: 'select', options: makeOptions(state.courseStructures.map((item) => item.nodeType)), match: equalsMatcher((item) => item.nodeType) },
+      { name: 'status', label: '状态', type: 'select', options: makeOptions(state.courseStructures.map((item) => item.status)), match: equalsMatcher((item) => item.status) },
+    ],
+    <>
+      <Button onClick={() => router.push('/courses')}>课程管理</Button>
+      <Button onClick={() => router.push('/course-orders')}>课程订单</Button>
+      <Button type="primary" onClick={() => openEditor()}>新增节点</Button>
+    </>,
+  );
+
+  return (
+    <Space direction="vertical" size={16} style={{ width: '100%' }}>
+      <SectionHeader title="课程架构" subtitle="维护课程章节目录与课时结构，支持章节增改和状态管理。" />
+      {toolbar}
+      <Card>
+        <Table<CourseStructureNode>
+          rowKey="id"
+          dataSource={filteredCourseStructures}
+          columns={[
+            { title: '课程名称', render: (_, record) => state.courses.find((item) => item.id === record.courseId)?.title ?? record.courseId },
+            { title: '节点名称', dataIndex: 'title' },
+            { title: '节点类型', dataIndex: 'nodeType' },
+            { title: '上级节点', render: (_, record) => state.courseStructures.find((item) => item.id === record.parentId)?.title ?? '-' },
+            { title: '时长(分钟)', dataIndex: 'durationMinutes' },
+            { title: '状态', dataIndex: 'status', render: (value: string) => <Tag color={statusColor(value)}>{value}</Tag> },
+            { title: '操作', render: (_, record) => <Button type="link" onClick={() => openEditor(record)}>编辑</Button> },
+          ]}
+        />
+      </Card>
+      <Drawer open={open} title={editing ? '编辑课程节点' : '新增课程节点'} onClose={() => setOpen(false)} width={520}>
+        <Form form={form} layout="vertical" onFinish={submit}>
+          <Form.Item label="课程" name="courseId" rules={[{ required: true, message: '请选择课程' }]}>
+            <Select showSearch optionFilterProp="label" options={state.courses.map((item) => ({ label: item.title, value: item.id }))} />
+          </Form.Item>
+          <Form.Item label="上级节点" name="parentId">
+            <Select allowClear showSearch optionFilterProp="label" options={state.courseStructures.map((item) => ({ label: item.title, value: item.id }))} />
+          </Form.Item>
+          <Row gutter={12}>
+            <Col span={12}><Form.Item label="节点类型" name="nodeType" rules={[{ required: true, message: '请选择节点类型' }]}><Select options={['章', '节', '课时'].map((value) => ({ label: value, value }))} /></Form.Item></Col>
+            <Col span={12}><Form.Item label="状态" name="status" rules={[{ required: true, message: '请选择状态' }]}><Select options={['启用', '停用'].map((value) => ({ label: value, value }))} /></Form.Item></Col>
+          </Row>
+          <Form.Item label="节点名称" name="title" rules={[{ required: true, message: '请输入节点名称' }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item label="时长(分钟)" name="durationMinutes" rules={[{ required: true, message: '请输入时长' }]}>
+            <InputNumber min={0} style={{ width: '100%' }} />
+          </Form.Item>
+          <Button type="primary" htmlType="submit">保存节点</Button>
+        </Form>
+      </Drawer>
+    </Space>
+  );
+}
+
+function CourseOrdersPage() {
+  const { state, actions } = useAdminStore();
+  const { message } = App.useApp();
+  const router = useRouter();
+  const [detail, setDetail] = useState<CourseOrderRecord | null>(null);
+  const [reviewTarget, setReviewTarget] = useState<CourseOrderRecord | null>(null);
+  const [reviewForm] = Form.useForm();
+
+  const { filteredRecords: filteredCourseOrders, toolbar } = useListFilters<CourseOrderRecord>(
+    state.courseOrders,
+    [
+      { name: 'keyword', label: '订单关键词', placeholder: '订单号 / 课程 / 学员 / 手机号', match: textMatcher((item) => item.id, (item) => item.courseTitle, (item) => item.buyerName, (item) => item.phone) },
+      { name: 'courseId', label: '课程名称', type: 'select', options: state.courses.map((item) => ({ label: item.title, value: item.id })), match: equalsMatcher((item) => item.courseId) },
+      { name: 'status', label: '订单状态', type: 'select', options: makeOptions(state.courseOrders.map((item) => item.status)), match: equalsMatcher((item) => item.status) },
+      { name: 'paidAt', label: '下单时间', placeholder: '例如 2026-04', match: textMatcher((item) => item.paidAt) },
+    ],
+    <>
+      <Button onClick={() => router.push('/courses')}>课程管理</Button>
+      <Button onClick={() => router.push('/course-structure')}>课程架构</Button>
+    </>,
+  );
+
+  function submit(values: { status: CourseOrderRecord['status']; reason?: string }) {
+    if (!reviewTarget) return;
+    actions.updateCourseOrderStatus(reviewTarget.id, values.status, values.reason);
+    message.success('课程订单状态已更新');
+    setReviewTarget(null);
+    reviewForm.resetFields();
+  }
+
+  return (
+    <Space direction="vertical" size={16} style={{ width: '100%' }}>
+      <SectionHeader title="课程订单" subtitle="查看课程订单明细，处理退款申请并同步订单状态。" />
+      {toolbar}
+      <Card>
+        <Table<CourseOrderRecord>
+          rowKey="id"
+          dataSource={filteredCourseOrders}
+          columns={[
+            { title: '订单编号', dataIndex: 'id' },
+            { title: '课程名称', dataIndex: 'courseTitle' },
+            { title: '购买学员', dataIndex: 'buyerName' },
+            { title: '手机号', dataIndex: 'phone' },
+            { title: '订单金额', dataIndex: 'amount', render: (value: number) => `￥${value}` },
+            { title: '支付时间', dataIndex: 'paidAt' },
+            { title: '状态', dataIndex: 'status', render: (value: string) => <Tag color={statusColor(value)}>{value}</Tag> },
+            { title: '退款原因', dataIndex: 'refundReason', render: (value?: string) => value || '-' },
+            {
+              title: '操作',
+              render: (_, record) => (
+                <Space>
+                  <Button type="link" onClick={() => setDetail(record)}>详情</Button>
+                  {record.status === '已支付' ? (
+                    <Button type="link" onClick={() => { setReviewTarget(record); reviewForm.setFieldsValue({ status: '退款中', reason: '' }); }}>发起退款</Button>
+                  ) : null}
+                  {record.status === '退款中' ? (
+                    <>
+                      <Button type="link" onClick={() => { setReviewTarget(record); reviewForm.setFieldsValue({ status: '已退款', reason: record.refundReason || '' }); }}>确认退款</Button>
+                      <Button type="link" onClick={() => { setReviewTarget(record); reviewForm.setFieldsValue({ status: '已支付', reason: '退款申请驳回，订单恢复已支付' }); }}>驳回退款</Button>
+                    </>
+                  ) : null}
+                </Space>
+              ),
+            },
+          ]}
+        />
+      </Card>
+      <Drawer open={Boolean(detail)} title={detail ? `${detail.id} · 订单详情` : '订单详情'} onClose={() => setDetail(null)} width={560}>
+        {detail ? (
+          <Descriptions bordered column={1} size="small" items={[
+            { key: '1', label: '订单编号', children: detail.id },
+            { key: '2', label: '课程名称', children: detail.courseTitle },
+            { key: '3', label: '购买学员', children: `${detail.buyerName} / ${detail.phone}` },
+            { key: '4', label: '订单金额', children: `￥${detail.amount}` },
+            { key: '5', label: '支付时间', children: detail.paidAt },
+            { key: '6', label: '状态', children: <Tag color={statusColor(detail.status)}>{detail.status}</Tag> },
+            { key: '7', label: '退款原因', children: detail.refundReason || '-' },
+          ]} />
+        ) : null}
+      </Drawer>
+      <Modal open={Boolean(reviewTarget)} title={reviewTarget ? `${reviewTarget.id} · 订单处理` : '订单处理'} onCancel={() => setReviewTarget(null)} onOk={() => reviewForm.submit()}>
+        <Form form={reviewForm} layout="vertical" onFinish={submit}>
+          <Form.Item label="处理结果" name="status" rules={[{ required: true, message: '请选择处理结果' }]}>
+            <Select options={['已支付', '退款中', '已退款'].map((value) => ({ label: value, value }))} />
+          </Form.Item>
+          <Form.Item label="处理说明" name="reason">
+            <Input.TextArea rows={4} />
+          </Form.Item>
+        </Form>
+      </Modal>
     </Space>
   );
 }
@@ -2669,6 +3186,7 @@ function DevicesPage() {
     [
       { name: 'keyword', label: '设备关键词', placeholder: '序列号 / 批次 / 最近动作', match: textMatcher((item) => item.serialNumber, (item) => item.batch, (item) => item.lastAction) },
       { name: 'batch', label: '批次', type: 'select', options: makeOptions(state.devices.map((item) => item.batch)), match: equalsMatcher((item) => item.batch) },
+      { name: 'warehouseId', label: '所在分仓', type: 'select', options: state.warehouses.map((item) => ({ label: item.name, value: item.id })), match: equalsMatcher((item) => item.warehouseId) },
       { name: 'status', label: '设备状态', type: 'select', options: makeOptions(state.devices.map((item) => item.status)), match: equalsMatcher((item) => item.status) },
       { name: 'movementDate', label: '出入库日期', placeholder: '例如 2026-05', match: textMatcher((item) => item.lastMovementDate) },
     ],
@@ -2681,6 +3199,7 @@ function DevicesPage() {
         <Table rowKey="id" dataSource={filteredDevices} pagination={{ pageSize: 8 }} columns={[
           { title: '序列号', dataIndex: 'serialNumber' },
           { title: '批次', dataIndex: 'batch' },
+          { title: '所在分仓', render: (_, record: any) => state.warehouses.find((item) => item.id === record.warehouseId)?.name ?? '-' },
           { title: '状态', dataIndex: 'status', render: (value: string) => <Tag color={statusColor(value)}>{value}</Tag> },
           { title: '最后出入库日期', dataIndex: 'lastMovementDate' },
           { title: '租赁次数', dataIndex: 'rentalTimes' },
@@ -2721,6 +3240,7 @@ function SalesOnlinePage() {
   const [current, setCurrent] = useState<any>(null);
   const [logisticsUploadOpen, setLogisticsUploadOpen] = useState(false);
   const [form] = Form.useForm();
+  const [returnForm] = Form.useForm();
   const warehouseAllowed = canUse(state.demoRole, ['warehouse']);
   const { filteredRecords: filteredOnlineSales, toolbar } = useListFilters<any>(
     state.onlineSales,
@@ -2754,6 +3274,7 @@ function SalesOnlinePage() {
           { title: '手机号', dataIndex: 'phone' },
           { title: '订单时间', dataIndex: 'orderDate' },
           { title: '订单状态', dataIndex: 'status', render: (value: string) => <Tag color={statusColor(value)}>{value}</Tag> },
+          { title: '发货分仓', render: (_, record: any) => state.warehouses.find((item) => item.id === record.warehouseId)?.name ?? '-' },
           { title: '订购数量', dataIndex: 'quantity' },
           { title: '实付金额', dataIndex: 'paidAmount' },
           { title: '发货时间', dataIndex: 'shippedAt' },
@@ -2779,6 +3300,33 @@ function SalesOnlinePage() {
                 <Button disabled={!warehouseAllowed} type="primary" htmlType="submit">确认发货</Button>
               </Form>
             </Card>
+            <Card title="退货处理">
+              <Descriptions size="small" column={1} items={[
+                { key: 'status', label: '退货状态', children: current.status === '退货中' || current.status === '收到退货' ? current.status : '未发起' },
+                { key: 'express', label: '退货物流', children: current.returnExpressCompany ? `${current.returnExpressCompany} ${current.returnExpressNo}` : '-' },
+                { key: 'received', label: '收到退货时间', children: current.returnReceivedAt ?? '-' },
+              ]} />
+              <Divider />
+              <Form
+                form={returnForm}
+                layout="vertical"
+                initialValues={{ status: current.status === '收到退货' ? '收到退货' : '退货中', expressCompany: current.returnExpressCompany, expressNo: current.returnExpressNo, note: current.returnNote }}
+                onFinish={(values) => {
+                  actions.updateOnlineReturn(current.id, values.status, values.expressCompany, values.expressNo, values.note ?? '');
+                  message.success(values.status === '收到退货' ? '已确认收到退货，设备已回到分仓库存' : '退货物流已登记');
+                  setCurrent(null);
+                  returnForm.resetFields();
+                }}
+              >
+                <Row gutter={12}>
+                  <Col span={8}><Form.Item label="退货状态" name="status"><Select options={['退货中', '收到退货'].map((value) => ({ label: value, value }))} /></Form.Item></Col>
+                  <Col span={8}><Form.Item label="物流公司" name="expressCompany" rules={[{ required: true, message: '请输入物流公司' }]}><Input /></Form.Item></Col>
+                  <Col span={8}><Form.Item label="物流单号" name="expressNo" rules={[{ required: true, message: '请输入物流单号' }]}><Input /></Form.Item></Col>
+                </Row>
+                <Form.Item label="处理备注" name="note"><Input.TextArea rows={2} /></Form.Item>
+                <Button type="primary" htmlType="submit">保存退货状态</Button>
+              </Form>
+            </Card>
           </Space>
         ) : null}
       </Drawer>
@@ -2786,8 +3334,9 @@ function SalesOnlinePage() {
         open={logisticsUploadOpen}
         title="导入物流信息 Excel"
         accept=".xls,.xlsx"
-        description="上传快递系统回传的物流 Excel，系统模拟更新订单物流状态、发货时间和设备出库。"
+        description="上传快递系统回传的物流 Excel，系统将更新订单物流状态、发货时间和设备出库。"
         resultName="WL"
+        template={{ filename: '在线销售物流导入模版.xlsx', sheetName: '物流信息', headers: ['订单号', '快递公司', '快递单号', '设备ID'], sample: { 订单号: 'sale-online-2', 快递公司: '顺丰速运', 快递单号: 'SF123456789', 设备ID: 'YXB-SZ-2026-0020' } }}
         onCancel={() => setLogisticsUploadOpen(false)}
         onConfirm={(fileName) => {
           actions.importOnlineLogistics(fileName);
@@ -2801,10 +3350,10 @@ function SalesOnlinePage() {
 function SalesEnterprisePage() {
   const { state, actions } = useAdminStore();
   const { message } = App.useApp();
+  const router = useRouter();
   const [current, setCurrent] = useState<any>(null);
   const [agreementUploadTarget, setAgreementUploadTarget] = useState<any>(null);
   const [form] = Form.useForm();
-  const [paymentForm] = Form.useForm();
   const freeDevices = state.devices.filter((item) => item.status === '库存');
   const salesAllowed = canUse(state.demoRole, ['sales']);
   const { filteredRecords: filteredEnterpriseSales, toolbar } = useListFilters<any>(
@@ -2835,7 +3384,7 @@ function SalesEnterprisePage() {
           { title: '总金额', dataIndex: 'totalAmount' },
           { title: '已收金额', dataIndex: 'paidAmount' },
           { title: '状态', dataIndex: 'status', render: (value: string) => <Tag color={statusColor(value)}>{value}</Tag> },
-          { title: '操作', render: (_, record: any) => <Space><Button type="link" onClick={() => { setCurrent(record); form.setFieldsValue({ serials: record.deviceSerials, status: record.status }); }}>详情</Button><Button type="link" disabled={!salesAllowed} onClick={() => { setCurrent(record); paymentForm.setFieldsValue({ method: '转账' }); }}>收款</Button><Button type="link" disabled={!salesAllowed} onClick={() => setAgreementUploadTarget(record)}>协议</Button></Space> },
+          { title: '操作', render: (_, record: any) => <Space><Button type="link" onClick={() => { setCurrent(record); form.setFieldsValue({ serials: record.deviceSerials, status: record.status }); }}>详情</Button><Button type="link" disabled={!salesAllowed} onClick={() => router.push(`/payment-center?sourceType=企业销售&orderId=${record.id}`)}>收款</Button><Button type="link" disabled={!salesAllowed} onClick={() => setAgreementUploadTarget(record)}>协议</Button></Space> },
         ]} />
       </Card>
       <Drawer open={Boolean(current)} title={current?.customerName} onClose={() => setCurrent(null)} width={620}>
@@ -2859,12 +3408,7 @@ function SalesEnterprisePage() {
             <Card title="收款记录">
               <List dataSource={current.payments} locale={{ emptyText: '暂无收款记录' }} renderItem={(item: any) => <List.Item>{item.createdAt} · {item.method} · {item.amount} 元 · <Tag color={statusColor(item.confirmationStatus)}>{item.confirmationStatus}</Tag>{item.voucherFile ? ` · ${item.voucherFile}` : ' · 待补传凭证'}</List.Item>} />
               <Divider />
-              <Form form={paymentForm} layout="inline" onFinish={(values) => { actions.addEnterprisePayment(current.id, values); message.success('收款记录已新增'); paymentForm.resetFields(); }}>
-                <Form.Item name="amount" rules={[{ required: true, message: '请输入金额' }]}><InputNumber min={1} placeholder="金额" /></Form.Item>
-                <Form.Item name="method" initialValue="转账"><Select style={{ width: 120 }} options={['转账', '扫码', '现金'].map((value) => ({ label: value, value }))} /></Form.Item>
-                <Form.Item name="note" rules={[{ required: true, message: '请输入摘要' }]}><Input placeholder="摘要" /></Form.Item>
-                <Button disabled={!salesAllowed} type="primary" htmlType="submit">录入收款</Button>
-              </Form>
+              <Button disabled={!salesAllowed} type="primary" onClick={() => router.push(`/payment-center?sourceType=企业销售&orderId=${current.id}`)}>去收款中心</Button>
             </Card>
             <Card title="协议与附件">
               <List
@@ -2882,7 +3426,7 @@ function SalesEnterprisePage() {
         open={Boolean(agreementUploadTarget)}
         title="上传企业销售协议"
         accept=".pdf,.doc,.docx,image/*"
-        description="上传采购协议、盖章合同或补充附件，系统模拟写入订单附件和上传结果。"
+        description="上传采购协议、盖章合同或补充附件，系统将写入订单附件和上传结果。"
         resultName="AG"
         onCancel={() => setAgreementUploadTarget(null)}
         onConfirm={(fileName) => {
@@ -2895,65 +3439,194 @@ function SalesEnterprisePage() {
   );
 }
 
-type FinancePaymentRow = {
-  id: string;
-  sourceType: '企业销售' | '租赁订单';
-  orderId: string;
-  orderTitle: string;
-  customerName: string;
-  saleOwner: string;
-  totalAmount: number;
-  paidAmount: number;
-  payment: PaymentRecord;
-};
+function PaymentCenterPage() {
+  const { state, actions } = useAdminStore();
+  const { message } = App.useApp();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const salesAllowed = canUse(state.demoRole, ['sales']);
+  const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState<PaymentCenterRecord | null>(null);
+  const [voucherTarget, setVoucherTarget] = useState<PaymentCenterRecord | null>(null);
+  const [createVoucherOpen, setCreateVoucherOpen] = useState(false);
+  const [form] = Form.useForm();
+  const sourceType = Form.useWatch('sourceType', form) as PaymentCenterRecord['sourceType'] | undefined;
+
+  const { filteredRecords: filteredPaymentCenterRecords, toolbar } = useListFilters<PaymentCenterRecord>(
+    state.paymentCenterRecords,
+    [
+      { name: 'keyword', label: '收款关键词', placeholder: '订单 / 客户 / 销售', match: textMatcher((item) => item.orderId, (item) => item.orderTitle, (item) => item.customerName, (item) => item.saleOwner) },
+      { name: 'sourceType', label: '来源类型', type: 'select', options: [{ label: '租赁订单', value: '租赁订单' }, { label: '企业销售', value: '企业销售' }], match: equalsMatcher((item) => item.sourceType) },
+      { name: 'status', label: '确认状态', type: 'select', options: makeOptions(state.paymentCenterRecords.map((item) => item.status)), match: equalsMatcher((item) => item.status) },
+      { name: 'saleOwner', label: '销售人员', type: 'select', options: makeOptions(state.paymentCenterRecords.map((item) => item.saleOwner)), match: equalsMatcher((item) => item.saleOwner) },
+    ],
+    <>
+      <Button onClick={() => router.push('/finance-confirmations')}>去财务确认</Button>
+      <Button type="primary" disabled={!salesAllowed} onClick={() => { setOpen(true); form.setFieldsValue({ sourceType: '租赁订单', method: '转账' }); }}>新增收款</Button>
+    </>,
+  );
+
+  const orderOptions = useMemo(() => {
+    if (sourceType === '企业销售') {
+      return state.enterpriseSales.map((item) => ({ label: `${item.id} · ${item.customerName}`, value: item.id }));
+    }
+    return state.rentalOrders.map((item) => ({ label: `${item.id} · ${item.teamName}`, value: item.id }));
+  }, [sourceType, state.enterpriseSales, state.rentalOrders]);
+
+  useEffect(() => {
+    const sourceTypeParam = searchParams.get('sourceType');
+    const orderId = searchParams.get('orderId');
+    if ((sourceTypeParam === '租赁订单' || sourceTypeParam === '企业销售') && orderId) {
+      setOpen(true);
+      form.setFieldsValue({ sourceType: sourceTypeParam, orderId, method: '转账' });
+    }
+  }, [form, searchParams]);
+
+  function submit(values: {
+    sourceType: '租赁订单' | '企业销售';
+    orderId: string;
+    amount: number;
+    method: PaymentRecord['method'];
+    note: string;
+    voucherFile?: string;
+  }) {
+    actions.createPaymentCenterRecord(values.sourceType, values.orderId, {
+      amount: values.amount,
+      method: values.method,
+      note: values.note,
+      voucherFile: values.voucherFile,
+    });
+    message.success('收款记录已提交，等待财务确认');
+    setOpen(false);
+    form.resetFields();
+  }
+
+  return (
+    <Space direction="vertical" size={16} style={{ width: '100%' }}>
+      <SectionHeader title="收款中心" subtitle="集中录入租赁订单与企业销售收款，上传票据后流转到财务到账确认。" />
+      <RolePermissionBanner demoRole={state.demoRole} roles={['sales']} scene="收款录入与票据补传" />
+      {toolbar}
+      <Card>
+        <Table<PaymentCenterRecord>
+          rowKey="id"
+          dataSource={filteredPaymentCenterRecords}
+          columns={[
+            { title: '来源类型', dataIndex: 'sourceType' },
+            { title: '订单编号', dataIndex: 'orderId' },
+            { title: '订单标题', dataIndex: 'orderTitle' },
+            { title: '客户/机构', dataIndex: 'customerName' },
+            { title: '销售人员', dataIndex: 'saleOwner' },
+            { title: '收款金额', dataIndex: 'amount', render: (value: number) => `￥${value}` },
+            { title: '收款方式', dataIndex: 'method' },
+            { title: '票据附件', render: (_, record) => record.voucherFile ?? <Tag color="warning">待补传</Tag> },
+            { title: '确认状态', dataIndex: 'status', render: (value: string) => <Tag color={statusColor(value)}>{value}</Tag> },
+            { title: '提交时间', dataIndex: 'createdAt' },
+            {
+              title: '操作',
+              render: (_, record) => (
+                <Space>
+                  <Button type="link" onClick={() => setDetail(record)}>详情</Button>
+                  <Button type="link" disabled={!salesAllowed} onClick={() => setVoucherTarget(record)}>补传票据</Button>
+                </Space>
+              ),
+            },
+          ]}
+        />
+      </Card>
+      <Drawer open={open} title="新增收款记录" onClose={() => setOpen(false)} width={520}>
+        <Form form={form} layout="vertical" onFinish={submit}>
+          <Form.Item label="来源类型" name="sourceType" rules={[{ required: true, message: '请选择来源类型' }]}>
+            <Select options={[{ label: '租赁订单', value: '租赁订单' }, { label: '企业销售', value: '企业销售' }]} />
+          </Form.Item>
+          <Form.Item label="订单选择" name="orderId" rules={[{ required: true, message: '请选择订单' }]}>
+            <Select showSearch optionFilterProp="label" options={orderOptions} />
+          </Form.Item>
+          <Row gutter={12}>
+            <Col span={12}><Form.Item label="收款金额" name="amount" rules={[{ required: true, message: '请输入金额' }]}><InputNumber min={1} style={{ width: '100%' }} /></Form.Item></Col>
+            <Col span={12}><Form.Item label="收款方式" name="method" rules={[{ required: true, message: '请选择收款方式' }]}><Select options={['转账', '扫码', '现金'].map((value) => ({ label: value, value }))} /></Form.Item></Col>
+          </Row>
+          <Form.Item label="票据附件" name="voucherFile">
+            <Input placeholder="可上传回单或收款截图" readOnly />
+          </Form.Item>
+          <Button onClick={() => setCreateVoucherOpen(true)} icon={<UploadOutlined />}>上传票据</Button>
+          <Divider />
+          <Form.Item label="收款备注" name="note"><Input.TextArea rows={4} /></Form.Item>
+          <Button type="primary" htmlType="submit" disabled={!salesAllowed}>提交财务确认</Button>
+        </Form>
+      </Drawer>
+      <Drawer open={Boolean(detail)} title={detail ? `${detail.orderId} 收款详情` : '收款详情'} onClose={() => setDetail(null)} width={620}>
+        {detail ? (
+          <Descriptions bordered column={1} size="small" items={[
+            { key: '1', label: '来源类型', children: detail.sourceType },
+            { key: '2', label: '订单信息', children: `${detail.orderId} · ${detail.orderTitle}` },
+            { key: '3', label: '客户/机构', children: detail.customerName },
+            { key: '4', label: '销售人员', children: detail.saleOwner },
+            { key: '5', label: '收款金额', children: `￥${detail.amount}` },
+            { key: '6', label: '收款方式', children: detail.method },
+            { key: '7', label: '票据附件', children: detail.voucherFile ?? '待补传' },
+            { key: '8', label: '确认状态', children: <Tag color={statusColor(detail.status)}>{detail.status}</Tag> },
+            { key: '9', label: '备注', children: detail.note || '-' },
+            { key: '10', label: '更新时间', children: detail.updatedAt },
+          ]} />
+        ) : null}
+      </Drawer>
+      <UploadMockModal
+        open={createVoucherOpen}
+        title="上传收款票据"
+        accept="image/*,.pdf"
+        description="上传回单或收款截图后，票据会自动写入当前收款记录。"
+        resultName="PAYMENT"
+        onCancel={() => setCreateVoucherOpen(false)}
+        onConfirm={(fileName) => {
+          form.setFieldValue('voucherFile', fileName);
+          message.success('票据已上传');
+          setCreateVoucherOpen(false);
+        }}
+      />
+      <UploadMockModal
+        open={Boolean(voucherTarget)}
+        title="补传收款票据"
+        accept="image/*,.pdf"
+        description="补传后将重新进入财务确认队列。"
+        resultName="PAYMENT"
+        onCancel={() => setVoucherTarget(null)}
+        onConfirm={(fileName) => {
+          if (!voucherTarget) return;
+          actions.updatePaymentCenterVoucher(voucherTarget.id, fileName);
+          message.success('票据已补传，等待财务确认');
+          setVoucherTarget(null);
+        }}
+      />
+    </Space>
+  );
+}
 
 function FinanceConfirmationsPage() {
   const { state, actions } = useAdminStore();
   const { message } = App.useApp();
-  const [detail, setDetail] = useState<FinancePaymentRow | null>(null);
-  const [voucherTarget, setVoucherTarget] = useState<FinancePaymentRow | null>(null);
+  const [detail, setDetail] = useState<PaymentCenterRecord | null>(null);
+  const [returnTarget, setReturnTarget] = useState<PaymentCenterRecord | null>(null);
+  const [returnForm] = Form.useForm();
   const financeAllowed = canUse(state.demoRole, ['finance']);
-  const salesAllowed = canUse(state.demoRole, ['sales']);
-  const rows = useMemo<FinancePaymentRow[]>(() => [
-    ...state.enterpriseSales.flatMap((order) => order.payments.map((payment) => ({
-      id: `enterprise-${order.id}-${payment.id}`,
-      sourceType: '企业销售' as const,
-      orderId: order.id,
-      orderTitle: order.id,
-      customerName: order.customerName,
-      saleOwner: order.saleOwner,
-      totalAmount: order.totalAmount,
-      paidAmount: order.paidAmount,
-      payment,
-    }))),
-    ...state.rentalOrders.flatMap((order) => order.payments.map((payment) => ({
-      id: `rental-${order.id}-${payment.id}`,
-      sourceType: '租赁订单' as const,
-      orderId: order.id,
-      orderTitle: order.teamName,
-      customerName: state.organizations.find((item) => item.id === order.organizationId)?.name ?? order.teamName,
-      saleOwner: order.saleOwner,
-      totalAmount: order.totalAmount,
-      paidAmount: order.paidAmount,
-      payment,
-    }))),
-  ], [state.enterpriseSales, state.organizations, state.rentalOrders]);
+  const rows = state.paymentCenterRecords;
 
-  function confirm(row: FinancePaymentRow) {
-    actions.confirmPayment(row.sourceType, row.orderId, row.payment.id);
+  function confirm(row: PaymentCenterRecord) {
+    actions.confirmPaymentCenterRecord(row.id);
     message.success('财务已确认到账，订单已收金额已同步');
     setDetail(null);
   }
 
-  function returnBack(row: FinancePaymentRow) {
-    actions.returnPayment(row.sourceType, row.orderId, row.payment.id, '凭证金额或到账账户需销售补充确认');
+  function returnBack(row: PaymentCenterRecord, reason: string) {
+    actions.returnPaymentCenterRecord(row.id, reason);
     message.warning('已退回销售补充凭证');
     setDetail(null);
+    setReturnTarget(null);
+    returnForm.resetFields();
   }
 
-  function table(dataSource: FinancePaymentRow[]) {
+  function table(dataSource: PaymentCenterRecord[]) {
     return (
-      <Table<FinancePaymentRow>
+      <Table<PaymentCenterRecord>
         rowKey="id"
         dataSource={dataSource}
         columns={[
@@ -2961,15 +3634,14 @@ function FinanceConfirmationsPage() {
           { title: '订单', render: (_, record) => `${record.orderId} · ${record.orderTitle}` },
           { title: '客户/机构', dataIndex: 'customerName' },
           { title: '销售录入人', dataIndex: 'saleOwner' },
-          { title: '收款金额', render: (_, record) => `￥${record.payment.amount}` },
-          { title: '凭证', render: (_, record) => record.payment.voucherFile ?? <Tag color="warning">待补传</Tag> },
-          { title: '确认状态', render: (_, record) => <Tag color={statusColor(record.payment.confirmationStatus)}>{record.payment.confirmationStatus}</Tag> },
+          { title: '收款金额', render: (_, record) => `￥${record.amount}` },
+          { title: '凭证', render: (_, record) => record.voucherFile ?? <Tag color="warning">待补传</Tag> },
+          { title: '确认状态', render: (_, record) => <Tag color={statusColor(record.status)}>{record.status}</Tag> },
           { title: '操作', render: (_, record) => (
             <Space>
               <Button type="link" onClick={() => setDetail(record)}>详情</Button>
-              <Button type="link" disabled={!salesAllowed} onClick={() => setVoucherTarget(record)}>补传凭证</Button>
-              <Button type="link" disabled={!financeAllowed || record.payment.confirmationStatus === '已确认'} onClick={() => confirm(record)}>确认到账</Button>
-              <Button type="link" danger disabled={!financeAllowed || record.payment.confirmationStatus === '已确认'} onClick={() => returnBack(record)}>退回修改</Button>
+              <Button type="link" disabled={!financeAllowed || record.status === '已确认'} onClick={() => confirm(record)}>确认到账</Button>
+              <Button type="link" danger disabled={!financeAllowed || record.status === '已确认'} onClick={() => { setReturnTarget(record); returnForm.setFieldsValue({ reason: record.note || '票据金额或到账账户需补充确认' }); }}>退回修改</Button>
             </Space>
           ) },
         ]}
@@ -2977,10 +3649,10 @@ function FinanceConfirmationsPage() {
     );
   }
 
-  const enterpriseRows = rows.filter((item) => item.sourceType === '企业销售' && item.payment.confirmationStatus === '待确认');
-  const rentalRows = rows.filter((item) => item.sourceType === '租赁订单' && item.payment.confirmationStatus === '待确认');
-  const confirmedRows = rows.filter((item) => item.payment.confirmationStatus === '已确认');
-  const returnedRows = rows.filter((item) => item.payment.confirmationStatus === '已退回');
+  const enterpriseRows = rows.filter((item) => item.sourceType === '企业销售' && item.status === '待确认');
+  const rentalRows = rows.filter((item) => item.sourceType === '租赁订单' && item.status === '待确认');
+  const confirmedRows = rows.filter((item) => item.status === '已确认');
+  const returnedRows = rows.filter((item) => item.status === '已退回');
 
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
@@ -3008,34 +3680,204 @@ function FinanceConfirmationsPage() {
             <Descriptions bordered column={1} size="small" items={[
               { key: '1', label: '来源订单', children: `${detail.sourceType} / ${detail.orderId}` },
               { key: '2', label: '客户/机构', children: detail.customerName },
-              { key: '3', label: '订单金额', children: `￥${detail.totalAmount}，当前已确认 ￥${detail.paidAmount}` },
-              { key: '4', label: '收款金额', children: `￥${detail.payment.amount}` },
-              { key: '5', label: '销售录入', children: `${detail.payment.recordedBy} · ${detail.payment.createdAt}` },
-              { key: '6', label: '凭证附件', children: detail.payment.voucherFile ?? '待销售补传' },
-              { key: '7', label: '财务状态', children: <Tag color={statusColor(detail.payment.confirmationStatus)}>{detail.payment.confirmationStatus}</Tag> },
-              { key: '8', label: '退回原因', children: detail.payment.returnedReason ?? '-' },
+              { key: '3', label: '收款金额', children: `￥${detail.amount}` },
+              { key: '4', label: '销售录入', children: `${detail.saleOwner} · ${detail.createdAt}` },
+              { key: '5', label: '凭证附件', children: detail.voucherFile ?? '待销售补传' },
+              { key: '6', label: '财务状态', children: <Tag color={statusColor(detail.status)}>{detail.status}</Tag> },
+              { key: '7', label: '退回原因', children: detail.status === '已退回' ? detail.note : '-' },
             ]} />
             <Space>
-              <Button disabled={!financeAllowed || detail.payment.confirmationStatus === '已确认'} type="primary" onClick={() => confirm(detail)}>确认到账</Button>
-              <Button disabled={!financeAllowed || detail.payment.confirmationStatus === '已确认'} danger onClick={() => returnBack(detail)}>退回修改</Button>
-              <Button disabled={!salesAllowed} onClick={() => setVoucherTarget(detail)}>补传凭证</Button>
+              <Button disabled={!financeAllowed || detail.status === '已确认'} type="primary" onClick={() => confirm(detail)}>确认到账</Button>
+              <Button disabled={!financeAllowed || detail.status === '已确认'} danger onClick={() => { setReturnTarget(detail); returnForm.setFieldsValue({ reason: detail.note || '票据金额或到账账户需补充确认' }); }}>退回修改</Button>
             </Space>
           </Space>
         ) : null}
       </Drawer>
+      <Modal
+        open={Boolean(returnTarget)}
+        title="退回修改"
+        onCancel={() => setReturnTarget(null)}
+        onOk={() => returnForm.submit()}
+      >
+        <Form form={returnForm} layout="vertical" onFinish={(values: { reason: string }) => { if (!returnTarget) return; returnBack(returnTarget, values.reason); }}>
+          <Form.Item label="退回原因" name="reason" rules={[{ required: true, message: '请输入退回原因' }]}>
+            <Input.TextArea rows={4} />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </Space>
+  );
+}
+
+function WarehousesPage() {
+  const { state, actions } = useAdminStore();
+  const { message } = App.useApp();
+  const warehouseAllowed = canUse(state.demoRole, ['warehouse']);
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<WarehouseRecord | null>(null);
+  const [uploadKind, setUploadKind] = useState<'inbound' | 'transfer' | null>(null);
+  const [form] = Form.useForm();
+
+  function openEditor(record?: WarehouseRecord) {
+    setEditing(record ?? null);
+    setOpen(true);
+    form.setFieldsValue(record ?? { province: '广东省', city: '深圳市', status: '启用', stock: 0, rentalStock: 0, serviceCities: [] });
+  }
+
+  function submit(values: Omit<WarehouseRecord, 'id'>) {
+    actions.saveWarehouse(values, editing?.id);
+    message.success(editing ? '分仓信息已更新' : '分仓已新增');
+    setOpen(false);
+  }
+
+  const { filteredRecords: filteredWarehouses, toolbar } = useListFilters<WarehouseRecord>(
+    state.warehouses,
+    [
+      { name: 'keyword', label: '分仓关键词', placeholder: '分仓名称 / 负责人 / 部门', match: textMatcher((item) => item.name, (item) => item.manager, (item) => item.departmentName) },
+      { name: 'province', label: '省份', type: 'select', options: makeOptions(state.warehouses.map((item) => item.province)), match: equalsMatcher((item) => item.province) },
+      { name: 'city', label: '城市', type: 'select', options: makeOptions(state.warehouses.map((item) => item.city)), match: equalsMatcher((item) => item.city) },
+      { name: 'status', label: '状态', type: 'select', options: makeOptions(state.warehouses.map((item) => item.status)), match: equalsMatcher((item) => item.status) },
+    ],
+    <>
+      <Button disabled={!warehouseAllowed} onClick={() => setUploadKind('inbound')}>设备入库导入</Button>
+      <Button disabled={!warehouseAllowed} onClick={() => setUploadKind('transfer')}>分仓调拨导入</Button>
+      <Button type="primary" disabled={!warehouseAllowed} onClick={() => openEditor()}>新增分仓</Button>
+    </>,
+  );
+
+  return (
+    <Space direction="vertical" size={16} style={{ width: '100%' }}>
+      <SectionHeader title="分仓管理" subtitle="维护分仓资料、覆盖城市、库存归属与设备入库调拨。" />
+      <RolePermissionBanner demoRole={state.demoRole} roles={['warehouse']} scene="分仓管理" />
+      {toolbar}
+      <Card title="分仓台账">
+        <Table<WarehouseRecord>
+          rowKey="id"
+          dataSource={filteredWarehouses}
+          columns={[
+            { title: '分仓名称', dataIndex: 'name' },
+            { title: '省份/城市', render: (_, record) => `${record.province} / ${record.city}` },
+            { title: '所属部门', dataIndex: 'departmentName' },
+            { title: '负责人', dataIndex: 'manager' },
+            { title: '覆盖城市', render: (_, record) => (record.serviceCities ?? []).join('、') || '-' },
+            { title: '可售库存', dataIndex: 'stock' },
+            { title: '租赁库存', dataIndex: 'rentalStock' },
+            { title: '联系电话', dataIndex: 'contactPhone' },
+            { title: '状态', dataIndex: 'status', render: (value: string) => <Tag color={statusColor(value)}>{value}</Tag> },
+            { title: '操作', render: (_, record) => <Button type="link" onClick={() => openEditor(record)}>编辑</Button> },
+          ]}
+        />
+      </Card>
+      <Drawer open={open} title={editing ? '编辑分仓' : '新增分仓'} onClose={() => setOpen(false)} width={560}>
+        <Form form={form} layout="vertical" onFinish={submit}>
+          <Row gutter={12}>
+            <Col span={12}><Form.Item label="分仓名称" name="name" rules={[{ required: true, message: '请输入分仓名称' }]}><Input /></Form.Item></Col>
+            <Col span={12}><Form.Item label="所属部门" name="departmentName" rules={[{ required: true, message: '请输入所属部门' }]}><Input /></Form.Item></Col>
+          </Row>
+          <Row gutter={12}>
+            <Col span={12}><Form.Item label="省份" name="province" rules={[{ required: true, message: '请输入省份' }]}><Input /></Form.Item></Col>
+            <Col span={12}><Form.Item label="城市" name="city" rules={[{ required: true, message: '请输入城市' }]}><Input /></Form.Item></Col>
+          </Row>
+          <Form.Item label="覆盖城市" name="serviceCities"><Select mode="tags" placeholder="例如：深圳市-南山区" /></Form.Item>
+          <Form.Item label="仓库地址" name="address"><Input /></Form.Item>
+          <Row gutter={12}>
+            <Col span={12}><Form.Item label="负责人" name="manager" rules={[{ required: true, message: '请输入负责人' }]}><Input /></Form.Item></Col>
+            <Col span={12}><Form.Item label="联系电话" name="contactPhone"><Input /></Form.Item></Col>
+          </Row>
+          <Row gutter={12}>
+            <Col span={8}><Form.Item label="可售库存" name="stock" rules={[{ required: true, message: '请输入库存' }]}><InputNumber min={0} style={{ width: '100%' }} /></Form.Item></Col>
+            <Col span={8}><Form.Item label="租赁库存" name="rentalStock" rules={[{ required: true, message: '请输入库存' }]}><InputNumber min={0} style={{ width: '100%' }} /></Form.Item></Col>
+            <Col span={8}><Form.Item label="状态" name="status" rules={[{ required: true, message: '请选择状态' }]}><Select options={['启用', '停用'].map((value) => ({ label: value, value }))} /></Form.Item></Col>
+          </Row>
+          <Button type="primary" htmlType="submit" disabled={!warehouseAllowed}>保存分仓</Button>
+        </Form>
+      </Drawer>
       <UploadMockModal
-        open={Boolean(voucherTarget)}
-        title="补传收款凭证"
-        accept="image/*,.pdf"
-        description="销售人员补传转账截图、银行回单或收款凭证后，记录回到待财务确认状态。"
-        resultName="VOUCHER"
-        onCancel={() => setVoucherTarget(null)}
-        onConfirm={(fileName) => {
-          if (!voucherTarget) return;
-          actions.supplementPaymentVoucher(voucherTarget.sourceType, voucherTarget.orderId, voucherTarget.payment.id, fileName);
-          message.success('收款凭证已补传，等待财务确认');
-        }}
+        open={uploadKind === 'inbound'}
+        title="分仓设备入库导入"
+        accept=".xls,.xlsx"
+        description="下载模版后导入设备入库清单，系统将更新分仓可售库存与设备台账。"
+        resultName="WAREHOUSE-IN"
+        template={{ filename: '分仓设备入库模版.xlsx', sheetName: '入库清单', headers: ['分仓名称', '设备序列号', '设备类型', '入库日期'], sample: { 分仓名称: '深圳南山分仓', 设备序列号: 'YXB-SZ-2026-0031', 设备类型: '标准设备', 入库日期: '2026-05-18' } }}
+        onCancel={() => setUploadKind(null)}
+        onConfirm={() => { actions.importInventoryDevices(); message.success('设备入库批次已处理'); }}
       />
+      <UploadMockModal
+        open={uploadKind === 'transfer'}
+        title="分仓调拨导入"
+        accept=".xls,.xlsx"
+        description="导入分仓调拨表，系统会同步更新设备分仓、库存日报与操作记录。"
+        resultName="WAREHOUSE-TR"
+        template={{ filename: '分仓调拨模版.xlsx', sheetName: '调拨清单', headers: ['调出分仓', '调入分仓', '设备序列号', '调拨日期'], sample: { 调出分仓: '深圳南山分仓', 调入分仓: '广州天河分仓', 设备序列号: 'YXB-SZ-2026-0008', 调拨日期: '2026-05-19' } }}
+        onCancel={() => setUploadKind(null)}
+        onConfirm={() => { actions.transferWarehouseStock(); message.success('分仓调拨批次已处理'); }}
+      />
+    </Space>
+  );
+}
+
+function WarehousePermissionsPage() {
+  const { state, actions } = useAdminStore();
+  const { message } = App.useApp();
+  const warehouseAllowed = canUse(state.demoRole, ['warehouse']);
+  const [permissionOpen, setPermissionOpen] = useState(false);
+  const [permissionEditing, setPermissionEditing] = useState<WarehousePermissionRecord | null>(null);
+  const [permissionForm] = Form.useForm();
+
+  function openPermission(record?: WarehousePermissionRecord) {
+    setPermissionEditing(record ?? null);
+    setPermissionOpen(true);
+    permissionForm.setFieldsValue(record ?? { subjectType: '员工', status: '启用', warehouseIds: [], permissions: ['查看'] });
+  }
+
+  function submitPermission(values: Omit<WarehousePermissionRecord, 'id'>) {
+    actions.saveWarehousePermission(values, permissionEditing?.id);
+    message.success(permissionEditing ? '分仓权限已更新' : '分仓权限已新增');
+    setPermissionOpen(false);
+  }
+
+  const { filteredRecords: filteredPermissions, toolbar: permissionToolbar } = useListFilters<WarehousePermissionRecord>(
+    state.warehousePermissions,
+    [
+      { name: 'keyword', label: '权限关键词', placeholder: '员工 / 部门', match: textMatcher((item) => item.subjectName, (item) => item.departmentName) },
+      { name: 'subjectType', label: '配置对象', type: 'select', options: [{ label: '员工', value: '员工' }, { label: '部门', value: '部门' }], match: equalsMatcher((item) => item.subjectType) },
+      { name: 'status', label: '状态', type: 'select', options: makeOptions(state.warehousePermissions.map((item) => item.status)), match: equalsMatcher((item) => item.status) },
+    ],
+    <Button type="primary" disabled={!warehouseAllowed} onClick={() => openPermission()}>新增权限</Button>,
+  );
+
+  return (
+    <Space direction="vertical" size={16} style={{ width: '100%' }}>
+      <SectionHeader title="分仓权限" subtitle="按员工或部门配置可查看、入库、调拨、发货、回收和确认租赁申请的分仓范围。" />
+      <RolePermissionBanner demoRole={state.demoRole} roles={['warehouse']} scene="分仓权限配置" />
+      {permissionToolbar}
+      <Card title="分仓权限配置">
+        <Table<WarehousePermissionRecord>
+          rowKey="id"
+          dataSource={filteredPermissions}
+          columns={[
+            { title: '配置对象', render: (_, record) => `${record.subjectType} · ${record.subjectName}` },
+            { title: '所属部门', dataIndex: 'departmentName' },
+            { title: '分仓范围', render: (_, record) => record.warehouseIds.map((id) => state.warehouses.find((item) => item.id === id)?.name ?? id).join('、') || '-' },
+            { title: '权限项', render: (_, record) => record.permissions.join('、') },
+            { title: '状态', dataIndex: 'status', render: (value: string) => <Tag color={statusColor(value)}>{value}</Tag> },
+            { title: '操作', render: (_, record) => <Button type="link" onClick={() => openPermission(record)}>编辑</Button> },
+          ]}
+        />
+      </Card>
+      <Drawer open={permissionOpen} title={permissionEditing ? '编辑分仓权限' : '新增分仓权限'} onClose={() => setPermissionOpen(false)} width={560}>
+        <Form form={permissionForm} layout="vertical" onFinish={submitPermission}>
+          <Row gutter={12}>
+            <Col span={12}><Form.Item label="配置对象" name="subjectType" rules={[{ required: true, message: '请选择配置对象' }]}><Select options={['员工', '部门'].map((value) => ({ label: value, value }))} /></Form.Item></Col>
+            <Col span={12}><Form.Item label="对象名称" name="subjectName" rules={[{ required: true, message: '请输入对象名称' }]}><Input /></Form.Item></Col>
+          </Row>
+          <Form.Item label="所属部门" name="departmentName" rules={[{ required: true, message: '请输入部门名称' }]}><Input /></Form.Item>
+          <Form.Item label="分仓范围" name="warehouseIds" rules={[{ required: true, message: '请选择分仓范围' }]}><Select mode="multiple" showSearch optionFilterProp="label" options={state.warehouses.map((item) => ({ label: item.name, value: item.id }))} /></Form.Item>
+          <Form.Item label="权限项" name="permissions" rules={[{ required: true, message: '请选择权限项' }]}><Select mode="multiple" options={['查看', '入库', '调拨', '发货', '回收', '确认租赁申请'].map((value) => ({ label: value, value }))} /></Form.Item>
+          <Form.Item label="状态" name="status" rules={[{ required: true, message: '请选择状态' }]}><Select options={['启用', '停用'].map((value) => ({ label: value, value }))} /></Form.Item>
+          <Button type="primary" htmlType="submit" disabled={!warehouseAllowed}>保存权限</Button>
+        </Form>
+      </Drawer>
     </Space>
   );
 }
@@ -3043,6 +3885,7 @@ function FinanceConfirmationsPage() {
 function SosPage() {
   const { state, actions } = useAdminStore();
   const { message } = App.useApp();
+  const router = useRouter();
   const [current, setCurrent] = useState<any>(null);
   const [form] = Form.useForm();
   const { filteredRecords: filteredSosAlerts, toolbar } = useListFilters<any>(
@@ -3066,12 +3909,29 @@ function SosPage() {
           { title: '操作', render: (_, record: any) => <Button type="link" onClick={() => { setCurrent(record); form.setFieldsValue(record); }}>处理</Button> },
         ]} />
       </Card>
-      <Drawer open={Boolean(current)} title={current?.studentName} onClose={() => setCurrent(null)} width={480}>
-        <Form form={form} layout="vertical" onFinish={(values) => { actions.updateSosStatus(current.id, values.status, values.note); message.success('处理结果已保存'); setCurrent(null); }}>
-          <Form.Item label="处理状态" name="status"><Select options={['未处理', '已联系'].map((value) => ({ label: value, value }))} /></Form.Item>
-          <Form.Item label="处理备注" name="note"><Input.TextArea rows={4} /></Form.Item>
-          <Button type="primary" htmlType="submit">保存处理结果</Button>
-        </Form>
+      <Drawer open={Boolean(current)} title={current?.studentName} onClose={() => setCurrent(null)} width={720}>
+        {current ? (
+          <Space direction="vertical" size={16} style={{ width: '100%' }}>
+            <Descriptions bordered column={1} size="small" items={[
+              { key: 'student', label: '学员信息', children: <Button type="link" onClick={() => router.push(`/students?studentId=${current.studentId}`)}>{current.studentName}</Button> },
+              { key: 'guardian', label: '家长信息', children: `${current.guardianName ?? '-'} / ${current.guardianPhone ?? '-'}` },
+              { key: 'device', label: '研学宝设备 ID', children: current.deviceId ?? '-' },
+              { key: 'phone', label: '绑定手机号', children: current.boundPhone ?? '-' },
+              { key: 'team', label: '当前研学团队', children: <Button type="link" disabled={!current.teamId} onClick={() => router.push(`/team-assignments?teamId=${current.teamId}`)}>{state.teams.find((item) => item.id === current.teamId)?.name ?? '-'}</Button> },
+              { key: 'mentor', label: '研学导师', children: <Button type="link" disabled={!current.mentorId} onClick={() => router.push(`/mentors?mentorId=${current.mentorId}`)}>{state.mentors.find((item) => item.id === current.mentorId)?.name ?? '-'}</Button> },
+              { key: 'location', label: '当前位置', children: current.location },
+              { key: 'audio', label: '录音摘要', children: current.audioSummary },
+            ]} />
+            <Card title="位置轨迹">
+              <Timeline items={(current.trackPoints ?? []).map((item: { time: string; location: string }) => ({ children: `${item.time} · ${item.location}` }))} />
+            </Card>
+            <Form form={form} layout="vertical" onFinish={(values) => { actions.updateSosStatus(current.id, values.status, values.note); message.success('处理结果已保存'); setCurrent(null); }}>
+              <Form.Item label="处理状态" name="status"><Select options={['未处理', '已联系'].map((value) => ({ label: value, value }))} /></Form.Item>
+              <Form.Item label="处理备注" name="note"><Input.TextArea rows={4} /></Form.Item>
+              <Button type="primary" htmlType="submit">保存处理结果</Button>
+            </Form>
+          </Space>
+        ) : null}
       </Drawer>
     </Space>
   );
@@ -3081,6 +3941,31 @@ function CoursesPage() {
   const { state, actions } = useAdminStore();
   const { message } = App.useApp();
   const [detail, setDetail] = useState<any>(null);
+  const [editing, setEditing] = useState<any>(null);
+  const [form] = Form.useForm();
+
+  function openEditor(record: any) {
+    setEditing(record);
+    form.setFieldsValue(record);
+  }
+
+  function submit(values: any) {
+    if (!editing) return;
+    actions.saveCourse(
+      {
+        ...editing,
+        ...values,
+        price: Number(values.price ?? editing.price),
+        sales: Number(values.sales ?? editing.sales ?? 0),
+        views: Number(values.views ?? editing.views ?? 0),
+        studentCount: Number(values.studentCount ?? editing.studentCount ?? 0),
+      },
+      editing.id,
+    );
+    message.success('课程信息已更新');
+    setEditing(null);
+  }
+
   const { filteredRecords: filteredCourses, toolbar } = useListFilters<any>(
     state.courses,
     [
@@ -3108,7 +3993,7 @@ function CoursesPage() {
           { title: '浏览量', dataIndex: 'views' },
           { title: '销售量', dataIndex: 'sales' },
           { title: '状态', dataIndex: 'status', render: (value: string) => <Tag color={statusColor(value)}>{value}</Tag> },
-          { title: '操作', render: (_, record: any) => <Space><Button type="link" onClick={() => setDetail(record)}>详情</Button><Button type="link" onClick={() => actions.toggleCourseStatus(record.id)}>{record.status === '已上架' ? '下架' : '上架'}</Button></Space> },
+          { title: '操作', render: (_, record: any) => <Space><Button type="link" onClick={() => setDetail(record)}>详情</Button><Button type="link" onClick={() => openEditor(record)}>编辑</Button><Button type="link" onClick={() => actions.toggleCourseStatus(record.id)}>{record.status === '已上架' ? '下架' : '上架'}</Button></Space> },
         ]} />
       </Card>
       <Drawer open={Boolean(detail)} title={detail?.title} onClose={() => setDetail(null)} width={620}>
@@ -3128,6 +4013,46 @@ function CoursesPage() {
             </Card>
           </Space>
         ) : null}
+      </Drawer>
+      <Drawer open={Boolean(editing)} title={editing ? `${editing.title} · 编辑课程信息` : '编辑课程信息'} onClose={() => setEditing(null)} width={560}>
+        <Form form={form} layout="vertical" onFinish={submit}>
+          <Form.Item label="课程名称" name="title" rules={[{ required: true, message: '请输入课程名称' }]}>
+            <Input />
+          </Form.Item>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item label="专家姓名" name="expertName" rules={[{ required: true, message: '请输入专家姓名' }]}>
+                <Input />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="课程类型" name="type" rules={[{ required: true, message: '请选择课程类型' }]}>
+                <Select options={['线上课程', '线下课程'].map((value) => ({ label: value, value }))} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item label="课程价格" name="price" rules={[{ required: true, message: '请输入课程价格' }]}>
+                <InputNumber min={0} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="课程状态" name="status" rules={[{ required: true, message: '请选择课程状态' }]}>
+                <Select options={['创建中', '审核中', '已审核', '已上架', '下架中', '已下架', '已结束'].map((value) => ({ label: value, value }))} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={12}>
+            <Col span={8}><Form.Item label="学员数" name="studentCount"><InputNumber min={0} style={{ width: '100%' }} /></Form.Item></Col>
+            <Col span={8}><Form.Item label="浏览量" name="views"><InputNumber min={0} style={{ width: '100%' }} /></Form.Item></Col>
+            <Col span={8}><Form.Item label="销售量" name="sales"><InputNumber min={0} style={{ width: '100%' }} /></Form.Item></Col>
+          </Row>
+          <Space>
+            <Button type="primary" htmlType="submit">保存课程信息</Button>
+            <Button onClick={() => setEditing(null)}>取消</Button>
+          </Space>
+        </Form>
       </Drawer>
     </Space>
   );
@@ -3295,23 +4220,85 @@ function AgentsPage() {
 }
 
 function CapabilityElementsPage() {
-  const { state } = useAdminStore();
+  const { state, actions } = useAdminStore();
+  const { message } = App.useApp();
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<CapabilityElement | null>(null);
+  const [form] = Form.useForm();
+
+  function openEditor(record?: CapabilityElement) {
+    setEditing(record ?? null);
+    setOpen(true);
+    form.setFieldsValue(record ?? { plane: '自主发展', indicator: '目标管理', name: '', description: '', enabled: true });
+  }
+
+  function submit(values: Omit<CapabilityElement, 'id'>) {
+    actions.saveCapabilityElement(values, editing?.id);
+    message.success(editing ? '能力元素已更新' : '能力元素已新增');
+    setOpen(false);
+  }
+
+  const { filteredRecords: filteredCapabilityElements, toolbar } = useListFilters<CapabilityElement>(
+    state.capabilityElements,
+    [
+      { name: 'keyword', label: '元素关键词', placeholder: '维度 / 指标 / 元素名称', match: textMatcher((item) => item.plane, (item) => item.indicator, (item) => item.name) },
+      { name: 'plane', label: '能力维度', type: 'select', options: makeOptions(state.capabilityElements.map((item) => item.plane)), match: equalsMatcher((item) => item.plane) },
+      { name: 'indicator', label: '能力指标', type: 'select', options: makeOptions(state.capabilityElements.map((item) => item.indicator)), match: equalsMatcher((item) => item.indicator) },
+      { name: 'enabled', label: '状态', type: 'select', options: [{ label: '启用', value: true }, { label: '停用', value: false }], match: equalsMatcher((item) => item.enabled) },
+    ],
+    <Button type="primary" onClick={() => openEditor()}>新增能力元素</Button>,
+  );
 
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
-      <SectionHeader title="能力元素" subtitle="维护四个维度、16 个能力指标与 48 个能力元素，能力映射已独立为同级功能。" />
-      <Row gutter={[16, 16]}>
+      <SectionHeader title="能力元素" subtitle="维护 4 个维度、16 个能力指标与 48 个能力元素，保存后同步能力映射和学员能力展示。" />
+      {toolbar}
+      <Row gutter={[12, 12]}>
         {['自主发展', '科技素养', '创新发展', '社会参与'].map((plane) => {
           const planeElements = state.capabilityElements.filter((item) => item.plane === plane);
           return (
-            <Col span={12} key={plane}>
-              <Card title={`${plane} · ${new Set(planeElements.map((item) => item.indicator)).size} 个指标 / ${planeElements.length} 个元素`}>
-                <List dataSource={planeElements} renderItem={(item) => <List.Item>{item.indicator} · {item.name}</List.Item>} />
+            <Col span={6} key={plane}>
+              <Card size="small">
+                <Statistic title={plane} value={planeElements.length} suffix={`个元素 / ${new Set(planeElements.map((item) => item.indicator)).size} 指标`} />
               </Card>
             </Col>
           );
         })}
       </Row>
+      <Card>
+        <Table<CapabilityElement>
+          rowKey="id"
+          dataSource={filteredCapabilityElements}
+          pagination={{ pageSize: 12 }}
+          columns={[
+            { title: '能力维度', dataIndex: 'plane' },
+            { title: '能力指标', dataIndex: 'indicator' },
+            { title: '能力元素', dataIndex: 'name' },
+            { title: '状态', render: (_, record) => <Tag color={record.enabled ? 'success' : 'error'}>{record.enabled ? '启用' : '停用'}</Tag> },
+            { title: '操作', render: (_, record) => <Button type="link" onClick={() => openEditor(record)}>编辑</Button> },
+          ]}
+        />
+      </Card>
+      <Drawer open={open} title={editing ? '编辑能力元素' : '新增能力元素'} onClose={() => setOpen(false)} width={520}>
+        <Form form={form} layout="vertical" onFinish={submit}>
+          <Form.Item label="能力维度" name="plane" rules={[{ required: true, message: '请选择能力维度' }]}>
+            <Select options={['自主发展', '科技素养', '创新发展', '社会参与'].map((value) => ({ label: value, value }))} />
+          </Form.Item>
+          <Form.Item label="能力指标" name="indicator" rules={[{ required: true, message: '请输入能力指标' }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item label="能力元素名称" name="name" rules={[{ required: true, message: '请输入能力元素名称' }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item label="元素说明" name="description">
+            <Input />
+          </Form.Item>
+          <Form.Item label="状态" name="enabled" rules={[{ required: true, message: '请选择状态' }]}>
+            <Select options={[{ label: '启用', value: true }, { label: '停用', value: false }]} />
+          </Form.Item>
+          <Button type="primary" htmlType="submit">保存能力元素</Button>
+        </Form>
+      </Drawer>
     </Space>
   );
 }
@@ -3382,10 +4369,63 @@ function CapabilityMappingsPage() {
 
 function QuestionBankPage() {
   const { state, actions } = useAdminStore();
+  const { message } = App.useApp();
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | undefined>();
   const [form] = Form.useForm();
-  const { filteredRecords: filteredQuestionBank, toolbar } = useListFilters<any>(
+  const questionType = Form.useWatch('type', form) as QuestionBankItem['type'] | undefined;
+
+  function openEditor(record?: QuestionBankItem) {
+    setEditingId(record?.id);
+    setOpen(true);
+    form.setFieldsValue(record ?? {
+      category: '学员自测',
+      type: '单选',
+      title: '',
+      element: '',
+      options: [
+        { id: 'new-option-a', label: 'A', content: '', isCorrect: true },
+        { id: 'new-option-b', label: 'B', content: '', isCorrect: false },
+      ],
+      analysis: '',
+      answer: '',
+      scoringStandard: '',
+      status: '创建中',
+    });
+  }
+
+  function submit(values: QuestionBankItem) {
+    const needOptions = values.type === '单选' || values.type === '判断';
+    const normalizedOptions = (values.options ?? [])
+      .map((item, index) => ({
+        id: item.id || `option-${Date.now()}-${index}`,
+        label: item.label || String.fromCharCode(65 + index),
+        content: item.content?.trim() ?? '',
+        isCorrect: Boolean(item.isCorrect),
+      }))
+      .filter((item) => item.content);
+    if (needOptions && normalizedOptions.length < 2) {
+      message.warning('单选和判断题至少需要两个候选答案');
+      return;
+    }
+    if (needOptions && !normalizedOptions.some((item) => item.isCorrect)) {
+      message.warning('请设置一个正确答案');
+      return;
+    }
+    const correctOption = normalizedOptions.find((item) => item.isCorrect);
+    actions.saveQuestionBankItem(
+      {
+        ...values,
+        options: needOptions ? normalizedOptions : [],
+        answer: needOptions ? `${correctOption?.label ?? ''}` : values.answer,
+      },
+      editingId,
+    );
+    message.success(editingId ? '题目已更新' : '题目已新增');
+    setOpen(false);
+  }
+
+  const { filteredRecords: filteredQuestionBank, toolbar } = useListFilters<QuestionBankItem>(
     state.questionBank,
     [
       { name: 'keyword', label: '题目关键词', placeholder: '题目 / 能力元素', match: textMatcher((item) => item.title, (item) => item.element) },
@@ -3393,31 +4433,87 @@ function QuestionBankPage() {
       { name: 'type', label: '题型', type: 'select', options: makeOptions(state.questionBank.map((item) => item.type)), match: equalsMatcher((item) => item.type) },
       { name: 'status', label: '状态', type: 'select', options: makeOptions(state.questionBank.map((item) => item.status)), match: equalsMatcher((item) => item.status) },
     ],
-    <Button type="primary" onClick={() => { setOpen(true); setEditingId(undefined); form.resetFields(); }}>新增题目</Button>,
+    <Button type="primary" onClick={() => openEditor()}>新增题目</Button>,
   );
+
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
-      <SectionHeader title="能力题库" subtitle="维护学员自测与家长评测题库。" />
+      <SectionHeader title="能力题库" subtitle="维护学员自测、家长评测与天赋测试题库，支持候选答案、答案解析与评分标准。" />
       {toolbar}
       <Card>
-        <Table rowKey="id" dataSource={filteredQuestionBank} columns={[
-          { title: '分类', dataIndex: 'category' },
-          { title: '题型', dataIndex: 'type' },
-          { title: '题目', dataIndex: 'title' },
-          { title: '能力元素', dataIndex: 'element' },
-          { title: '答案', dataIndex: 'answer' },
-          { title: '评分标准', dataIndex: 'scoringStandard' },
-          { title: '状态', dataIndex: 'status', render: (value: string) => <Tag color={statusColor(value)}>{value}</Tag> },
-          { title: '操作', render: (_, record: any) => <Button type="link" onClick={() => { setEditingId(record.id); setOpen(true); form.setFieldsValue(record); }}>编辑</Button> },
-        ]} />
+        <Table<QuestionBankItem>
+          rowKey="id"
+          dataSource={filteredQuestionBank}
+          columns={[
+            { title: '分类', dataIndex: 'category' },
+            { title: '题型', dataIndex: 'type' },
+            { title: '题目', dataIndex: 'title' },
+            { title: '能力元素', dataIndex: 'element' },
+            { title: '候选答案', render: (_, record) => record.options?.length ?? 0 },
+            { title: '正确答案', dataIndex: 'answer' },
+            { title: '评分标准', dataIndex: 'scoringStandard' },
+            { title: '状态', dataIndex: 'status', render: (value: string) => <Tag color={statusColor(value)}>{value}</Tag> },
+            { title: '操作', render: (_, record) => <Button type="link" onClick={() => openEditor(record)}>编辑</Button> },
+          ]}
+        />
       </Card>
-      <Drawer open={open} title={editingId ? '编辑题目' : '新增题目'} onClose={() => setOpen(false)} width={520}>
-        <Form form={form} layout="vertical" onFinish={(values) => { actions.saveQuestionBankItem(values, editingId); setOpen(false); }}>
-          <Form.Item label="分类" name="category"><Select options={['学员自测', '家长评测', '天赋测试'].map((value) => ({ label: value, value }))} /></Form.Item>
-          <Form.Item label="题型" name="type"><Select options={['单选', '判断', '问答', 'AI问答'].map((value) => ({ label: value, value }))} /></Form.Item>
-          <Form.Item label="题目" name="title"><Input.TextArea rows={4} /></Form.Item>
-          <Form.Item label="能力元素" name="element"><Input /></Form.Item>
-          <Form.Item label="答案" name="answer"><Input.TextArea rows={3} /></Form.Item>
+      <Drawer open={open} title={editingId ? '编辑题目' : '新增题目'} onClose={() => setOpen(false)} width={620}>
+        <Form form={form} layout="vertical" onFinish={submit}>
+          <Row gutter={12}>
+            <Col span={12}><Form.Item label="分类" name="category" rules={[{ required: true, message: '请选择分类' }]}><Select options={['学员自测', '家长评测', '天赋测试'].map((value) => ({ label: value, value }))} /></Form.Item></Col>
+            <Col span={12}><Form.Item label="题型" name="type" rules={[{ required: true, message: '请选择题型' }]}><Select options={['单选', '判断', '问答', 'AI问答'].map((value) => ({ label: value, value }))} /></Form.Item></Col>
+          </Row>
+          <Form.Item label="题目" name="title" rules={[{ required: true, message: '请输入题目' }]}><Input.TextArea rows={4} /></Form.Item>
+          <Form.Item label="能力元素" name="element" rules={[{ required: true, message: '请输入能力元素' }]}><Input /></Form.Item>
+          {questionType === '单选' || questionType === '判断' ? (
+            <Form.List name="options">
+              {(fields, { add, remove }) => (
+                <Card size="small" title="候选答案">
+                  <Space direction="vertical" style={{ width: '100%' }}>
+                    {fields.map((field, index) => (
+                      <Row gutter={8} key={field.key}>
+                        <Col span={4}>
+                          <Form.Item {...field} label={index === 0 ? '标签' : undefined} name={[field.name, 'label']} rules={[{ required: true, message: '请输入标签' }]}>
+                            <Input placeholder="A" />
+                          </Form.Item>
+                        </Col>
+                        <Col span={13}>
+                          <Form.Item {...field} label={index === 0 ? '选项内容' : undefined} name={[field.name, 'content']} rules={[{ required: true, message: '请输入选项内容' }]}>
+                            <Input placeholder="请输入候选答案内容" />
+                          </Form.Item>
+                        </Col>
+                        <Col span={5}>
+                          <Form.Item label={index === 0 ? '正确项' : undefined}>
+                            <Checkbox
+                              checked={Boolean(form.getFieldValue(['options', field.name, 'isCorrect']))}
+                              onChange={(event) => {
+                                const options = (form.getFieldValue('options') ?? []) as Array<{ isCorrect?: boolean }>;
+                                form.setFieldValue(
+                                  'options',
+                                  options.map((item, itemIndex) => ({ ...item, isCorrect: event.target.checked && itemIndex === field.name })),
+                                );
+                              }}
+                            >
+                              正确
+                            </Checkbox>
+                          </Form.Item>
+                        </Col>
+                        <Col span={2}>
+                          {fields.length > 2 ? (
+                            <Button danger onClick={() => remove(field.name)}>删</Button>
+                          ) : null}
+                        </Col>
+                      </Row>
+                    ))}
+                    <Button onClick={() => add({ label: String.fromCharCode(65 + fields.length), content: '', isCorrect: false })}>新增候选答案</Button>
+                  </Space>
+                </Card>
+              )}
+            </Form.List>
+          ) : (
+            <Form.Item label="参考答案" name="answer"><Input.TextArea rows={3} /></Form.Item>
+          )}
+          <Form.Item label="答案解析" name="analysis"><Input.TextArea rows={3} /></Form.Item>
           <Form.Item label="评分标准" name="scoringStandard"><Input.TextArea rows={3} /></Form.Item>
           <Form.Item label="状态" name="status" initialValue="创建中"><Select options={['创建中', '启用', '草稿', '停用'].map((value) => ({ label: value, value }))} /></Form.Item>
           <Button type="primary" htmlType="submit">保存题目</Button>
@@ -3653,8 +4749,14 @@ export function OperatorPageRenderer({ page }: { page: OperatorPageKey }) {
       return <TeamTasksPage />;
     case 'rental-orders':
       return <RentalOrdersPage />;
+    case 'payment-center':
+      return <PaymentCenterPage />;
     case 'finance-confirmations':
       return <FinanceConfirmationsPage />;
+    case 'warehouses':
+      return <WarehousesPage />;
+    case 'warehouse-permissions':
+      return <WarehousePermissionsPage />;
     case 'inventory':
       return <InventoryPage />;
     case 'students':
@@ -3665,6 +4767,8 @@ export function OperatorPageRenderer({ page }: { page: OperatorPageKey }) {
       return <TaskLibraryPage mode="operator" />;
     case 'audits':
       return <AuditsPage mode="operator" />;
+    case 'audit-records':
+      return <AuditRecordsPage />;
     case 'team-photos':
       return <TeamPhotosPage />;
     case 'task-types':
@@ -3685,8 +4789,14 @@ export function OperatorPageRenderer({ page }: { page: OperatorPageKey }) {
       return <SalesEnterprisePage />;
     case 'sos':
       return <SosPage />;
+    case 'expert-entry-audits':
+      return <ExpertEntryAuditsPage />;
     case 'courses':
       return <CoursesPage />;
+    case 'course-structure':
+      return <CourseStructurePage />;
+    case 'course-orders':
+      return <CourseOrdersPage />;
     case 'qa-records':
       return <QaRecordsPage />;
     case 'knowledge':

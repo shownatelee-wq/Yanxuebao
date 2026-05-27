@@ -46,14 +46,21 @@ export type OperatorPageKey =
   | 'task-import'
   | 'part-timers'
   | 'audits'
+  | 'audit-records'
   | 'performance'
   | 'rental-orders'
   | 'finance-confirmations'
+  | 'payment-center'
+  | 'warehouses'
+  | 'warehouse-permissions'
   | 'inventory'
   | 'devices'
   | 'sales-online'
   | 'sales-enterprise'
   | 'courses'
+  | 'expert-entry-audits'
+  | 'course-structure'
+  | 'course-orders'
   | 'qa-records'
   | 'knowledge'
   | 'agents'
@@ -112,6 +119,7 @@ export const operatorNavigation: Array<{
       { key: 'task-import', title: '智能录入', subtitle: '批量导入与智能入库流程', icon: <HistoryOutlined /> },
       { key: 'part-timers', title: '兼职人员', subtitle: '授权城市与工作权限', icon: <TeamOutlined /> },
       { key: 'audits', title: '数据审核', subtitle: '基地与任务审核队列', icon: <FileProtectOutlined /> },
+      { key: 'audit-records', title: '审核记录', subtitle: '审核流转记录查询', icon: <ProfileOutlined /> },
       { key: 'performance', title: '业绩统计', subtitle: '维护数量、通过率与导出', icon: <FundProjectionScreenOutlined /> },
     ],
   },
@@ -119,7 +127,10 @@ export const operatorNavigation: Array<{
     section: '设备与订单',
     items: [
       { key: 'rental-orders', title: '租赁订单', subtitle: '租赁、交付、回收与收款', icon: <ShoppingCartOutlined /> },
+      { key: 'payment-center', title: '收款中心', subtitle: '销售收款与票据附件', icon: <WalletOutlined /> },
       { key: 'finance-confirmations', title: '财务确认', subtitle: '企业与租赁收款到账确认', icon: <WalletOutlined /> },
+      { key: 'warehouses', title: '分仓管理', subtitle: '分仓资料与库存归属', icon: <DatabaseOutlined /> },
+      { key: 'warehouse-permissions', title: '分仓权限', subtitle: '员工与部门分仓权限', icon: <SafetyOutlined /> },
       { key: 'inventory', title: '进销存总览', subtitle: '库存日报与状态汇总', icon: <DatabaseOutlined /> },
       { key: 'devices', title: '设备台账', subtitle: '序列号池与生命周期', icon: <DatabaseOutlined /> },
       { key: 'sales-online', title: '在线销售', subtitle: '商城订单与发货', icon: <ShopOutlined /> },
@@ -129,7 +140,10 @@ export const operatorNavigation: Array<{
   {
     section: '专家内容运营',
     items: [
+      { key: 'expert-entry-audits', title: '专家入驻审核', subtitle: '专家资料审核与退回', icon: <FileProtectOutlined /> },
       { key: 'courses', title: '课程管理', subtitle: '审核、上架与数据看板', icon: <BookOutlined /> },
+      { key: 'course-structure', title: '课程架构', subtitle: '章节目录与课时管理', icon: <ClusterOutlined /> },
+      { key: 'course-orders', title: '课程订单', subtitle: '订单明细与退款处理', icon: <ShoppingCartOutlined /> },
       { key: 'qa-records', title: '问答记录', subtitle: '匹配情况与补充答案', icon: <MessageOutlined /> },
       { key: 'knowledge', title: '知识库', subtitle: '知识条目与资讯发布', icon: <NotificationOutlined /> },
       { key: 'agents', title: '智能体管理', subtitle: '参数、统计与知识库关联', icon: <ToolOutlined /> },

@@ -10,7 +10,7 @@ export type PhotoRecognitionStatus = '识别中' | '已关联' | '待修正';
 export type AuditStatus = '录入中' | '待审核' | '退回修改' | '已确认';
 export type DeviceStatus = '库存' | '库存-租赁' | '已销售' | '租赁中' | '已回收' | '故障' | '保修中' | '报废' | '遗失' | '丢失';
 export type RentalOrderStatus = '意向' | '已预订' | '已交付' | '已回收' | '已取消';
-export type SaleOrderStatus = '待发货' | '已发货' | '已完成' | '退款中' | '已退款';
+export type SaleOrderStatus = '待发货' | '已发货' | '已完成' | '退款中' | '已退款' | '退货中' | '收到退货';
 export type DemoRole = 'operator' | 'sales' | 'finance' | 'warehouse';
 export type PaymentConfirmationStatus = '待确认' | '已确认' | '已退回';
 
@@ -67,6 +67,8 @@ export type WorkRequirement = {
   id: string;
   type: 'text' | 'choice' | 'judge' | 'image' | 'video' | 'audio' | 'link';
   requirement: string;
+  quantity?: number;
+  scoringReference?: string;
 };
 
 export type TeamTask = {
@@ -267,6 +269,10 @@ export type RentalOrder = {
   deviceSerials: string[];
   payments: PaymentRecord[];
   note: string;
+  warehouseId?: string;
+  warehouseName?: string;
+  paymentRecordIds?: string[];
+  attachmentIds?: string[];
 };
 
 export type OnlineSaleOrder = {
@@ -283,6 +289,11 @@ export type OnlineSaleOrder = {
   address: string;
   expressCompany?: string;
   expressNo?: string;
+  warehouseId?: string;
+  returnExpressCompany?: string;
+  returnExpressNo?: string;
+  returnReceivedAt?: string;
+  returnNote?: string;
 };
 
 export type EnterpriseSaleOrder = {
@@ -300,6 +311,9 @@ export type EnterpriseSaleOrder = {
   status: '洽谈' | '已签约' | '意向' | '已预订' | '已交付' | '已取消';
   deviceSerials: string[];
   payments: PaymentRecord[];
+  warehouseId?: string;
+  paymentRecordIds?: string[];
+  attachmentIds?: string[];
 };
 
 export type InventoryDaily = {
@@ -391,6 +405,13 @@ export type SosAlert = {
   audioSummary: string;
   status: '未处理' | '已联系';
   note: string;
+  deviceId?: string;
+  boundPhone?: string;
+  teamId?: string;
+  mentorId?: string;
+  guardianName?: string;
+  guardianPhone?: string;
+  trackPoints?: Array<{ time: string; location: string }>;
 };
 
 export type CourseRecord = {
@@ -464,6 +485,8 @@ export type QuestionBankItem = {
   title: string;
   element: string;
   answer?: string;
+  options?: Array<{ id: string; label: string; content: string; isCorrect: boolean }>;
+  analysis?: string;
   scoringStandard?: string;
   status: '创建中' | '启用' | '草稿' | '停用';
 };
@@ -519,9 +542,107 @@ export type WarehouseRecord = {
   name: string;
   province: string;
   city: string;
+  departmentId?: string;
+  departmentName?: string;
+  serviceCities?: string[];
+  status?: EntityStatus;
+  address?: string;
+  contactPhone?: string;
   manager: string;
   stock: number;
   rentalStock: number;
+};
+
+export type WarehousePermissionRecord = {
+  id: string;
+  subjectType: '员工' | '部门';
+  subjectName: string;
+  departmentName: string;
+  warehouseIds: string[];
+  permissions: Array<'查看' | '入库' | '调拨' | '发货' | '回收' | '确认租赁申请'>;
+  status: EntityStatus;
+};
+
+export type PaymentCenterRecord = {
+  id: string;
+  sourceType: '租赁订单' | '企业销售';
+  orderId: string;
+  orderTitle: string;
+  customerName: string;
+  saleOwner: string;
+  paymentId: string;
+  amount: number;
+  method: PaymentRecord['method'];
+  voucherFile?: string;
+  note: string;
+  status: PaymentConfirmationStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ExpertEntryAuditRecord = {
+  id: string;
+  expertName: string;
+  phone: string;
+  organizationName: string;
+  specialty: string;
+  submittedAt: string;
+  status: AuditStatus;
+  note: string;
+};
+
+export type CourseStructureNode = {
+  id: string;
+  courseId: string;
+  parentId?: string;
+  title: string;
+  nodeType: '章' | '节' | '课时';
+  durationMinutes: number;
+  status: EntityStatus;
+};
+
+export type CourseOrderRecord = {
+  id: string;
+  courseId: string;
+  courseTitle: string;
+  buyerName: string;
+  phone: string;
+  amount: number;
+  paidAt: string;
+  status: '已支付' | '退款中' | '已退款';
+  refundReason?: string;
+};
+
+export type ExcellentTaskCard = {
+  id: string;
+  creatorRole: '导师' | '家长';
+  creatorName: string;
+  city: string;
+  title: string;
+  taskTypeId: string;
+  baseId?: string;
+  description: string;
+  abilityTags: string[];
+  subjectTags: string[];
+  stageTags: string[];
+  workRequirements: WorkRequirement[];
+  answer: string;
+  scoringStandard: string;
+  useCount: number;
+  rating: number;
+};
+
+export type AuditHistoryRecord = {
+  id: string;
+  auditId: string;
+  targetType: '基地' | '任务';
+  targetId: string;
+  title: string;
+  operatorName: string;
+  action: '提交' | '通过' | '退回' | '重新提交';
+  status: AuditStatus;
+  note: string;
+  operatedAt: string;
 };
 
 export type ContractRecord = {
@@ -600,8 +721,15 @@ export type AdminConsoleState = {
   demoRole: DemoRole;
   operationDailyRecords: OperationDailyRecord[];
   warehouses: WarehouseRecord[];
+  warehousePermissions: WarehousePermissionRecord[];
   contracts: ContractRecord[];
   attachments: AttachmentRecord[];
+  paymentCenterRecords: PaymentCenterRecord[];
+  expertEntryAudits: ExpertEntryAuditRecord[];
+  courseStructures: CourseStructureNode[];
+  courseOrders: CourseOrderRecord[];
+  excellentTaskCards: ExcellentTaskCard[];
+  auditHistories: AuditHistoryRecord[];
   uploadResults: UploadResultRecord[];
   rentalDeviceBatches: RentalDeviceBatch[];
   operationLogs: OperationLog[];
@@ -662,6 +790,8 @@ type AdminStoreActions = {
   ) => void;
   reviewAudit: (auditId: string, status: Extract<AuditStatus, '退回修改' | '已确认'>, note: string) => void;
   savePartTimer: (payload: Omit<PartTimer, 'id' | 'baseCount' | 'taskCount' | 'passedCount'>, partTimerId?: string) => void;
+  saveWarehouse: (payload: Omit<WarehouseRecord, 'id'>, warehouseId?: string) => void;
+  saveWarehousePermission: (payload: Omit<WarehousePermissionRecord, 'id'>, permissionId?: string) => void;
   createRentalOrder: (payload: Omit<RentalOrder, 'id' | 'createdAt' | 'payments'>) => void;
   updateRentalOrderStatus: (orderId: string, status: RentalOrderStatus, deviceSerials: string[], note: string) => void;
   addRentalPayment: (orderId: string, payment: PaymentInput) => void;
@@ -676,13 +806,19 @@ type AdminStoreActions = {
   transferWarehouseStock: (fileName?: string) => void;
   importOnlineLogistics: (fileName?: string) => void;
   shipOnlineSale: (orderId: string, deviceSerials: string[], expressCompany: string, expressNo: string) => void;
+  updateOnlineReturn: (orderId: string, status: Extract<SaleOrderStatus, '退货中' | '收到退货'>, expressCompany: string, expressNo: string, note: string) => void;
   createEnterpriseSaleDraft: () => void;
   attachEnterpriseAgreement: (orderId?: string, fileName?: string) => void;
   confirmEnterprisePayment: () => void;
   updateEnterpriseSale: (orderId: string, deviceSerials: string[], status: EnterpriseSaleOrder['status']) => void;
   addEnterprisePayment: (orderId: string, payment: PaymentInput) => void;
+  createPaymentCenterRecord: (sourceType: '租赁订单' | '企业销售', orderId: string, payment: PaymentInput) => void;
+  updatePaymentCenterVoucher: (recordId: string, fileName: string) => void;
+  confirmPaymentCenterRecord: (recordId: string) => void;
+  returnPaymentCenterRecord: (recordId: string, reason: string) => void;
   uploadOrganizationContract: (organizationId: string, fileName: string) => void;
   saveCapabilityMapping: (payload: Omit<CapabilityMapping, 'id'>, mappingId?: string) => void;
+  saveCapabilityElement: (payload: Omit<CapabilityElement, 'id'>, elementId?: string) => void;
   saveGrowthRule: (payload: Omit<GrowthRule, 'id'>, ruleId?: string) => void;
   saveGrowthGood: (payload: Omit<GrowthGood, 'id' | 'exchanged'>, goodId?: string) => void;
   saveAssessmentSetting: (payload: Omit<AssessmentSetting, 'id'>, settingId?: string) => void;
@@ -693,9 +829,15 @@ type AdminStoreActions = {
   advanceImportJob: (jobId: string) => void;
   applyImportJob: (jobId: string) => void;
   updateSosStatus: (alertId: string, status: SosAlert['status'], note: string) => void;
+  copyExcellentTaskCardToLibrary: (cardId: string, overrides: Partial<TaskLibraryItem> & { workRequirements?: string[] }) => void;
+  resubmitAudit: (auditId: string) => void;
   reviewExpertEntry: () => void;
+  reviewExpertEntryAudit: (auditId: string, status: Extract<AuditStatus, '退回修改' | '已确认'>, note: string) => void;
   reviewCourseOrders: () => void;
   createCourseUploadDraft: () => void;
+  saveCourse: (payload: Omit<CourseRecord, 'id'>, courseId?: string) => void;
+  saveCourseStructureNode: (payload: Omit<CourseStructureNode, 'id'>, nodeId?: string) => void;
+  updateCourseOrderStatus: (orderId: string, status: CourseOrderRecord['status'], reason?: string) => void;
   toggleCourseStatus: (courseId: string) => void;
   submitQaAnswer: (qaId: string) => void;
   uploadAgentKnowledge: (agentId: string) => void;
@@ -743,8 +885,8 @@ export type AdminStoreValue = {
   selectors: AdminStoreSelectors;
 };
 
-const STORE_KEY = 'yanxuebao_admin_console_state_v3';
-const STORE_VERSION = 4;
+const STORE_KEY = 'yanxuebao_admin_console_state_v4';
+const STORE_VERSION = 5;
 
 const AdminStoreContext = createContext<AdminStoreValue | null>(null);
 
@@ -784,7 +926,7 @@ function rebuildInventoryDaily(state: AdminConsoleState) {
     date: nowDate(),
     openingStock: last?.closingStock ?? 120,
     inbound: 0,
-    onlineOutbound: state.onlineSales.filter((item) => item.status !== '待发货').reduce((sum, item) => sum + item.quantity, 0),
+    onlineOutbound: state.onlineSales.filter((item) => item.status === '已发货' || item.status === '已完成').reduce((sum, item) => sum + item.quantity, 0),
     enterpriseOutbound: state.enterpriseSales.filter((item) => item.status === '已交付').reduce((sum, item) => sum + item.quantity, 0),
     rentalOutbound: state.rentalOrders.filter((item) => item.status === '已交付').reduce((sum, item) => sum + item.quantity, 0),
     rentalInbound: state.rentalOrders.filter((item) => item.status === '已回收').reduce((sum, item) => sum + item.quantity, 0),
@@ -824,6 +966,44 @@ function findPaymentTarget(
       : draft.enterpriseSales.find((item) => item.id === orderId);
   const payment = order?.payments.find((item) => item.id === paymentId);
   return { order, payment };
+}
+
+function addPaymentCenterRecord(
+  draft: AdminConsoleState,
+  sourceType: '租赁订单' | '企业销售',
+  orderId: string,
+  orderTitle: string,
+  customerName: string,
+  saleOwner: string,
+  payment: PaymentRecord,
+) {
+  const existing = draft.paymentCenterRecords.find((item) => item.paymentId === payment.id);
+  if (existing) {
+    existing.amount = payment.amount;
+    existing.method = payment.method;
+    existing.voucherFile = payment.voucherFile;
+    existing.note = payment.note;
+    existing.status = payment.confirmationStatus;
+    existing.updatedAt = nowTime();
+    return;
+  }
+
+  draft.paymentCenterRecords.unshift({
+    id: uid('payment-center'),
+    sourceType,
+    orderId,
+    orderTitle,
+    customerName,
+    saleOwner,
+    paymentId: payment.id,
+    amount: payment.amount,
+    method: payment.method,
+    voucherFile: payment.voucherFile,
+    note: payment.note,
+    status: payment.confirmationStatus,
+    createdAt: payment.createdAt,
+    updatedAt: nowTime(),
+  });
 }
 
 function seedOperationDailyRecords(): OperationDailyRecord[] {
@@ -1303,6 +1483,10 @@ function buildSeedState(): AdminConsoleState {
       totalAmount: 2760,
       paidAmount: 2200,
       status: '已交付',
+      warehouseId: 'warehouse-1',
+      warehouseName: '深圳南山分仓',
+      paymentRecordIds: ['payment-1'],
+      attachmentIds: ['attachment-1'],
       deviceSerials: devices.slice(0, 8).map((item) => item.serialNumber),
       payments: [
         {
@@ -1335,6 +1519,10 @@ function buildSeedState(): AdminConsoleState {
       totalAmount: 3950,
       paidAmount: 3950,
       status: '已预订',
+      warehouseId: 'warehouse-1',
+      warehouseName: '深圳南山分仓',
+      paymentRecordIds: ['payment-2'],
+      attachmentIds: [],
       deviceSerials: [],
       payments: [{
         id: 'payment-2',
@@ -1361,6 +1549,7 @@ function buildSeedState(): AdminConsoleState {
       quantity: 2,
       paidAmount: 2198,
       status: '已发货',
+      warehouseId: 'warehouse-1',
       shippedAt: '2026-04-13 10:20',
       deviceSerials: devices.slice(8, 10).map((item) => item.serialNumber),
       receiver: '张女士',
@@ -1376,6 +1565,7 @@ function buildSeedState(): AdminConsoleState {
       quantity: 1,
       paidAmount: 1099,
       status: '待发货',
+      warehouseId: 'warehouse-1',
       deviceSerials: [],
       receiver: '陈先生',
       address: '深圳市宝安区新安一路 58 号',
@@ -1396,6 +1586,9 @@ function buildSeedState(): AdminConsoleState {
       contactPhone: '13800138003',
       saleOwner: '唐瑞',
       status: '已交付',
+      warehouseId: 'warehouse-1',
+      paymentRecordIds: ['payment-3'],
+      attachmentIds: ['attachment-2'],
       deviceSerials: devices.slice(10, 12).map((item) => item.serialNumber),
       payments: [{
         id: 'payment-3',
@@ -1510,6 +1703,17 @@ function buildSeedState(): AdminConsoleState {
       audioSummary: '现场环境嘈杂，学员请求导师协助集合',
       status: '已联系',
       note: '助理老师已抵达现场处理',
+      deviceId: 'YXB-SZ-2026-0001',
+      boundPhone: '13800138111',
+      teamId: 'team-1',
+      mentorId: 'mentor-1',
+      guardianName: '林女士',
+      guardianPhone: '13800138111',
+      trackPoints: [
+        { time: '2026-04-19 16:20', location: '深圳湾红树林生态观测站入口' },
+        { time: '2026-04-19 16:30', location: '东侧样本区木栈道' },
+        { time: '2026-04-19 16:35', location: '东侧样本区' },
+      ],
     },
     {
       id: 'sos-2',
@@ -1520,6 +1724,17 @@ function buildSeedState(): AdminConsoleState {
       audioSummary: '学员与小组暂时走散，已发送位置',
       status: '未处理',
       note: '',
+      deviceId: 'YXB-SZ-2026-0002',
+      boundPhone: '13800138112',
+      teamId: 'team-1',
+      mentorId: 'mentor-1',
+      guardianName: '周先生',
+      guardianPhone: '13800138112',
+      trackPoints: [
+        { time: '2026-04-20 10:00', location: '南山海洋文明展馆一层大厅' },
+        { time: '2026-04-20 10:10', location: '海洋文明展区出口' },
+        { time: '2026-04-20 10:15', location: '南山海洋文明展馆出口' },
+      ],
     },
   ];
 
@@ -1568,9 +1783,9 @@ function buildSeedState(): AdminConsoleState {
   ];
 
   const questionBank: QuestionBankItem[] = [
-    { id: 'question-1', category: '学员自测', type: '单选', title: '遇到陌生任务时你通常如何开始？', element: '自主学习', answer: '先观察目标并拆解步骤', scoringStandard: '能说明目标拆解和行动顺序得高分', status: '启用' },
-    { id: 'question-2', category: '家长评测', type: '判断', title: '孩子愿意在活动后主动复盘自己的完成情况。', element: '自我认知', answer: '是', scoringStandard: '结合频次和主动性评分', status: '启用' },
-    { id: 'question-3', category: '天赋测试', type: 'AI问答', title: '请描述一次你主动解决复杂问题的经历。', element: '问题解决', answer: '开放式回答', scoringStandard: '从问题识别、行动策略、复盘表达三个维度评分', status: '创建中' },
+    { id: 'question-1', category: '学员自测', type: '单选', title: '遇到陌生任务时你通常如何开始？', element: '自主学习', answer: 'B', options: [{ id: 'option-1-a', label: 'A', content: '直接开始尝试', isCorrect: false }, { id: 'option-1-b', label: 'B', content: '先观察目标并拆解步骤', isCorrect: true }, { id: 'option-1-c', label: 'C', content: '等待别人给出答案', isCorrect: false }], analysis: '优先选择能体现目标拆解和自主规划的答案。', scoringStandard: '能说明目标拆解和行动顺序得高分', status: '启用' },
+    { id: 'question-2', category: '家长评测', type: '判断', title: '孩子愿意在活动后主动复盘自己的完成情况。', element: '自我认知', answer: '是', options: [{ id: 'option-2-a', label: '是', content: '符合', isCorrect: true }, { id: 'option-2-b', label: '否', content: '不符合', isCorrect: false }], analysis: '结合日常频次和主动性判断。', scoringStandard: '结合频次和主动性评分', status: '启用' },
+    { id: 'question-3', category: '天赋测试', type: 'AI问答', title: '请描述一次你主动解决复杂问题的经历。', element: '问题解决', answer: '开放式回答', options: [], analysis: '由 AI 根据结构完整度、策略有效性和复盘表达评分。', scoringStandard: '从问题识别、行动策略、复盘表达三个维度评分', status: '创建中' },
   ];
 
   const growthRules: GrowthRule[] = [
@@ -1644,8 +1859,14 @@ function buildSeedState(): AdminConsoleState {
   const operationDailyRecords = seedOperationDailyRecords();
 
   const warehouses: WarehouseRecord[] = [
-    { id: 'warehouse-1', name: '深圳南山分仓', province: '广东省', city: '深圳市', manager: '库管-许晴', stock: 18, rentalStock: 12 },
-    { id: 'warehouse-2', name: '广州天河分仓', province: '广东省', city: '广州市', manager: '库管-陈立', stock: 12, rentalStock: 8 },
+    { id: 'warehouse-1', name: '深圳南山分仓', province: '广东省', city: '深圳市', departmentId: 'dept-warehouse-sz', departmentName: '深圳库管部', serviceCities: ['深圳市-南山区', '深圳市-宝安区'], status: '启用', address: '深圳市南山区科技园仓储中心 A 座', contactPhone: '0755-88001001', manager: '库管-许晴', stock: 18, rentalStock: 12 },
+    { id: 'warehouse-2', name: '广州天河分仓', province: '广东省', city: '广州市', departmentId: 'dept-warehouse-gz', departmentName: '广州库管部', serviceCities: ['广州市-天河区', '广州市-越秀区'], status: '启用', address: '广州市天河区科韵路 66 号', contactPhone: '020-88001002', manager: '库管-陈立', stock: 12, rentalStock: 8 },
+  ];
+
+  const warehousePermissions: WarehousePermissionRecord[] = [
+    { id: 'warehouse-permission-1', subjectType: '部门', subjectName: '深圳库管部', departmentName: '深圳库管部', warehouseIds: ['warehouse-1'], permissions: ['查看', '入库', '调拨', '发货', '回收', '确认租赁申请'], status: '启用' },
+    { id: 'warehouse-permission-2', subjectType: '员工', subjectName: '库管-陈立', departmentName: '广州库管部', warehouseIds: ['warehouse-2'], permissions: ['查看', '入库', '调拨', '发货', '回收'], status: '启用' },
+    { id: 'warehouse-permission-3', subjectType: '员工', subjectName: '销售-唐瑞', departmentName: '销售一部', warehouseIds: ['warehouse-1'], permissions: ['查看', '确认租赁申请'], status: '启用' },
   ];
 
   const contracts: ContractRecord[] = [
@@ -1662,6 +1883,38 @@ function buildSeedState(): AdminConsoleState {
     { id: 'upload-1', feature: '租赁设备批次', target: 'rent-1', fileName: '租赁交付设备清单.xlsx', batchNo: 'CK-20260418-001', successCount: 8, failedCount: 0, failedFields: [], createdAt: '2026-04-18 09:40', operatorRole: '库管人员' },
     { id: 'upload-2', feature: '企业收款凭证', target: 'sale-enterprise-1', fileName: '企业转账截图.png', batchNo: 'VOUCHER-20260409-001', successCount: 1, failedCount: 0, failedFields: [], createdAt: '2026-04-09 11:30', operatorRole: '销售人员' },
   ];
+
+  const paymentCenterRecords: PaymentCenterRecord[] = [
+    { id: 'payment-center-1', sourceType: '企业销售', orderId: 'sale-enterprise-1', orderTitle: '华侨城生态探索基地设备采购', customerName: '华侨城生态探索基地', saleOwner: '唐瑞', paymentId: 'payment-3', amount: 1997, method: '转账', voucherFile: '企业转账截图.png', note: '首付款', status: '待确认', createdAt: '2026-04-09 11:20', updatedAt: '2026-04-09 11:30' },
+    { id: 'payment-center-2', sourceType: '租赁订单', orderId: 'rent-1', orderTitle: '南山七年级春季海洋研学', customerName: '南山实验学校', saleOwner: '唐瑞', paymentId: 'payment-1', amount: 2200, method: '转账', voucherFile: '南山实验学校租赁首付款截图.png', note: '首笔到账', status: '已确认', createdAt: '2026-04-11 16:20', updatedAt: '2026-04-11 17:05' },
+  ];
+
+  const expertEntryAudits: ExpertEntryAuditRecord[] = [
+    { id: 'expert-entry-1', expertName: '杨舟教授', phone: '13920030001', organizationName: '海洋文明研究社', specialty: '海洋生态与青少年科普', submittedAt: '2026-04-08 10:00', status: '已确认', note: '资质完整，课程资料已归档' },
+    { id: 'expert-entry-2', expertName: '杜老师', phone: '13920030002', organizationName: '城市科技实验室', specialty: '城市工程与科技创新', submittedAt: '2026-04-18 15:40', status: '待审核', note: '待补充线下课程安全方案' },
+  ];
+
+  const courseStructures: CourseStructureNode[] = [
+    { id: 'course-node-1', courseId: 'course-1', title: '第一章 海洋文明导入', nodeType: '章', durationMinutes: 0, status: '启用' },
+    { id: 'course-node-2', courseId: 'course-1', parentId: 'course-node-1', title: '潮汐与红树林', nodeType: '课时', durationMinutes: 18, status: '启用' },
+    { id: 'course-node-3', courseId: 'course-1', parentId: 'course-node-1', title: '观察任务讲解', nodeType: '课时', durationMinutes: 22, status: '启用' },
+    { id: 'course-node-4', courseId: 'course-2', title: '城市观察方法', nodeType: '章', durationMinutes: 0, status: '启用' },
+  ];
+
+  const courseOrders: CourseOrderRecord[] = [
+    { id: 'course-order-1', courseId: 'course-1', courseTitle: '海洋文明启蒙课', buyerName: '林女士', phone: '13800138111', amount: 199, paidAt: '2026-04-15 20:20', status: '已支付' },
+    { id: 'course-order-2', courseId: 'course-1', courseTitle: '海洋文明启蒙课', buyerName: '周先生', phone: '13800138112', amount: 199, paidAt: '2026-04-16 09:15', status: '退款中', refundReason: '重复购买' },
+  ];
+
+  const excellentTaskCards: ExcellentTaskCard[] = [
+    { id: 'excellent-card-1', creatorRole: '导师', creatorName: '陈卓', city: '深圳市-南山区', title: '红树林生物足迹调查', taskTypeId: 'type-3', baseId: 'base-1', description: '沿样线记录红树林区域常见生物足迹，并尝试解释分布原因。', abilityTags: ['问题发现', '证据收集'], subjectTags: ['科学', '地理'], stageTags: ['初中'], workRequirements: [{ id: 'card-req-1', type: 'image', requirement: '上传 3 张足迹照片', quantity: 3, scoringReference: '照片清晰且标注位置' }, { id: 'card-req-2', type: 'text', requirement: '提交 100 字观察结论', quantity: 1, scoringReference: '能说明证据与结论关系' }], answer: '可从潮间带位置、食物来源和活动时间解释足迹分布。', scoringStandard: '证据完整 40%，解释合理 40%，表达清晰 20%。', useCount: 86, rating: 4.8 },
+    { id: 'excellent-card-2', creatorRole: '家长', creatorName: '周先生', city: '深圳市-南山区', title: '展馆文物故事卡', taskTypeId: 'type-1', baseId: 'base-2', description: '选择一件海洋文明展品，用自己的话讲述其历史背景和现代意义。', abilityTags: ['沟通表达', '历史理解'], subjectTags: ['历史', '语文'], stageTags: ['小学高段', '初中'], workRequirements: [{ id: 'card-req-3', type: 'text', requirement: '完成 150 字讲解词', quantity: 1, scoringReference: '故事完整且有个人理解' }], answer: '围绕展品来源、使用场景、背后人物或技术变迁展开。', scoringStandard: '信息准确 35%，表达生动 35%，个人思考 30%。', useCount: 42, rating: 4.6 },
+  ];
+
+  const auditHistories: AuditHistoryRecord[] = audits.flatMap((audit) => [
+    { id: `audit-history-${audit.id}-submit`, auditId: audit.id, targetType: audit.targetType, targetId: audit.targetId, title: audit.title, operatorName: audit.maintainerName, action: '提交', status: '待审核', note: '提交资料进入审核队列', operatedAt: audit.submittedAt },
+    ...(audit.status === '已确认' || audit.status === '退回修改' ? [{ id: `audit-history-${audit.id}-review`, auditId: audit.id, targetType: audit.targetType, targetId: audit.targetId, title: audit.title, operatorName: '运营总控台', action: audit.status === '已确认' ? '通过' as const : '退回' as const, status: audit.status, note: audit.note, operatedAt: '2026-04-19 10:00' }] : []),
+  ]);
 
   const rentalDeviceBatches: RentalDeviceBatch[] = [
     { id: 'rental-batch-1', orderId: 'rent-1', batchNo: 'CK-20260418-001', fileName: '租赁交付设备清单.xlsx', quantity: 8, failedCount: 0, deviceSerials: devices.slice(0, 8).map((item) => item.serialNumber), importedAt: '2026-04-18 09:40', status: '已出库' },
@@ -1687,8 +1940,15 @@ function buildSeedState(): AdminConsoleState {
     demoRole: 'operator',
     operationDailyRecords,
     warehouses,
+    warehousePermissions,
     contracts,
     attachments,
+    paymentCenterRecords,
+    expertEntryAudits,
+    courseStructures,
+    courseOrders,
+    excellentTaskCards,
+    auditHistories,
     uploadResults,
     rentalDeviceBatches,
     operationLogs,
@@ -2172,8 +2432,20 @@ export function AdminStoreProvider({ children }: { children: React.ReactNode }) 
               existing.status = '待审核';
               existing.note = '维护信息已更新，等待审核';
               existing.submittedAt = nowTime();
+              draft.auditHistories.unshift({
+                id: uid('audit-history'),
+                auditId: existing.id,
+                targetType: '基地',
+                targetId: base!.id,
+                title: payload.name,
+                operatorName: maintainer?.name ?? editorId,
+                action: '重新提交',
+                status: '待审核',
+                note: existing.note,
+                operatedAt: nowTime(),
+              });
             } else if (maintainer) {
-              draft.audits.unshift({
+              const audit = {
                 id: uid('audit'),
                 targetType: '基地',
                 targetId: base!.id,
@@ -2184,6 +2456,19 @@ export function AdminStoreProvider({ children }: { children: React.ReactNode }) 
                 submittedAt: nowTime(),
                 status: '待审核',
                 note: '提交基地维护数据',
+              } satisfies AuditRecord;
+              draft.audits.unshift(audit);
+              draft.auditHistories.unshift({
+                id: uid('audit-history'),
+                auditId: audit.id,
+                targetType: '基地',
+                targetId: base!.id,
+                title: payload.name,
+                operatorName: maintainer.name,
+                action: '提交',
+                status: '待审核',
+                note: audit.note,
+                operatedAt: audit.submittedAt,
               });
             }
           }
@@ -2221,8 +2506,20 @@ export function AdminStoreProvider({ children }: { children: React.ReactNode }) 
               existing.status = '待审核';
               existing.note = '任务内容已更新，等待审核';
               existing.submittedAt = nowTime();
+              draft.auditHistories.unshift({
+                id: uid('audit-history'),
+                auditId: existing.id,
+                targetType: '任务',
+                targetId: record!.id,
+                title: payload.name,
+                operatorName: maintainer?.name ?? editorId,
+                action: '重新提交',
+                status: '待审核',
+                note: existing.note,
+                operatedAt: nowTime(),
+              });
             } else if (maintainer) {
-              draft.audits.unshift({
+              const audit = {
                 id: uid('audit'),
                 targetType: '任务',
                 targetId: record!.id,
@@ -2233,6 +2530,19 @@ export function AdminStoreProvider({ children }: { children: React.ReactNode }) 
                 submittedAt: nowTime(),
                 status: '待审核',
                 note: '提交任务维护数据',
+              } satisfies AuditRecord;
+              draft.audits.unshift(audit);
+              draft.auditHistories.unshift({
+                id: uid('audit-history'),
+                auditId: audit.id,
+                targetType: '任务',
+                targetId: record!.id,
+                title: payload.name,
+                operatorName: maintainer.name,
+                action: '提交',
+                status: '待审核',
+                note: audit.note,
+                operatedAt: audit.submittedAt,
               });
             }
           }
@@ -2269,6 +2579,18 @@ export function AdminStoreProvider({ children }: { children: React.ReactNode }) 
           if (maintainer && status === '已确认') {
             maintainer.passedCount += 1;
           }
+          draft.auditHistories.unshift({
+            id: uid('audit-history'),
+            auditId: audit.id,
+            targetType: audit.targetType,
+            targetId: audit.targetId,
+            title: audit.title,
+            operatorName: '运营总控台',
+            action: status === '已确认' ? '通过' : '退回',
+            status,
+            note,
+            operatedAt: nowTime(),
+          });
           addOperationLog(draft, {
             role: '运营管理员',
             operatorName: '运营总控台',
@@ -2295,12 +2617,51 @@ export function AdminStoreProvider({ children }: { children: React.ReactNode }) 
             ...payload,
           });
         }),
+      saveWarehouse: (payload, warehouseId) =>
+        mutate((draft) => {
+          if (warehouseId) {
+            const found = draft.warehouses.find((item) => item.id === warehouseId);
+            if (found) Object.assign(found, payload);
+          } else {
+            draft.warehouses.unshift({ id: uid('warehouse'), ...payload });
+          }
+          addOperationLog(draft, {
+            role: '运营管理员',
+            operatorName: '运营总控台',
+            feature: '分仓管理',
+            target: payload.name,
+            content: warehouseId ? '编辑分仓信息' : '新增分仓信息',
+            result: '成功',
+          });
+        }),
+      saveWarehousePermission: (payload, permissionId) =>
+        mutate((draft) => {
+          if (permissionId) {
+            const found = draft.warehousePermissions.find((item) => item.id === permissionId);
+            if (found) Object.assign(found, payload);
+          } else {
+            draft.warehousePermissions.unshift({ id: uid('warehouse-permission'), ...payload });
+          }
+          addOperationLog(draft, {
+            role: '运营管理员',
+            operatorName: '运营总控台',
+            feature: '分仓权限',
+            target: payload.subjectName,
+            content: `配置${payload.permissions.join('、')}权限`,
+            result: '成功',
+          });
+        }),
       createRentalOrder: (payload) =>
         mutate((draft) => {
+          const warehouse = draft.warehouses.find((item) => item.id === payload.warehouseId) ?? draft.warehouses[0];
           draft.rentalOrders.unshift({
             id: uid('rent'),
             createdAt: nowTime(),
             payments: [],
+            warehouseId: warehouse?.id,
+            warehouseName: warehouse?.name,
+            paymentRecordIds: [],
+            attachmentIds: [],
             ...payload,
           });
           addOperationLog(draft, {
@@ -2350,13 +2711,17 @@ export function AdminStoreProvider({ children }: { children: React.ReactNode }) 
         mutate((draft) => {
           const order = draft.rentalOrders.find((item) => item.id === orderId);
           if (!order) return;
-          order.payments.unshift({
+          const record: PaymentRecord = {
             id: uid('payment'),
             createdAt: nowTime(),
             confirmationStatus: '待确认',
             recordedBy: order.saleOwner,
             ...payment,
-          });
+          };
+          order.payments.unshift(record);
+          order.paymentRecordIds = [...(order.paymentRecordIds ?? []), record.id];
+          const organization = draft.organizations.find((item) => item.id === order.organizationId);
+          addPaymentCenterRecord(draft, '租赁订单', order.id, order.teamName, organization?.name ?? order.contactName, order.saleOwner, record);
           addOperationLog(draft, {
             role: '销售人员',
             operatorName: order.saleOwner,
@@ -2377,6 +2742,11 @@ export function AdminStoreProvider({ children }: { children: React.ReactNode }) 
           payment.confirmedBy = '财务确认岗';
           payment.confirmedAt = nowTime();
           payment.returnedReason = undefined;
+          const center = draft.paymentCenterRecords.find((item) => item.paymentId === payment.id);
+          if (center) {
+            center.status = '已确认';
+            center.updatedAt = nowTime();
+          }
           addOperationLog(draft, {
             role: '财务人员',
             operatorName: '财务确认岗',
@@ -2397,6 +2767,12 @@ export function AdminStoreProvider({ children }: { children: React.ReactNode }) 
           payment.confirmedBy = '财务确认岗';
           payment.confirmedAt = nowTime();
           payment.returnedReason = reason;
+          const center = draft.paymentCenterRecords.find((item) => item.paymentId === payment.id);
+          if (center) {
+            center.status = '已退回';
+            center.note = reason;
+            center.updatedAt = nowTime();
+          }
           addOperationLog(draft, {
             role: '财务人员',
             operatorName: '财务确认岗',
@@ -2413,6 +2789,12 @@ export function AdminStoreProvider({ children }: { children: React.ReactNode }) 
           payment.voucherFile = fileName;
           payment.confirmationStatus = '待确认';
           payment.returnedReason = undefined;
+          const center = draft.paymentCenterRecords.find((item) => item.paymentId === payment.id);
+          if (center) {
+            center.voucherFile = fileName;
+            center.status = '待确认';
+            center.updatedAt = nowTime();
+          }
           draft.attachments.unshift({
             id: uid('attachment'),
             ownerType: sourceType,
@@ -2495,7 +2877,7 @@ export function AdminStoreProvider({ children }: { children: React.ReactNode }) 
         mutate((draft) => {
           const order = draft.rentalOrders.find((item) => item.id === orderId);
           if (!order) return;
-          const freeDevices = draft.devices.filter((item) => item.status === '库存' || item.status === '库存-租赁');
+          const freeDevices = draft.devices.filter((item) => (item.status === '库存' || item.status === '库存-租赁') && (!order.warehouseId || item.warehouseId === order.warehouseId));
           const assigned = freeDevices.slice(0, Math.min(order.quantity, Math.max(1, freeDevices.length))).map((item) => item.serialNumber);
           const batchNo = `CK-${nowDate().replace(/-/g, '')}-${String(draft.rentalDeviceBatches.length + 1).padStart(3, '0')}`;
           draft.rentalDeviceBatches.unshift({
@@ -2510,6 +2892,7 @@ export function AdminStoreProvider({ children }: { children: React.ReactNode }) 
             status: '待出库',
           });
           order.deviceSerials = Array.from(new Set([...order.deviceSerials, ...assigned]));
+          order.warehouseName = draft.warehouses.find((item) => item.id === order.warehouseId)?.name ?? order.warehouseName;
           order.note = `${order.note}\n设备批次导入：${batchNo}，成功 ${assigned.length} 台`;
           draft.attachments.unshift({
             id: uid('attachment'),
@@ -2686,6 +3069,37 @@ export function AdminStoreProvider({ children }: { children: React.ReactNode }) 
             result: '成功',
           });
         }),
+      updateOnlineReturn: (orderId, status, expressCompany, expressNo, note) =>
+        mutate((draft) => {
+          const order = draft.onlineSales.find((item) => item.id === orderId);
+          if (!order) return;
+          order.status = status;
+          order.returnExpressCompany = expressCompany;
+          order.returnExpressNo = expressNo;
+          order.returnNote = note;
+          if (status === '收到退货') {
+            order.returnReceivedAt = nowTime();
+            draft.devices.forEach((device) => {
+              if (order.deviceSerials.includes(device.serialNumber)) {
+                device.status = '库存';
+                device.warehouseId = order.warehouseId ?? device.warehouseId;
+                device.lastMovementDate = nowDate();
+                device.lastAction = `商城退货入库 ${order.id}`;
+              }
+            });
+            const warehouse = draft.warehouses.find((item) => item.id === order.warehouseId);
+            if (warehouse) warehouse.stock += order.deviceSerials.length;
+            rebuildInventoryDaily(draft);
+          }
+          addOperationLog(draft, {
+            role: '物流人员',
+            operatorName: '商城售后岗',
+            feature: '在线销售退货',
+            target: order.id,
+            content: `订单状态更新为${status}，${expressCompany} ${expressNo}`,
+            result: '成功',
+          });
+        }),
       createEnterpriseSaleDraft: () =>
         mutate((draft) => {
           const order: EnterpriseSaleOrder = {
@@ -2792,13 +3206,16 @@ export function AdminStoreProvider({ children }: { children: React.ReactNode }) 
         mutate((draft) => {
           const order = draft.enterpriseSales.find((item) => item.id === orderId);
           if (!order) return;
-          order.payments.unshift({
+          const record: PaymentRecord = {
             id: uid('payment'),
             createdAt: nowTime(),
             confirmationStatus: '待确认',
             recordedBy: order.saleOwner,
             ...payment,
-          });
+          };
+          order.payments.unshift(record);
+          order.paymentRecordIds = [...(order.paymentRecordIds ?? []), record.id];
+          addPaymentCenterRecord(draft, '企业销售', order.id, `${order.customerName}设备采购`, order.customerName, order.saleOwner, record);
           addOperationLog(draft, {
             role: '销售人员',
             operatorName: order.saleOwner,
@@ -2806,6 +3223,126 @@ export function AdminStoreProvider({ children }: { children: React.ReactNode }) 
             target: order.id,
             content: `录入收款${payment.amount}元`,
             result: '待确认',
+          });
+        }),
+      createPaymentCenterRecord: (sourceType, orderId, payment) =>
+        mutate((draft) => {
+          if (sourceType === '租赁订单') {
+            const order = draft.rentalOrders.find((item) => item.id === orderId);
+            if (!order) return;
+            const organization = draft.organizations.find((item) => item.id === order.organizationId);
+            const record: PaymentRecord = {
+              id: uid('payment'),
+              amount: payment.amount,
+              method: payment.method,
+              note: payment.note,
+              voucherFile: payment.voucherFile,
+              createdAt: nowTime(),
+              confirmationStatus: '待确认',
+              recordedBy: order.saleOwner,
+            };
+            order.payments.unshift(record);
+            order.paymentRecordIds = [...(order.paymentRecordIds ?? []), record.id];
+            addPaymentCenterRecord(draft, sourceType, order.id, order.teamName, organization?.name ?? order.contactName, order.saleOwner, record);
+          } else {
+            const order = draft.enterpriseSales.find((item) => item.id === orderId);
+            if (!order) return;
+            const record: PaymentRecord = {
+              id: uid('payment'),
+              amount: payment.amount,
+              method: payment.method,
+              note: payment.note,
+              voucherFile: payment.voucherFile,
+              createdAt: nowTime(),
+              confirmationStatus: '待确认',
+              recordedBy: order.saleOwner,
+            };
+            order.payments.unshift(record);
+            order.paymentRecordIds = [...(order.paymentRecordIds ?? []), record.id];
+            addPaymentCenterRecord(draft, sourceType, order.id, `${order.customerName}设备采购`, order.customerName, order.saleOwner, record);
+          }
+          addOperationLog(draft, {
+            role: '销售人员',
+            operatorName: '收款中心',
+            feature: '收款中心',
+            target: `${sourceType} ${orderId}`,
+            content: `录入收款${payment.amount}元并等待财务确认`,
+            result: '待确认',
+          });
+        }),
+      updatePaymentCenterVoucher: (recordId, fileName) =>
+        mutate((draft) => {
+          const record = draft.paymentCenterRecords.find((item) => item.id === recordId);
+          if (!record) return;
+          const { payment } = findPaymentTarget(draft, record.sourceType, record.orderId, record.paymentId);
+          if (payment) {
+            payment.voucherFile = fileName;
+            payment.confirmationStatus = '待确认';
+          }
+          record.voucherFile = fileName;
+          record.status = '待确认';
+          record.updatedAt = nowTime();
+          draft.attachments.unshift({
+            id: uid('attachment'),
+            ownerType: record.sourceType,
+            ownerId: record.orderId,
+            fileName,
+            uploadedAt: nowTime(),
+            note: '收款中心票据附件',
+          });
+          addOperationLog(draft, {
+            role: '销售人员',
+            operatorName: record.saleOwner,
+            feature: '收款中心',
+            target: record.orderTitle,
+            content: `补传票据附件 ${fileName}`,
+            result: '待确认',
+          });
+        }),
+      confirmPaymentCenterRecord: (recordId) =>
+        mutate((draft) => {
+          const record = draft.paymentCenterRecords.find((item) => item.id === recordId);
+          if (!record) return;
+          const { order, payment } = findPaymentTarget(draft, record.sourceType, record.orderId, record.paymentId);
+          if (!order || !payment) return;
+          if (payment.confirmationStatus !== '已确认') {
+            order.paidAmount += payment.amount;
+          }
+          payment.confirmationStatus = '已确认';
+          payment.confirmedBy = '财务确认岗';
+          payment.confirmedAt = nowTime();
+          record.status = '已确认';
+          record.updatedAt = nowTime();
+          addOperationLog(draft, {
+            role: '财务人员',
+            operatorName: '财务确认岗',
+            feature: '收款中心',
+            target: record.orderTitle,
+            content: `确认到账 ${record.amount} 元`,
+            result: '成功',
+          });
+        }),
+      returnPaymentCenterRecord: (recordId, reason) =>
+        mutate((draft) => {
+          const record = draft.paymentCenterRecords.find((item) => item.id === recordId);
+          if (!record) return;
+          const { order, payment } = findPaymentTarget(draft, record.sourceType, record.orderId, record.paymentId);
+          if (!order || !payment) return;
+          if (payment.confirmationStatus === '已确认') {
+            order.paidAmount = Math.max(0, order.paidAmount - payment.amount);
+          }
+          payment.confirmationStatus = '已退回';
+          payment.returnedReason = reason;
+          record.status = '已退回';
+          record.note = reason;
+          record.updatedAt = nowTime();
+          addOperationLog(draft, {
+            role: '财务人员',
+            operatorName: '财务确认岗',
+            feature: '收款中心',
+            target: record.orderTitle,
+            content: `退回票据：${reason}`,
+            result: '退回修改',
           });
         }),
       uploadOrganizationContract: (organizationId, fileName) =>
@@ -2857,6 +3394,31 @@ export function AdminStoreProvider({ children }: { children: React.ReactNode }) 
             feature: '能力映射',
             target: payload.indicator,
             content: '保存合作机构能力映射公式',
+            result: '成功',
+          });
+        }),
+      saveCapabilityElement: (payload, elementId) =>
+        mutate((draft) => {
+          if (elementId) {
+            const found = draft.capabilityElements.find((item) => item.id === elementId);
+            if (found) {
+              const oldName = found.name;
+              Object.assign(found, payload);
+              draft.students.forEach((student) => {
+                student.capabilityRecords.forEach((record) => {
+                  if (record.element === oldName) record.element = payload.name;
+                });
+              });
+            }
+          } else {
+            draft.capabilityElements.push({ id: uid('ce'), ...payload });
+          }
+          addOperationLog(draft, {
+            role: '运营管理员',
+            operatorName: '运营总控台',
+            feature: '能力元素',
+            target: payload.name,
+            content: elementId ? '更新能力元素名称与状态' : '新增能力元素',
             result: '成功',
           });
         }),
@@ -2989,15 +3551,97 @@ export function AdminStoreProvider({ children }: { children: React.ReactNode }) 
             result: '成功',
           });
         }),
+      copyExcellentTaskCardToLibrary: (cardId, overrides) =>
+        mutate((draft) => {
+          const card = draft.excellentTaskCards.find((item) => item.id === cardId);
+          if (!card) return;
+          const workRequirements = overrides.workRequirements ?? card.workRequirements.map((item) => `${item.requirement}；数量：${item.quantity ?? 1}；评分参考：${item.scoringReference ?? '按完成质量评分'}`);
+          const record: TaskLibraryItem = {
+            id: uid('task-library'),
+            city: overrides.city ?? card.city,
+            baseId: overrides.baseId ?? card.baseId,
+            name: overrides.name ?? card.title,
+            typeId: overrides.typeId ?? card.taskTypeId,
+            description: overrides.description ?? `${card.description}\n参考答案：${card.answer}\n评分标准：${card.scoringStandard}`,
+            abilityTags: overrides.abilityTags ?? card.abilityTags,
+            subjectTags: overrides.subjectTags ?? card.subjectTags,
+            stageTags: overrides.stageTags ?? card.stageTags,
+            applyTo: overrides.applyTo ?? ['团体研学'],
+            approvalStatus: '已确认',
+            createdBy: 'operator-001',
+            createdByRole: 'operator',
+            teamUseCount: 0,
+            completionCount: 0,
+            workRequirements,
+          };
+          draft.taskLibrary.unshift(record);
+          card.useCount += 1;
+          addOperationLog(draft, {
+            role: '运营管理员',
+            operatorName: '运营总控台',
+            feature: '任务卡片复制',
+            target: card.title,
+            content: `从${card.creatorRole}${card.creatorName}的优秀任务卡片复制到任务库`,
+            result: '成功',
+          });
+        }),
+      resubmitAudit: (auditId) =>
+        mutate((draft) => {
+          const audit = draft.audits.find((item) => item.id === auditId);
+          if (!audit) return;
+          audit.status = '待审核';
+          audit.submittedAt = nowTime();
+          audit.note = '已根据退回意见重新提交';
+          draft.auditHistories.unshift({
+            id: uid('audit-history'),
+            auditId: audit.id,
+            targetType: audit.targetType,
+            targetId: audit.targetId,
+            title: audit.title,
+            operatorName: audit.maintainerName,
+            action: '重新提交',
+            status: '待审核',
+            note: audit.note,
+            operatedAt: nowTime(),
+          });
+          addOperationLog(draft, {
+            role: '兼职维护员',
+            operatorName: audit.maintainerName,
+            feature: '审核记录',
+            target: audit.title,
+            content: '退回后重新提交',
+            result: '待确认',
+          });
+        }),
       reviewExpertEntry: () =>
         mutate((draft) => {
+          const pending = draft.expertEntryAudits.find((item) => item.status === '待审核');
+          if (pending) {
+            pending.status = '已确认';
+            pending.note = '资质与课程方向审核通过';
+          }
           addOperationLog(draft, {
             role: '运营管理员',
             operatorName: '运营总控台',
             feature: '专家入驻审核',
-            target: '专家入驻申请',
+            target: pending?.expertName ?? '专家入驻申请',
             content: '审核专家资质与课程运营资料',
             result: '成功',
+          });
+        }),
+      reviewExpertEntryAudit: (auditId, status, note) =>
+        mutate((draft) => {
+          const audit = draft.expertEntryAudits.find((item) => item.id === auditId);
+          if (!audit) return;
+          audit.status = status;
+          audit.note = note;
+          addOperationLog(draft, {
+            role: '运营管理员',
+            operatorName: '运营总控台',
+            feature: '专家入驻审核',
+            target: audit.expertName,
+            content: `入驻审核结果：${status}`,
+            result: status === '已确认' ? '成功' : '退回修改',
           });
         }),
       reviewCourseOrders: () =>
@@ -3032,6 +3676,56 @@ export function AdminStoreProvider({ children }: { children: React.ReactNode }) 
             target: course.title,
             content: '代专家上传课程图文、视频与售卖信息',
             result: '待确认',
+          });
+        }),
+      saveCourse: (payload, courseId) =>
+        mutate((draft) => {
+          if (courseId) {
+            const found = draft.courses.find((item) => item.id === courseId);
+            if (found) Object.assign(found, payload);
+          } else {
+            draft.courses.unshift({ id: uid('course'), ...payload });
+          }
+          addOperationLog(draft, {
+            role: '运营管理员',
+            operatorName: '运营总控台',
+            feature: '课程管理',
+            target: payload.title,
+            content: courseId ? '编辑课程信息' : '新增课程信息',
+            result: '成功',
+          });
+        }),
+      saveCourseStructureNode: (payload, nodeId) =>
+        mutate((draft) => {
+          if (nodeId) {
+            const found = draft.courseStructures.find((item) => item.id === nodeId);
+            if (found) Object.assign(found, payload);
+          } else {
+            draft.courseStructures.unshift({ id: uid('course-node'), ...payload });
+          }
+          const course = draft.courses.find((item) => item.id === payload.courseId);
+          addOperationLog(draft, {
+            role: '运营管理员',
+            operatorName: '运营总控台',
+            feature: '课程架构',
+            target: course?.title ?? payload.title,
+            content: nodeId ? '编辑课程章节' : '新增课程章节',
+            result: '成功',
+          });
+        }),
+      updateCourseOrderStatus: (orderId, status, reason) =>
+        mutate((draft) => {
+          const order = draft.courseOrders.find((item) => item.id === orderId);
+          if (!order) return;
+          order.status = status;
+          order.refundReason = reason;
+          addOperationLog(draft, {
+            role: '运营管理员',
+            operatorName: '运营总控台',
+            feature: '课程订单',
+            target: order.id,
+            content: status === '退款中' ? `发起退款：${reason ?? '用户申请'}` : `订单状态更新为${status}`,
+            result: status === '已退款' ? '成功' : '待确认',
           });
         }),
       toggleCourseStatus: (courseId) =>

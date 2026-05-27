@@ -108,7 +108,7 @@ export function AdminShell({ role, session, children }: Props) {
           <Space size={22} align="center">
             {!isCity ? (
               <Space className="demo-role-switch" size={8}>
-                <Tag color="blue">演示岗位视图</Tag>
+                <Tag color="blue">岗位视角</Tag>
                 <Segmented
                   size="small"
                   value={state.demoRole}
