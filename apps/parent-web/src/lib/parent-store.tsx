@@ -27,6 +27,7 @@ export type CapabilityIndicatorDimension = { label: string; score: number; avera
 export type TalentSource = 'student_test' | 'parent_review';
 export type OrderType = '研学宝' | '团队报名' | '专家课程' | '难题挑战' | '增值服务';
 export type OrderStatus = '未查看' | '未处理' | '待缴费' | '已缴费' | '待支付' | '已支付';
+export type TaskSyncStatus = '已同步' | '待同步更新';
 
 export type CapabilityElement = {
   id: string;
@@ -242,6 +243,18 @@ export type ParentFamilyTeam = {
   createdAt: string;
 };
 
+export type ParentInviteEnrollment = {
+  id: string;
+  teamId: string;
+  inviterParentName: string;
+  invitedParentPhone: string;
+  childName: string;
+  grade: string;
+  yxbId: string;
+  status: '已报名';
+  createdAt: string;
+};
+
 export type ParentDeviceAd = {
   id: string;
   title: string;
@@ -249,6 +262,8 @@ export type ParentDeviceAd = {
   imageUrl: string;
   features: string[];
   imageTone: 'ability' | 'safety' | 'ai';
+  enabled?: boolean;
+  sortOrder?: number;
 };
 
 export type ParentStudent = {
@@ -511,6 +526,10 @@ export type FamilyTask = {
   assignedStudentIds: string[];
   createdAt: string;
   publishedAt?: string;
+  updatedAt?: string;
+  version?: number;
+  syncStatus?: TaskSyncStatus;
+  lastSyncedAt?: string;
 };
 
 export type TaskWork = {
@@ -556,6 +575,17 @@ export type ParentOrder = {
   address?: string;
   phone?: string;
   paidAt?: string;
+  enrollmentStudentId?: string;
+  enrollmentStudentSnapshot?: {
+    name: string;
+    yxbId: string;
+    idNumber: string;
+    birthday: string;
+    age: number;
+    school: string;
+    grade: string;
+    city: string;
+  };
 };
 
 export type TaskTemplate = {
@@ -591,6 +621,7 @@ export type ParentState = {
   works: TaskWork[];
   messages: ParentMessage[];
   orders: ParentOrder[];
+  inviteEnrollments: ParentInviteEnrollment[];
   deviceAds: ParentDeviceAd[];
   scanDevices: DemoScanDevice[];
 };
@@ -626,12 +657,14 @@ type ParentContextValue = {
   toggleQuietTime: (studentId: string, quietTimeId: string) => void;
   deleteQuietTime: (studentId: string, quietTimeId: string) => void;
   completeAssessment: (studentId: string, planeKey: CapabilityPlaneKey | 'all', answers: Record<string, number>, capabilityId?: string) => void;
+  completeTalentTest: (studentId: string, input: TalentTestInput) => void;
   createTasksFromTemplates: (input: QuickTaskInput) => string[];
   createCustomTask: (input: CustomTaskInput) => string;
   updateTask: (taskId: string, input: CustomTaskInput) => void;
   createFamilyTeam: (input: FamilyTeamInput) => string;
   joinFamilyTeamFromInvite: (input: InviteJoinInput) => string;
   publishTasks: (taskIds: string[], studentIds: string[]) => void;
+  syncTaskUpdates: (taskIds: string[]) => void;
   syncDeviceWork: (taskId: string, studentId: string) => void;
   scoreWork: (workId: string, input: ScoreInput) => void;
   addMessage: (input: MessageInput) => void;
@@ -642,7 +675,7 @@ type ParentContextValue = {
   deletePortfolioPhoto: (recordId: string) => void;
   deletePortfolioAchievement: (recordId: string) => void;
   createOrder: (input?: Partial<ParentOrder>) => string;
-  payOrder: (orderId: string, submitInfo?: Pick<ParentOrder, 'receiver' | 'address' | 'phone'>) => void;
+  payOrder: (orderId: string, submitInfo?: OrderSubmitInput) => void;
   markOrderViewed: (orderId: string) => void;
 };
 
@@ -663,6 +696,17 @@ export type TalentInterestInput = {
   studentTags: string[];
   parentTags: string[];
   testCompleted?: boolean;
+};
+
+export type TalentTestInput = {
+  strongestTalent: string;
+  secondaryTalent: string;
+  interestTags: string[];
+  answers: Record<string, number>;
+};
+
+export type OrderSubmitInput = Pick<ParentOrder, 'receiver' | 'address' | 'phone'> & {
+  enrollmentStudentId?: string;
 };
 
 export type DeviceInput = {
@@ -776,8 +820,9 @@ export type PortfolioMediaUpdateInput = {
   content?: string;
 };
 
-const STORE_KEY = 'yanxuebao_parent_h5_state_v11';
+const STORE_KEY = 'yanxuebao_parent_h5_state_v12';
 const LEGACY_STORE_KEYS = [
+  'yanxuebao_parent_h5_state_v11',
   'yanxuebao_parent_h5_state_v10',
   'yanxuebao_parent_h5_state_v9',
   'yanxuebao_parent_h5_state_v8',
@@ -788,7 +833,7 @@ const LEGACY_STORE_KEYS = [
   'yanxuebao_parent_h5_state_v3',
   'yanxuebao_parent_h5_state_v2',
 ];
-const STORE_VERSION = 11;
+const STORE_VERSION = 12;
 
 export const CAPABILITY_PLANES: Array<{
   key: CapabilityPlaneKey;
@@ -914,6 +959,15 @@ const ASSESSMENT_QUESTIONS = [
   '遇到困难时，孩子愿意尝试不同方法继续完成任务。',
   '完成任务后，孩子会复盘哪里做得好、哪里还能改进。',
   '与家人或同伴合作时，孩子能清楚表达自己的想法。',
+];
+
+export const TALENT_TEST_QUESTIONS = [
+  { id: 'talent_language', title: '语言表达', description: '孩子喜欢阅读、讲故事、演讲或用文字记录想法。', talent: '语言智能', interestTags: ['阅读', '写作', '演讲'] },
+  { id: 'talent_logic', title: '逻辑推理', description: '孩子喜欢解谜、数独、实验推理或寻找规律。', talent: '逻辑-数理智能', interestTags: ['数独', '科学实验', '编程'] },
+  { id: 'talent_space', title: '空间想象', description: '孩子喜欢绘画、模型、地图、建筑或空间搭建。', talent: '空间智能', interestTags: ['绘画', '积木', '航模'] },
+  { id: 'talent_body', title: '身体动觉', description: '孩子喜欢运动、舞蹈、手作或通过身体操作学习。', talent: '身体-动觉智能', interestTags: ['球类', '舞蹈', '手工创意'] },
+  { id: 'talent_people', title: '人际协作', description: '孩子愿意组织伙伴、照顾他人、沟通协调并共同完成任务。', talent: '人际交往智能', interestTags: ['主持', '创业', '环保实践'] },
+  { id: 'talent_nature', title: '自然观察', description: '孩子对动植物、天气、地理、环保和户外观察有持续兴趣。', talent: '自然观察智能', interestTags: ['生态观察', '天文观测', '环保实践'] },
 ];
 
 const SCAN_DEVICE_POOL: DemoScanDevice[] = [
@@ -1333,6 +1387,36 @@ function buildStudentAccount(yxbId: string, activated = false): StudentAccount {
   };
 }
 
+export function getEnrollmentMissingFields(student?: ParentStudent | null) {
+  if (!student) {
+    return ['报名学员'];
+  }
+  const fields: string[] = [];
+  if (!student.name) fields.push('姓名');
+  if (!student.yxbId) fields.push('研学宝 ID');
+  if (!student.idNumber) fields.push('证件号');
+  if (!student.birthday) fields.push('出生日期');
+  if (!student.school) fields.push('学校');
+  if (!student.grade) fields.push('年级');
+  return fields;
+}
+
+function buildOrderStudentSnapshot(student?: ParentStudent | null): ParentOrder['enrollmentStudentSnapshot'] {
+  if (!student) {
+    return undefined;
+  }
+  return {
+    name: student.name,
+    yxbId: student.yxbId,
+    idNumber: student.idNumber,
+    birthday: student.birthday,
+    age: student.age,
+    school: student.school,
+    grade: student.grade,
+    city: student.city,
+  };
+}
+
 function buildDefaultTalentProfile(offset = 0): StudentTalentProfile {
   const talent = TALENT_OPTIONS[Math.abs(offset) % TALENT_OPTIONS.length] ?? TALENT_OPTIONS[0];
   return {
@@ -1743,6 +1827,7 @@ function buildEmptyState(): ParentState {
     works: [],
     messages: [welcomeMessage],
     orders: [],
+    inviteEnrollments: [],
     deviceAds: [
       {
         id: 'ad_device_01',
@@ -2614,6 +2699,7 @@ function buildDemoState(): ParentState {
         description: '学员希望报名难题挑战，家长确认后可模拟支付并开通挑战任务。',
       },
     ],
+    inviteEnrollments: [],
     deviceAds: [
       {
         id: 'ad_device_01',
@@ -4004,12 +4090,87 @@ export function ParentStoreProvider({ children }: { children: ReactNode }) {
             sourceType: '家长',
             elementRecords: adjustmentElementRecords,
           };
+          const updateMessage: ParentMessage = {
+            id: makeId('msg'),
+            type: 'system',
+            scope: 'student',
+            studentId,
+            title: '能力评测已更新',
+            content: `${report.title}已生成，${adjustmentElementRecords.length} 项能力元素完成指数更新。`,
+            createdAt: evaluatedAt,
+            read: false,
+          };
           return {
             ...nextState,
             reports: [report, ...nextState.reports],
             portfolioGrowthRecords: [capabilityUpdateRecord, ...nextState.portfolioGrowthRecords],
             capabilityAdjustmentRecords: [adjustmentRecord, ...nextState.capabilityAdjustmentRecords],
+            messages: [updateMessage, ...nextState.messages],
+            messageCenterItems: [buildMessageCenterItemFromMessage(updateMessage), ...nextState.messageCenterItems],
             diaryItems: [diaryItem, ...nextState.diaryItems],
+          };
+        });
+      },
+      completeTalentTest(studentId, input) {
+        setState((current) => {
+          const completedAt = nowText();
+          const interestTags = Array.from(new Set(input.interestTags.filter(Boolean)));
+          const nextState = withStudent(current, studentId, (student) => ({
+            ...student,
+            talentProfile: {
+              strongestTalent: input.strongestTalent,
+              source: 'student_test',
+              parentTalent: input.secondaryTalent,
+              testCompleted: true,
+              updatedAt: completedAt,
+            },
+            interestProfile: {
+              studentTags: Array.from(new Set([...interestTags, ...student.interestProfile.studentTags])).slice(0, 8),
+              parentTags: student.interestProfile.parentTags,
+              updatedAt: completedAt,
+            },
+          }));
+          const testRecord: ParentGrowthRecord = {
+            id: makeId('growth'),
+            studentId,
+            type: 'capability_update',
+            category: input.strongestTalent,
+            sourceType: 'self_test',
+            title: '免费天赋测试完成',
+            value: Math.max(...Object.values(input.answers), 0),
+            delta: 0,
+            occurredAt: completedAt,
+            summary: `识别出优势天赋：${input.strongestTalent}；关联兴趣：${interestTags.join('、') || '待补充'}。`,
+            displaySource: '天赋测试',
+          };
+          const message: ParentMessage = {
+            id: makeId('msg'),
+            type: 'system',
+            scope: 'student',
+            studentId,
+            title: '天赋测试结果已生成',
+            content: `已为学员生成 ${input.strongestTalent} 成长建议，可在个性化成长路径中查看任务和课程推荐。`,
+            createdAt: completedAt,
+            read: false,
+          };
+          return {
+            ...nextState,
+            portfolioGrowthRecords: [testRecord, ...nextState.portfolioGrowthRecords],
+            diaryItems: [
+              {
+                id: makeId('diary'),
+                studentId,
+                type: 'assessment',
+                title: '免费天赋测试完成',
+                date: completedAt,
+                source: '天赋测试',
+                summary: testRecord.summary,
+                rating: input.strongestTalent,
+              },
+              ...nextState.diaryItems,
+            ],
+            messages: [message, ...nextState.messages],
+            messageCenterItems: [buildMessageCenterItemFromMessage(message), ...nextState.messageCenterItems],
           };
         });
       },
@@ -4018,6 +4179,7 @@ export function ParentStoreProvider({ children }: { children: ReactNode }) {
         const taskIds = templates.map(() => makeId('task'));
         setState((current) => {
           const targetTeamId = input.familyTeamId ?? getSelectedFamilyTeamId(current) ?? familyTeamId(current.selectedStudentId, input.studyDate);
+          const createdAt = nowText();
           const tasks = templates.map((template, index): FamilyTask => ({
             id: taskIds[index],
             familyTeamId: targetTeamId,
@@ -4031,7 +4193,10 @@ export function ParentStoreProvider({ children }: { children: ReactNode }) {
             requirements: clone(template.requirements).map((requirement) => ({ ...requirement, id: makeId('req') })),
             status: 'draft',
             assignedStudentIds: [],
-            createdAt: nowText(),
+            createdAt,
+            updatedAt: createdAt,
+            version: 1,
+            syncStatus: '已同步',
           }));
           return { ...current, selectedFamilyTeamId: targetTeamId, familyTasks: [...tasks, ...current.familyTasks] };
         });
@@ -4041,6 +4206,7 @@ export function ParentStoreProvider({ children }: { children: ReactNode }) {
         const taskId = makeId('task');
         setState((current) => {
           const targetTeamId = input.familyTeamId ?? getSelectedFamilyTeamId(current) ?? familyTeamId(current.selectedStudentId, input.studyDate);
+          const createdAt = nowText();
           const task: FamilyTask = {
             id: taskId,
             familyTeamId: targetTeamId,
@@ -4056,13 +4222,17 @@ export function ParentStoreProvider({ children }: { children: ReactNode }) {
               .map((requirement) => ({ id: makeId('req'), ...requirement })),
             status: 'draft',
             assignedStudentIds: [],
-            createdAt: nowText(),
+            createdAt,
+            updatedAt: createdAt,
+            version: 1,
+            syncStatus: '已同步',
           };
           return { ...current, selectedFamilyTeamId: targetTeamId, familyTasks: [task, ...current.familyTasks] };
         });
         return taskId;
       },
       updateTask(taskId, input) {
+        const updatedAt = nowText();
         setState((current) => ({
           ...current,
           familyTasks: current.familyTasks.map((task) =>
@@ -4079,6 +4249,9 @@ export function ParentStoreProvider({ children }: { children: ReactNode }) {
                   requirements: input.requirements
                     .filter((requirement) => requirement.requirement)
                     .map((requirement) => ({ id: makeId('req'), ...requirement })),
+                  updatedAt,
+                  version: (task.version ?? 1) + 1,
+                  syncStatus: task.status === 'draft' ? '已同步' : '待同步更新',
                 }
               : task,
           ),
@@ -4108,71 +4281,55 @@ export function ParentStoreProvider({ children }: { children: ReactNode }) {
         return teamId;
       },
       joinFamilyTeamFromInvite(input) {
-        let joinedStudentId = '';
+        let enrollmentId = '';
         setState((current) => {
-          const existingStudent = current.students.find((student) => student.name === input.childName);
-          const nextStudent =
-            existingStudent ??
-            createStudent(current.students, {
-              name: input.childName,
-              idNumber: `INVITE${Date.now().toString().slice(-8)}`,
-              birthday: '2016-09-01',
-              city: '深圳',
-              school: '好友家庭',
-              grade: input.grade,
-              avatar: input.childName.slice(-2),
-            });
-          joinedStudentId = nextStudent.id;
-          const nextTeam = existingStudent ? null : buildLongTermFamilyTeam(nextStudent);
-          const now = today();
-          return refreshRelationLabel({
+          const team = current.familyTeams.find((item) => item.id === input.teamId);
+          const yxbId = `INV${Date.now().toString().slice(-6)}`;
+          const createdAt = nowText();
+          const enrollment: ParentInviteEnrollment = {
+            id: makeId('invite_enroll'),
+            teamId: input.teamId,
+            inviterParentName: current.parentProfile.name,
+            invitedParentPhone: input.phone,
+            childName: input.childName,
+            grade: input.grade,
+            yxbId,
+            status: '已报名',
+            createdAt,
+          };
+          enrollmentId = enrollment.id;
+          const message: ParentMessage = {
+            id: makeId('msg'),
+            type: 'system',
+            scope: 'system',
+            title: '研学邀伴报名成功',
+            content: `${input.childName} 已通过邀伴链接报名 ${team?.name ?? '家庭研学团队'}。该学员归属好友家长账户，不会绑定到当前家长账户。`,
+            createdAt,
+            read: false,
+          };
+          return {
             ...current,
-            selectedStudentId: nextStudent.id,
             selectedFamilyTeamId: input.teamId,
-            students: existingStudent ? current.students : [...current.students, nextStudent],
-            familyTeams: [
-              ...(nextTeam ? [nextTeam] : []),
-              ...current.familyTeams.map((team) =>
-                team.id === input.teamId && !team.studentIds.includes(nextStudent.id)
-                  ? { ...team, studentIds: [...team.studentIds, nextStudent.id] }
-                  : team,
-              ),
-            ],
-            familyTasks: current.familyTasks.map((task) =>
-              task.familyTeamId === input.teamId &&
-              task.status !== 'draft' &&
-              task.studyDate >= now &&
-              !task.assignedStudentIds.includes(nextStudent.id)
-                ? { ...task, assignedStudentIds: [...task.assignedStudentIds, nextStudent.id] }
-                : task,
-            ),
-            messages: [
-              {
-                id: makeId('msg'),
-                type: 'system',
-                scope: 'system',
-                title: '研学邀伴报名成功',
-                content: `${input.childName} 已通过邀伴链接加入家庭研学团队，未来任务会自动下发。`,
-                createdAt: nowText(),
-                read: false,
-              },
-              ...current.messages,
-            ],
-          });
+            inviteEnrollments: [enrollment, ...current.inviteEnrollments],
+            messages: [message, ...current.messages],
+            messageCenterItems: [buildMessageCenterItemFromMessage(message), ...current.messageCenterItems],
+          };
         });
-        return joinedStudentId;
+        return enrollmentId;
       },
       publishTasks(taskIds, studentIds) {
         setState((current) => {
+          const syncedAt = nowText();
           const publishMessages = taskIds.map((taskId): ParentMessage => {
             const task = current.familyTasks.find((item) => item.id === taskId);
+            const isUpdate = task?.status !== 'draft';
             return {
               id: makeId('msg'),
               type: 'system',
               scope: 'system',
-              title: '家庭任务已下发',
-              content: `${task?.title ?? '家庭任务'} 已下发到 ${studentIds.length} 位学员研学宝。`,
-              createdAt: nowText(),
+              title: isUpdate ? '家庭任务更新已下发' : '家庭任务已下发',
+              content: `${task?.title ?? '家庭任务'} 已${isUpdate ? '更新' : '下发'}到 ${studentIds.length} 位学员研学宝。`,
+              createdAt: syncedAt,
               read: false,
             };
           });
@@ -4184,13 +4341,46 @@ export function ParentStoreProvider({ children }: { children: ReactNode }) {
                 ? {
                     ...task,
                     status: task.status === 'draft' ? 'published' : task.status,
-                    assignedStudentIds: studentIds,
-                    publishedAt: task.publishedAt ?? nowText(),
+                    assignedStudentIds: studentIds.length ? studentIds : task.assignedStudentIds,
+                    publishedAt: task.publishedAt ?? syncedAt,
+                    syncStatus: '已同步',
+                    lastSyncedAt: syncedAt,
                   }
                 : task,
             ),
             messages: [...publishMessages, ...current.messages],
             messageCenterItems: [...publishMessages.map(buildMessageCenterItemFromMessage), ...current.messageCenterItems],
+          };
+        });
+      },
+      syncTaskUpdates(taskIds) {
+        setState((current) => {
+          const syncedAt = nowText();
+          const syncMessages = taskIds.map((taskId): ParentMessage => {
+            const task = current.familyTasks.find((item) => item.id === taskId);
+            return {
+              id: makeId('msg'),
+              type: 'system',
+              scope: 'system',
+              title: '家庭任务资料已同步',
+              content: `${task?.title ?? '家庭任务'} 的最新内容已同步到已分配学员研学宝端。`,
+              createdAt: syncedAt,
+              read: false,
+            };
+          });
+          return {
+            ...current,
+            familyTasks: current.familyTasks.map((task) =>
+              taskIds.includes(task.id)
+                ? {
+                    ...task,
+                    syncStatus: '已同步',
+                    lastSyncedAt: syncedAt,
+                  }
+                : task,
+            ),
+            messages: [...syncMessages, ...current.messages],
+            messageCenterItems: [...syncMessages.map(buildMessageCenterItemFromMessage), ...current.messageCenterItems],
           };
         });
       },
@@ -4388,6 +4578,16 @@ export function ParentStoreProvider({ children }: { children: ReactNode }) {
               };
             }),
           };
+          const scoreMessage: ParentMessage = {
+            id: makeId('msg'),
+            type: 'system',
+            scope: 'student',
+            studentId: work.studentId,
+            title: '能力指数已提升',
+            content: `${task.title}评分完成，${adjustmentElementRecords.length} 项能力元素已更新，可查看能力提升雷达图。`,
+            createdAt: scoreRecordedAt,
+            read: false,
+          };
           return {
             ...nextState,
             familyTasks: nextState.familyTasks.map((item) => (item.id === task.id ? { ...item, status: 'scored' } : item)),
@@ -4397,6 +4597,8 @@ export function ParentStoreProvider({ children }: { children: ReactNode }) {
             portfolioGrowthRecords: [capabilityUpdateRecord, growthValueRecord, ...nextState.portfolioGrowthRecords],
             growthValueLedger: [ledgerRecord, ...nextState.growthValueLedger],
             capabilityAdjustmentRecords: [adjustmentRecord, ...nextState.capabilityAdjustmentRecords],
+            messages: [scoreMessage, ...nextState.messages],
+            messageCenterItems: [buildMessageCenterItemFromMessage(scoreMessage), ...nextState.messageCenterItems],
             diaryItems: [
               {
                 id: makeId('diary'),
@@ -4514,27 +4716,34 @@ export function ParentStoreProvider({ children }: { children: ReactNode }) {
       },
       createOrder(input) {
         const orderId = makeId('order');
-        setState((current) => ({
-          ...current,
-          orders: [
-            {
-              id: orderId,
-              type: input?.type ?? '研学宝',
-              title: input?.title ?? '研学宝智能硬件优惠订购',
-              amount: input?.amount ?? 1299,
-              status: input?.status ?? '待支付',
-              createdAt: input?.createdAt ?? nowText(),
-              studentId: input?.studentId ?? current.selectedStudentId ?? undefined,
-              productName: input?.productName ?? '研学宝 Explorer S1 家庭套装',
-              sourceLabel: input?.sourceLabel ?? '研学宝订购',
-              description: input?.description ?? '请填写收货人、收货地址和手机号码后模拟拉起支付。',
-              receiver: input?.receiver ?? current.parentProfile.name,
-              address: input?.address ?? '深圳市南山区科技园演示地址',
-              phone: input?.phone ?? current.parentProfile.phone,
-            },
-            ...current.orders,
-          ],
-        }));
+        setState((current) => {
+          const studentId = input?.studentId ?? current.selectedStudentId ?? undefined;
+          const enrollmentStudentId = input?.enrollmentStudentId ?? (input?.type && input.type !== '研学宝' ? studentId : undefined);
+          const enrollmentStudent = enrollmentStudentId ? current.students.find((student) => student.id === enrollmentStudentId) : undefined;
+          return {
+            ...current,
+            orders: [
+              {
+                id: orderId,
+                type: input?.type ?? '研学宝',
+                title: input?.title ?? '研学宝智能硬件优惠订购',
+                amount: input?.amount ?? 1299,
+                status: input?.status ?? '待支付',
+                createdAt: input?.createdAt ?? nowText(),
+                studentId,
+                productName: input?.productName ?? '研学宝 Explorer S1 家庭套装',
+                sourceLabel: input?.sourceLabel ?? '研学宝订购',
+                description: input?.description ?? '请填写收货人、收货地址和手机号码后模拟拉起支付。',
+                receiver: input?.receiver ?? current.parentProfile.name,
+                address: input?.address ?? '深圳市南山区科技园演示地址',
+                phone: input?.phone ?? current.parentProfile.phone,
+                enrollmentStudentId,
+                enrollmentStudentSnapshot: input?.enrollmentStudentSnapshot ?? buildOrderStudentSnapshot(enrollmentStudent),
+              },
+              ...current.orders,
+            ],
+          };
+        });
         return orderId;
       },
       payOrder(orderId, submitInfo) {
@@ -4542,14 +4751,24 @@ export function ParentStoreProvider({ children }: { children: ReactNode }) {
           ...current,
           orders: current.orders.map((order) =>
             order.id === orderId
-              ? {
-                  ...order,
-                  receiver: submitInfo?.receiver ?? order.receiver,
-                  address: submitInfo?.address ?? order.address,
-                  phone: submitInfo?.phone ?? order.phone,
-                  status: order.type === '团队报名' ? '已缴费' : '已支付',
-                  paidAt: nowText(),
-                }
+              ? (() => {
+                  const enrollmentStudent =
+                    submitInfo?.enrollmentStudentId
+                      ? current.students.find((student) => student.id === submitInfo.enrollmentStudentId)
+                      : order.enrollmentStudentId
+                        ? current.students.find((student) => student.id === order.enrollmentStudentId)
+                        : undefined;
+                  return {
+                    ...order,
+                    receiver: submitInfo?.receiver ?? order.receiver,
+                    address: submitInfo?.address ?? order.address,
+                    phone: submitInfo?.phone ?? order.phone,
+                    enrollmentStudentId: submitInfo?.enrollmentStudentId ?? order.enrollmentStudentId,
+                    enrollmentStudentSnapshot: buildOrderStudentSnapshot(enrollmentStudent) ?? order.enrollmentStudentSnapshot,
+                    status: order.type === '团队报名' ? '已缴费' : '已支付',
+                    paidAt: nowText(),
+                  };
+                })()
               : order,
           ),
         }));

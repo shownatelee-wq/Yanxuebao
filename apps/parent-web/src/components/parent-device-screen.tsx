@@ -293,7 +293,7 @@ export function ParentDeviceManagementScreen() {
                 <strong>研学宝智能硬件 1299 元</strong>
                 <em>订单、支付状态采用本地 mock 数据演示。</em>
               </div>
-              <Button type="primary" icon={<ShoppingOutlined />} onClick={() => store.createOrder()}>
+              <Button type="primary" icon={<ShoppingOutlined />} onClick={() => router.push('/device/ad')}>
                 立即订购
               </Button>
             </div>

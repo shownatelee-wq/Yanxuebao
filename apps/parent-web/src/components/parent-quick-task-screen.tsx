@@ -2,12 +2,12 @@
 
 import '@ant-design/v5-patch-for-react-19';
 import { CheckCircleOutlined, RocketOutlined } from '@ant-design/icons';
-import { Button, Checkbox, Form, Input, Select, message } from 'antd';
+import { Button, Checkbox, Drawer, Form, Input, Select, Tag, message } from 'antd';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { ParentRouteFallback } from './parent-route-fallback';
 import { ParentPhoneFrame, ParentSubpageShell, useParentSessionReady } from './parent-mobile-shell';
-import { CAPABILITY_ELEMENT_OPTIONS, TASK_LIBRARY, useParentStore } from '../lib/parent-store';
+import { CAPABILITY_ELEMENT_OPTIONS, TASK_LIBRARY, useParentStore, type TaskTemplate } from '../lib/parent-store';
 
 const TASK_TYPES = ['观察记录', '问答任务', '调查任务', '创作任务', '商业体验'];
 const CAPABILITY_OPTIONS = CAPABILITY_ELEMENT_OPTIONS;
@@ -18,6 +18,7 @@ export function ParentQuickTaskScreen() {
   const store = useParentStore();
   const [form] = Form.useForm();
   const [createdTaskIds, setCreatedTaskIds] = useState<string[]>([]);
+  const [previewTemplate, setPreviewTemplate] = useState<TaskTemplate | null>(null);
   const [aiPrompt, setAiPrompt] = useState('我想带孩子去深圳海洋馆做一次亲子研学，希望提升问题解决、探究能力和表达能力。');
   const [analysisText, setAnalysisText] = useState('已识别：地点/场景=深圳海洋馆；主题=海洋动物观察；能力目标=问题解决、探究能力、表达能力。');
 
@@ -166,11 +167,56 @@ export function ParentQuickTaskScreen() {
                   <em>
                     {template.base} · {template.taskType}
                   </em>
+                  <Button
+                    size="small"
+                    type="link"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setPreviewTemplate(template);
+                    }}
+                  >
+                    查看详情
+                  </Button>
                 </Checkbox>
               ))}
             </Checkbox.Group>
           </Form.Item>
         </Form>
+        <Drawer
+          title="任务详情"
+          open={Boolean(previewTemplate)}
+          onClose={() => setPreviewTemplate(null)}
+          placement="bottom"
+          height={480}
+          getContainer={false}
+          rootClassName="parent-detail-drawer"
+        >
+          {previewTemplate ? (
+            <div className="parent-detail-stack">
+              <section className="parent-detail-hero compact">
+                <span className="parent-detail-eyebrow">{previewTemplate.taskType}</span>
+                <strong>{previewTemplate.title}</strong>
+                <p>{previewTemplate.description}</p>
+                <div className="parent-detail-chip-row">
+                  <Tag>{previewTemplate.base}</Tag>
+                  <Tag>{previewTemplate.points} 分</Tag>
+                  {previewTemplate.capabilityTags.map((tag) => (
+                    <Tag key={tag}>{tag}</Tag>
+                  ))}
+                </div>
+              </section>
+              <div className="parent-card-list">
+                {previewTemplate.requirements.map((item) => (
+                  <div key={item.id} className="parent-list-card static">
+                    <span>{item.requirement}</span>
+                    <em>{item.type}</em>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </Drawer>
       </ParentSubpageShell>
     </ParentPhoneFrame>
   );

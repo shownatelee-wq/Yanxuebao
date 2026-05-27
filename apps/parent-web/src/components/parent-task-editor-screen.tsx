@@ -124,13 +124,13 @@ export function ParentTaskEditorScreen() {
         onBack={goBack}
         footer={
           <Button block type="primary" onClick={() => form.submit()}>
-            保存任务
+            {editingTask?.status === 'draft' ? '保存任务' : '保存并标记待同步'}
           </Button>
         }
       >
         <section className="parent-editor-intro">
           <strong>{editingTask ? '修改任务内容' : '创建新的家庭任务'}</strong>
-          <span>完整填写后可以返回任务页继续下发给学员。</span>
+          <span>{editingTask?.status === 'draft' ? '完整填写后可以返回任务页继续下发给学员。' : '已下发任务仍可修正，保存后回到任务页同步更新到学员研学宝。'}</span>
         </section>
 
         <Form form={form} layout="vertical" onFinish={saveTask} className="parent-editor-form">

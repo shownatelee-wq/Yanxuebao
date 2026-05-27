@@ -5,6 +5,7 @@ import {
   BookOutlined,
   DatabaseOutlined,
   LogoutOutlined,
+  PictureOutlined,
   ReadOutlined,
 } from '@ant-design/icons';
 import { Breadcrumb, Button, Layout, Menu, Typography } from 'antd';
@@ -17,6 +18,7 @@ const { Title, Text } = Typography;
 
 const items = [
   { key: '/organizations', label: <Link href="/organizations">合作机构</Link>, icon: <ApartmentOutlined /> },
+  { key: '/ads', label: <Link href="/ads">广告管理</Link>, icon: <PictureOutlined /> },
   { key: '/task-templates', label: <Link href="/task-templates">任务模板</Link>, icon: <ReadOutlined /> },
   { key: '/question-bank', label: <Link href="/question-bank">题库管理</Link>, icon: <BookOutlined /> },
   { key: '/inventory', label: <Link href="/inventory">库存管理</Link>, icon: <DatabaseOutlined /> },

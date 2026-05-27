@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { ParentRouteFallback } from './parent-route-fallback';
 import { ParentPhoneFrame, ParentSubpageShell, useParentSessionReady } from './parent-mobile-shell';
+import { ParentCapabilityImprovementList, ParentRadarCard, buildCapabilityImprovementRadarItems } from './parent-growth-ui';
 import {
   getMessageScopeLabel,
   getMessageTypeLabel,
@@ -74,6 +75,16 @@ export function ParentPortfolioWorkDetailScreen({ workId }: { workId: string }) 
   const store = useParentStore();
   const work = store.state.portfolioWorks.find((item) => item.id === workId);
   const relatedTask = work ? store.state.familyTasks.find((item) => item.id === work.taskId) : null;
+  const relatedAdjustment = work
+    ? store.state.capabilityAdjustmentRecords.find(
+        (record) =>
+          record.studentId === work.studentId &&
+          (record.sourceTitle.includes(work.taskTitle) ||
+            (relatedTask ? record.teamOrTaskName === relatedTask.title : false)),
+      )
+    : null;
+  const workStudent = work ? store.state.students.find((student) => student.id === work.studentId) ?? null : null;
+  const workImprovementItems = buildCapabilityImprovementRadarItems(workStudent?.capabilities ?? [], relatedAdjustment);
 
   if (!work) {
     return (
@@ -221,6 +232,20 @@ export function ParentPortfolioWorkDetailScreen({ workId }: { workId: string }) 
           </div>
         </div>
       </section>
+
+      {work.status === 'scored' ? (
+        <ParentRadarCard
+          title="能力提升雷达图"
+          labels={workImprovementItems.map((item) => item.elementKey)}
+          values={workImprovementItems.map((item) => item.afterIndex)}
+          compareValues={workImprovementItems.map((item) => item.beforeIndex)}
+          valueLabel="最新指数"
+          compareLabel="更新前指数"
+          summary="作品评分已回写能力元素，展示本次增长最多的能力元素。"
+        >
+          <ParentCapabilityImprovementList items={workImprovementItems} />
+        </ParentRadarCard>
+      ) : null}
     </DetailShell>
   );
 }
@@ -326,6 +351,9 @@ export function ParentPortfolioReportDetailScreen({ reportId }: { reportId: stri
   const store = useParentStore();
   const [messageApi, messageHolder] = message.useMessage();
   const report = store.state.reports.find((item) => item.id === reportId);
+  const reportStudent = report ? store.state.students.find((student) => student.id === report.studentId) ?? null : null;
+  const reportAdjustment = report ? store.state.capabilityAdjustmentRecords.find((record) => record.reportId === report.id) ?? null : null;
+  const reportImprovementItems = buildCapabilityImprovementRadarItems(reportStudent?.capabilities ?? [], reportAdjustment);
 
   if (!report) {
     return (
@@ -404,12 +432,24 @@ export function ParentPortfolioReportDetailScreen({ reportId }: { reportId: stri
               <span>{row.elementKey}</span>
               <strong>{row.latestIndex.toFixed(1)}</strong>
               <em>
-                评测 {row.score.toFixed(1)} / 平均 {row.average.toFixed(1)}
+                本次评测 {row.score.toFixed(1)} / 历史 {row.average.toFixed(1)}
               </em>
             </div>
           ))}
         </div>
       </section>
+
+      <ParentRadarCard
+        title="能力提升雷达图"
+        labels={reportImprovementItems.map((item) => item.elementKey)}
+        values={reportImprovementItems.map((item) => item.afterIndex)}
+        compareValues={reportImprovementItems.map((item) => item.beforeIndex)}
+        valueLabel="最新指数"
+        compareLabel="更新前指数"
+        summary="研学报告同步展示本次增长最多的 6 项能力元素，不足时补充高分无变化元素。"
+      >
+        <ParentCapabilityImprovementList items={reportImprovementItems} />
+      </ParentRadarCard>
     </DetailShell>
   );
 }

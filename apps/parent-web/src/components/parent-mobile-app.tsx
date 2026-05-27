@@ -25,11 +25,12 @@ import {
 } from '@ant-design/icons';
 import { Badge, Button, Carousel, Checkbox, Drawer, Empty, Form, Input, Progress, Segmented, Select, Spin, Tag, message } from 'antd';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { type CSSProperties, type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { clearSession } from '../lib/api';
 import {
   getCapabilityOverview,
   getCapabilityLevel,
+  getEnrollmentMissingFields,
   getMessageTypeLabel,
   getPortfolioAiRecordsByStudent,
   getPortfolioTimelineEntries,
@@ -40,6 +41,7 @@ import {
   TALENT_OPTIONS,
   useParentStore,
   type FamilyTask,
+  type ParentFamilyTeam,
   type ParentOrder,
   type ParentPhotoRecord,
   type ParentStudent,
@@ -107,6 +109,124 @@ function getTimelineTagColor(type: PortfolioTimelineEntry['entryType']) {
 
 function getTaskWork(task: FamilyTask, works: TaskWork[], studentId: string) {
   return works.find((work) => work.taskId === task.id && work.studentId === studentId) ?? null;
+}
+
+const QR_GRID_SIZE = 25;
+
+function createInviteQrCells(value: string) {
+  return Array.from({ length: QR_GRID_SIZE * QR_GRID_SIZE }, (_, index) => {
+    const row = Math.floor(index / QR_GRID_SIZE);
+    const column = index % QR_GRID_SIZE;
+    return shouldRenderQrModule(value, row, column) ? { row, column } : null;
+  }).filter((cell): cell is { row: number; column: number } => Boolean(cell));
+}
+
+function shouldRenderQrModule(value: string, row: number, column: number) {
+  const inFinder =
+    (row < 8 && column < 8) ||
+    (row < 8 && column >= QR_GRID_SIZE - 8) ||
+    (row >= QR_GRID_SIZE - 8 && column < 8);
+
+  if (inFinder || (row >= 10 && row <= 14 && column >= 10 && column <= 14)) {
+    return false;
+  }
+
+  const seed = value || 'yanxuebao-invite';
+  const code = seed.charCodeAt((row * 7 + column * 11) % seed.length);
+  const pattern = (code + row * row * 3 + column * column * 5 + row * column * 7) % 13;
+  return pattern === 0 || pattern === 2 || pattern === 5 || ((row + column) % 7 === 0 && pattern < 10);
+}
+
+function ParentInviteQrCode({ value }: { value: string }) {
+  return (
+    <div className="parent-invite-qr-card" aria-label="研学邀伴二维码">
+      <div className="parent-invite-qr">
+        {createInviteQrCells(value).map(({ row, column }) => (
+          <i
+            key={`${row}-${column}`}
+            style={{ gridColumnStart: column + 1, gridRowStart: row + 1 } as CSSProperties}
+          />
+        ))}
+        <span className="parent-invite-qr-finder top-left" />
+        <span className="parent-invite-qr-finder top-right" />
+        <span className="parent-invite-qr-finder bottom-left" />
+        <strong>研</strong>
+      </div>
+    </div>
+  );
+}
+
+function escapeSvgText(value: string) {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function wrapSvgText(value: string, maxLength: number) {
+  const chars = Array.from(value);
+  const lines: string[] = [];
+  for (let index = 0; index < chars.length; index += maxLength) {
+    lines.push(chars.slice(index, index + maxLength).join(''));
+  }
+  return lines.slice(0, 3);
+}
+
+function renderInvitePosterQr(value: string, x: number, y: number, size: number) {
+  const moduleSize = size / QR_GRID_SIZE;
+  const modules = createInviteQrCells(value)
+    .map(({ row, column }) => `<rect x="${x + column * moduleSize}" y="${y + row * moduleSize}" width="${moduleSize * 0.82}" height="${moduleSize * 0.82}" rx="1.5" fill="#101828" />`)
+    .join('');
+  const finderSize = moduleSize * 7;
+  const finderInner = finderSize * 0.36;
+  const finders = [
+    [x, y],
+    [x + size - finderSize, y],
+    [x, y + size - finderSize],
+  ]
+    .map(
+      ([left, top]) => `
+        <rect x="${left}" y="${top}" width="${finderSize}" height="${finderSize}" rx="8" fill="#fff" stroke="#101828" stroke-width="12" />
+        <rect x="${left + finderSize / 2 - finderInner / 2}" y="${top + finderSize / 2 - finderInner / 2}" width="${finderInner}" height="${finderInner}" rx="4" fill="#101828" />
+      `,
+    )
+    .join('');
+
+  return `
+    <rect x="${x - 20}" y="${y - 20}" width="${size + 40}" height="${size + 40}" rx="26" fill="#fff" stroke="#dbe7e6" />
+    ${modules}
+    ${finders}
+    <circle cx="${x + size / 2}" cy="${y + size / 2}" r="32" fill="#0f8f88" stroke="#fff" stroke-width="8" />
+    <text x="${x + size / 2}" y="${y + size / 2 + 11}" text-anchor="middle" font-size="30" font-weight="900" fill="#fff">研</text>
+  `;
+}
+
+function buildInvitePosterImage(input: { team: ParentFamilyTeam; parentName: string; inviteUrl: string }) {
+  const goalLines = wrapSvgText(input.team.goal, 18);
+  const goalTspans = goalLines
+    .map((line, index) => `<tspan x="72" dy="${index === 0 ? 0 : 34}">${escapeSvgText(line)}</tspan>`)
+    .join('');
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="720" height="1060" viewBox="0 0 720 1060">
+      <defs>
+        <linearGradient id="inviteBg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#0f8f88" />
+          <stop offset="1" stop-color="#315f9b" />
+        </linearGradient>
+      </defs>
+      <rect width="720" height="1060" rx="44" fill="#f6fbfa" />
+      <rect x="40" y="40" width="640" height="410" rx="34" fill="url(#inviteBg)" />
+      <text x="72" y="116" font-size="28" font-weight="800" fill="rgba(255,255,255,0.82)">研学宝邀伴</text>
+      <text x="72" y="184" font-size="46" font-weight="900" fill="#fff">${escapeSvgText(input.team.name)}</text>
+      <text x="72" y="242" font-size="28" font-weight="700" fill="rgba(255,255,255,0.9)">${escapeSvgText(input.parentName)} 邀请你加入</text>
+      <text x="72" y="314" font-size="30" font-weight="850" fill="#fff">${escapeSvgText(input.team.theme)}</text>
+      <text x="72" y="374" font-size="24" fill="rgba(255,255,255,0.9)">${escapeSvgText(input.team.location)} · ${escapeSvgText(input.team.studyDate)}</text>
+      <rect x="72" y="480" width="576" height="188" rx="28" fill="#fff" />
+      <text x="72" y="532" font-size="24" font-weight="850" fill="#0f766e">研学目标</text>
+      <text y="585" font-size="26" font-weight="700" fill="#344054">${goalTspans}</text>
+      ${renderInvitePosterQr(input.inviteUrl, 250, 710, 220)}
+      <text x="360" y="976" text-anchor="middle" font-size="26" font-weight="850" fill="#101828">扫码查看团队信息并为孩子报名</text>
+      <text x="360" y="1018" text-anchor="middle" font-size="22" fill="#667085">${escapeSvgText(input.inviteUrl)}</text>
+    </svg>
+  `;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
 function getTaskStatusLabel(status: FamilyTask['status']) {
@@ -253,6 +373,7 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
   const [selectedOrder, setSelectedOrder] = useState<ParentOrder | null>(null);
   const [homeOrderTab, setHomeOrderTab] = useState<HomeOrderTab>('全部');
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [invitePosterUrl, setInvitePosterUrl] = useState('');
   const [teamOpen, setTeamOpen] = useState(false);
   const [selectedTaskDetail, setSelectedTaskDetail] = useState<FamilyTask | null>(null);
   const [editingMedia, setEditingMedia] = useState<{ kind: 'photo' | 'achievement'; id: string } | null>(null);
@@ -264,6 +385,7 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
   const flash = searchParams.get('flash');
   const studentIdParam = searchParams.get('studentId');
   const selectTaskId = searchParams.get('selectTaskId');
+  const orderIdParam = searchParams.get('orderId');
   const portfolioPanelParam = searchParams.get('panel');
   const growthFocusParam = searchParams.get('focus');
 
@@ -317,11 +439,27 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
     router.replace('/family-tasks');
   }, [flash, messageApi, router, selectTaskId]);
 
+  useEffect(() => {
+    if (!orderIdParam) {
+      return;
+    }
+    const order = state.orders.find((item) => item.id === orderIdParam);
+    if (order) {
+      setSelectedOrder(order);
+      router.replace('/home');
+    }
+  }, [orderIdParam, router, state.orders]);
+
   const selectedStudentId = selectedStudent?.id ?? '';
   const selectedFamilyTeam = useMemo(
     () => state.familyTeams.find((team) => team.id === state.selectedFamilyTeamId) ?? state.familyTeams[0] ?? null,
     [state.familyTeams, state.selectedFamilyTeamId],
   );
+
+  useEffect(() => {
+    setInvitePosterUrl('');
+  }, [selectedFamilyTeam?.id]);
+
   const tasksForStudent = useMemo(() => {
     const activeTeamId = selectedFamilyTeam?.id;
     if (!selectedStudentId) {
@@ -394,35 +532,7 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
   const shouldShowStudentContext = activeTab !== 'me' && Boolean(selectedStudent);
 
   function openDeviceOrder() {
-    const createdAt = formatDate(new Date().toISOString());
-    const orderId = store.createOrder({
-      type: '研学宝',
-      title: '研学宝智能硬件家庭套装',
-      amount: 1299,
-      status: '待支付',
-      createdAt,
-      productName: '研学宝 Explorer S1 家庭套装',
-      sourceLabel: '研学宝订购',
-      description: '确认套装功能后填写收货人、地址和手机号码，再模拟提交订单并支付。',
-      receiver: state.parentProfile.name,
-      address: '',
-      phone: state.parentProfile.phone,
-    });
-    setSelectedOrder({
-      id: orderId,
-      type: '研学宝',
-      title: '研学宝智能硬件家庭套装',
-      amount: 1299,
-      status: '待支付',
-      createdAt,
-      studentId: selectedStudentId ?? undefined,
-      productName: '研学宝 Explorer S1 家庭套装',
-      sourceLabel: '研学宝订购',
-      description: '确认套装功能后填写收货人、地址和手机号码，再模拟提交订单并支付。',
-      receiver: state.parentProfile.name,
-      address: '',
-      phone: state.parentProfile.phone,
-    });
+    router.push('/device/ad');
   }
 
   useEffect(() => {
@@ -624,6 +734,9 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
               <Button size="small" onClick={() => router.push('/me/students')}>
                 学员管理
               </Button>
+              <Button size="small" onClick={() => router.push('/growth/talent-test')}>
+                天赋测试
+              </Button>
               <Button size="small" type="primary" icon={<RadarChartOutlined />} onClick={() => router.push('/growth/assessment')}>
                 家长评测
               </Button>
@@ -766,6 +879,10 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
               <RocketOutlined />
               AI 创建
             </button>
+            <button type="button" onClick={() => router.push('/growth/path')}>
+              <RadarChartOutlined />
+              成长路径
+            </button>
             <button type="button" onClick={() => navigate('portfolio')}>
               <ReadOutlined />
               成长日记
@@ -865,6 +982,12 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
           </div>
 
           <div className="parent-growth-summary-actions">
+            <Button icon={<RocketOutlined />} onClick={() => router.push('/growth/path')}>
+              个性化成长路径
+            </Button>
+            <Button icon={<StarOutlined />} onClick={() => router.push('/growth/talent-test')}>
+              免费天赋测试
+            </Button>
             <Button type="primary" icon={<RadarChartOutlined />} onClick={() => router.push('/growth/assessment')}>
               家长评测
             </Button>
@@ -1338,18 +1461,32 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
                           <Tag>{task.base}</Tag>
                           <Tag>{task.studyDate}</Tag>
                           {task.publishedAt ? <Tag>下发 {formatDate(task.publishedAt)}</Tag> : null}
+                          {task.version && task.version > 1 ? <Tag>v{task.version}</Tag> : null}
+                          {task.syncStatus === '待同步更新' ? <Tag color="gold">待同步更新</Tag> : null}
                           <Tag>{task.points} 分</Tag>
                           {task.capabilityTags.slice(0, 2).map((tag) => (
                             <Tag key={tag}>{tag}</Tag>
                           ))}
                         </div>
                         <div className="parent-action-row compact">
-                          <Button size="small" onClick={() => router.push(`/family-tasks/editor?taskId=${task.id}`)} disabled={task.status !== 'draft'}>
+                          <Button size="small" onClick={() => router.push(`/family-tasks/editor?taskId=${task.id}`)}>
                             编辑
                           </Button>
                           <Button size="small" onClick={() => setSelectedTaskDetail(task)}>
                             详情
                           </Button>
+                          {task.syncStatus === '待同步更新' ? (
+                            <Button
+                              size="small"
+                              type="primary"
+                              onClick={() => {
+                                store.syncTaskUpdates([task.id]);
+                                messageApi.success('任务更新已同步到研学宝');
+                              }}
+                            >
+                              同步更新
+                            </Button>
+                          ) : null}
                           {task.status === 'published' ? (
                             <Button size="small" type="primary" onClick={() => store.syncDeviceWork(task.id, selectedStudent.id)}>
                               同步设备作品
@@ -1705,7 +1842,21 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
   }
 
   const activeTitle = TAB_ITEMS.find((item) => item.key === activeTab)?.label ?? (activeTab === 'me' ? '我的' : '首页');
-  const drawerOrder = selectedOrder ? state.orders.find((order) => order.id === selectedOrder.id) ?? selectedOrder : null;
+  const persistedDrawerOrder = selectedOrder ? state.orders.find((order) => order.id === selectedOrder.id) ?? null : null;
+  const drawerOrder = selectedOrder
+    ? persistedDrawerOrder
+      ? {
+          ...persistedDrawerOrder,
+          enrollmentStudentId: selectedOrder.enrollmentStudentId ?? persistedDrawerOrder.enrollmentStudentId,
+        }
+      : selectedOrder
+    : null;
+  const selectedInviteUrl = selectedFamilyTeam ? `/invite/${selectedFamilyTeam.id}` : '';
+  const drawerOrderEnrollmentStudentId = drawerOrder?.enrollmentStudentId ?? drawerOrder?.studentId ?? selectedStudentId;
+  const drawerOrderStudent = drawerOrderEnrollmentStudentId
+    ? state.students.find((student) => student.id === drawerOrderEnrollmentStudentId) ?? null
+    : null;
+  const drawerOrderMissingFields = drawerOrder && drawerOrder.type !== '研学宝' ? getEnrollmentMissingFields(drawerOrderStudent) : [];
   const editingMediaRecord =
     editingMedia?.kind === 'photo'
       ? state.portfolioPhotos.find((record) => record.id === editingMedia.id)
@@ -1918,7 +2069,7 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
         open={Boolean(drawerOrder)}
         onClose={() => setSelectedOrder(null)}
         placement="bottom"
-        height={drawerOrder?.type === '研学宝' ? 680 : 560}
+        height={drawerOrder?.type === '研学宝' ? 680 : 720}
         getContainer={false}
         rootClassName="parent-detail-drawer"
       >
@@ -1955,21 +2106,72 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
                 <em>{drawerOrder.phone ?? state.parentProfile.phone}</em>
               </div>
             </div>
+            {drawerOrder.type !== '研学宝' ? (
+              <section className="parent-order-student-panel">
+                <div className="parent-section-head">
+                  <strong>报名学员信息</strong>
+                  <span>{drawerOrderMissingFields.length ? `缺 ${drawerOrderMissingFields.length} 项` : '资料完整'}</span>
+                </div>
+                {drawerOrderStudent ? (
+                  <div className="parent-mini-table">
+                    <div>
+                      <span>学员</span>
+                      <strong>{drawerOrderStudent.name}</strong>
+                      <em>研学宝 ID {drawerOrderStudent.yxbId}</em>
+                    </div>
+                    <div>
+                      <span>证件/生日</span>
+                      <strong>{drawerOrderStudent.idNumber || '待补充'}</strong>
+                      <em>{drawerOrderStudent.birthday || '生日待补充'} · {drawerOrderStudent.age} 岁</em>
+                    </div>
+                    <div>
+                      <span>学校年级</span>
+                      <strong>{drawerOrderStudent.school || '学校待补充'}</strong>
+                      <em>{drawerOrderStudent.grade || '年级待补充'} · {drawerOrderStudent.city || '城市待补充'}</em>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="parent-empty-line">请先选择报名学员</div>
+                )}
+                {drawerOrderMissingFields.length ? (
+                  <div className="parent-warning-line">
+                    <span>缺少：{drawerOrderMissingFields.join('、')}</span>
+                    <Button size="small" onClick={() => router.push(drawerOrderStudent ? `/me/students/editor?studentId=${drawerOrderStudent.id}` : '/me/students/editor')}>
+                      快捷编辑
+                    </Button>
+                  </div>
+                ) : null}
+              </section>
+            ) : null}
             {drawerOrder.status === '待支付' || drawerOrder.status === '待缴费' || drawerOrder.status === '未查看' || drawerOrder.status === '未处理' ? (
               <Form
                 key={`order-submit-${drawerOrder.id}-${drawerOrder.status}`}
                 layout="vertical"
                 className="parent-order-submit-form"
                 initialValues={{
+                  enrollmentStudentId: drawerOrderEnrollmentStudentId || undefined,
                   receiver: drawerOrder.receiver ?? state.parentProfile.name,
                   address: drawerOrder.address ?? '',
                   phone: drawerOrder.phone ?? state.parentProfile.phone,
                 }}
-                onFinish={(values: Pick<ParentOrder, 'receiver' | 'address' | 'phone'>) => {
+                onFinish={(values: Pick<ParentOrder, 'receiver' | 'address' | 'phone' | 'enrollmentStudentId'>) => {
+                  if (drawerOrder.type !== '研学宝' && drawerOrderMissingFields.length) {
+                    messageApi.warning('请先补全报名学员信息');
+                    return;
+                  }
                   store.payOrder(drawerOrder.id, values);
                   messageApi.success(drawerOrder.type === '团队报名' ? '已完成报名缴费' : '已提交订单并模拟支付成功');
                 }}
               >
+                {drawerOrder.type !== '研学宝' ? (
+                  <Form.Item name="enrollmentStudentId" label="选择报名学员" rules={[{ required: true, message: '请选择报名学员' }]}>
+                    <Select
+                      size="large"
+                      options={state.students.map((student) => ({ label: `${student.name} · ${student.yxbId}`, value: student.id }))}
+                      onChange={(value) => setSelectedOrder({ ...drawerOrder, enrollmentStudentId: value })}
+                    />
+                  </Form.Item>
+                ) : null}
                 <Form.Item
                   name="receiver"
                   label={drawerOrder.type === '研学宝' ? '收货人' : '联系人'}
@@ -2024,6 +2226,8 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
                 <Tag>{selectedTaskDetail.base}</Tag>
                 <Tag>{selectedTaskDetail.studyDate}</Tag>
                 <Tag>{selectedTaskDetail.points} 分</Tag>
+                {selectedTaskDetail.version ? <Tag>版本 v{selectedTaskDetail.version}</Tag> : null}
+                {selectedTaskDetail.syncStatus ? <Tag color={selectedTaskDetail.syncStatus === '已同步' ? 'green' : 'gold'}>{selectedTaskDetail.syncStatus}</Tag> : null}
               </div>
             </section>
             <div className="parent-card-list">
@@ -2046,36 +2250,67 @@ export function ParentMobileApp({ initialTab }: { initialTab: ParentTabKey }) {
         height={520}
         getContainer={false}
         rootClassName="parent-detail-drawer"
+        footer={
+          selectedFamilyTeam ? (
+            <div className="parent-invite-drawer-footer">
+              <Button block type="primary" size="large" onClick={() => router.push(selectedInviteUrl)}>
+                查看好友报名页
+              </Button>
+            </div>
+          ) : null
+        }
       >
         {selectedFamilyTeam ? (
           <div className="parent-detail-stack">
             <section className="parent-invite-card">
               <strong>{selectedFamilyTeam.name}</strong>
-              <span>{selectedFamilyTeam.theme}</span>
+              <span>{state.parentProfile.name} 邀请好友加入 {selectedFamilyTeam.theme}</span>
               <em>邀伴码 {selectedFamilyTeam.inviteCode}</em>
             </section>
-            <Form
-              layout="vertical"
-              initialValues={{ childName: '好友孩子', grade: selectedStudent?.grade ?? '五年级', phone: '13900000009' }}
-              onFinish={(values: { childName: string; grade: string; phone: string }) => {
-                store.joinFamilyTeamFromInvite({ teamId: selectedFamilyTeam.id, ...values });
-                setInviteOpen(false);
-                messageApi.success('好友报名成功，未来任务已自动同步');
-              }}
-            >
-              <Form.Item name="childName" label="报名孩子姓名" rules={[{ required: true, message: '请输入孩子姓名' }]}>
-                <Input />
-              </Form.Item>
-              <Form.Item name="grade" label="年级">
-                <Input />
-              </Form.Item>
-              <Form.Item name="phone" label="家长手机号">
-                <Input />
-              </Form.Item>
-              <Button block type="primary" htmlType="submit">
-                模拟好友报名
+            <section className="parent-invite-poster-card">
+              <div className="parent-invite-poster-copy">
+                <span>邀请图片预览</span>
+                <strong>加入 {selectedFamilyTeam.name} 研学活动</strong>
+                <em>{selectedFamilyTeam.location} · {selectedFamilyTeam.studyDate}</em>
+                <p>好友扫码或打开链接后，可查看团队信息、研学任务并为孩子报名。</p>
+              </div>
+              <ParentInviteQrCode value={selectedInviteUrl} />
+            </section>
+            <div className="parent-action-row compact">
+              <Button
+                size="small"
+                onClick={() => {
+                  setInvitePosterUrl(
+                    buildInvitePosterImage({
+                      team: selectedFamilyTeam,
+                      parentName: state.parentProfile.name,
+                      inviteUrl: selectedInviteUrl,
+                    }),
+                  );
+                  messageApi.success('邀请图片已生成');
+                }}
+              >
+                生成邀请图片
               </Button>
-            </Form>
+              <Button size="small" type="primary" onClick={() => messageApi.success(`已复制小程序链接 ${selectedInviteUrl}`)}>
+                分享链接
+              </Button>
+            </div>
+            {invitePosterUrl ? (
+              <section className="parent-invite-generated-card">
+                <div className="parent-section-head compact">
+                  <strong>已生成邀请图片</strong>
+                  <a href={invitePosterUrl} download={`${selectedFamilyTeam.inviteCode}-invite.svg`}>
+                    保存图片
+                  </a>
+                </div>
+                <object data={invitePosterUrl} type="image/svg+xml" aria-label={`${selectedFamilyTeam.name} 邀请图片`} />
+              </section>
+            ) : null}
+            <section className="parent-invite-flow-card">
+              <strong>邀伴查看及报名流程</strong>
+              <span>好友点击分享链接后进入公开邀伴页，授权手机号后可查看研学主题、地点、日期、目标和任务，再提交孩子报名信息；报名暂不涉及费用支付。</span>
+            </section>
           </div>
         ) : null}
       </Drawer>

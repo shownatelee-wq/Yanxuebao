@@ -294,7 +294,7 @@ export function ParentAssessmentRecordCard({
           <span key={`${item.elementKey}_${item.dimensionLabel ?? index}`}>
             {item.dimensionLabel ?? item.elementKey}
             <em>
-              {item.beforeIndex.toFixed(1)} → {item.afterIndex.toFixed(1)}
+              历史 {item.beforeIndex.toFixed(1)} / 本次评测 {item.assessmentValue.toFixed(1)} / 调整后 {item.afterIndex.toFixed(1)}
             </em>
           </span>
         ))}
